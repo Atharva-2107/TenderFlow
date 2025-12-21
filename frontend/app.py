@@ -11,8 +11,8 @@ st.set_page_config(
 )
 
 # Replace these with your actual Supabase credentials
-SUPABASE_URL = "YOUR_SUPABASE_URL"
-SUPABASE_KEY = "YOUR_SUPABASE_ANON_KEY"
+SUPABASE_URL = "https://jaleiquogmqgvwqmdnqa.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImphbGVpcXVvZ21xZ3Z3cW1kbnFhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYxNDcxMDIsImV4cCI6MjA4MTcyMzEwMn0.ClymJSijiioTMDVlOX1sc_lsxaMVYO62Hpd7nLCi0kU"
 
 # Initialize Supabase Client
 @st.cache_resource

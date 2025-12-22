@@ -10,7 +10,6 @@ st.set_page_config(
     layout="wide"
 )
 
-# Replace these with your actual Supabase credentials
 SUPABASE_URL = "https://jaleiquogmqgvwqmdnqa.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImphbGVpcXVvZ21xZ3Z3cW1kbnFhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYxNDcxMDIsImV4cCI6MjA4MTcyMzEwMn0.ClymJSijiioTMDVlOX1sc_lsxaMVYO62Hpd7nLCi0kU"
 
@@ -31,6 +30,16 @@ if 'access_token' not in st.session_state:
     st.session_state.access_token = ""
 
 # --- 3. AUTHENTICATION FUNCTIONS ---
+def signup_user(email, password):
+    try:
+        supabase.auth.sign_up({
+            "email": email,
+            "password": password
+        })
+        st.success("Signup successful! You can now log in.")
+    except Exception as e:
+        st.error(f"Signup failed: {str(e)}")
+
 def login_user(email, password):
     try:
         response = supabase.auth.sign_in_with_password({"email": email, "password": password})
@@ -58,8 +67,15 @@ if not st.session_state.logged_in:
         with col1:
             email = st.text_input("Email Address")
             password = st.text_input("Password", type="password")
-            if st.button("Login", type="primary", use_container_width=True):
-                login_user(email, password)
+            col_login, col_signup = st.columns(2)
+            
+            with col_login:
+                if st.button("Login", type="primary", use_container_width=True):
+                    login_user(email, password)
+
+            with col_signup:
+                if st.button("Sign Up", use_container_width=True):
+                    signup_user(email, password)
         
         with col2:
             st.info("Don't have an account? Contact your administrator or sign up via the Supabase dashboard.")

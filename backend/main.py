@@ -1,11 +1,18 @@
 from fastapi import FastAPI
 from supabase import create_client, Client
+import os
+from dotenv import load_dotenv
+
+# 1. Load the secrets from the .env file into your computer's memory
+load_dotenv()
+
+# 2. Assign them to variables
+# The names inside the quotes MUST match exactly what you wrote in your .env file
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+LLAMA_KEY = os.getenv("LLAMAPARSE_CLOUD_API_KEY")
 
 app = FastAPI()
-
-# 1. Go to Supabase > Settings > API to find these:
-URL = "https://jaleiquogmqgvwqmdnqa.supabase.co"
-KEY = "sb_publishable_y-hBU82kEJcHz8wRszfhjw_YKF23_tj"
 
 # 2. Connect to the database
 supabase: Client = create_client(URL, KEY)

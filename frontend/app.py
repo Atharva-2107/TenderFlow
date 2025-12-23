@@ -2,6 +2,17 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from supabase import create_client, Client
+import os
+from dotenv import load_dotenv
+
+# 1. Load the secrets from the .env file into your computer's memory
+load_dotenv()
+
+# 2. Assign them to variables
+# The names inside the quotes MUST match exactly what you wrote in your .env file
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+LLAMA_KEY = os.getenv("LLAMAPARSE_CLOUD_API_KEY")
 
 # --- 1. SETUP & CONFIG ---
 st.set_page_config(
@@ -9,9 +20,6 @@ st.set_page_config(
     page_icon="🌊",
     layout="wide"
 )
-
-SUPABASE_URL = "https://jaleiquogmqgvwqmdnqa.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImphbGVpcXVvZ21xZ3Z3cW1kbnFhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYxNDcxMDIsImV4cCI6MjA4MTcyMzEwMn0.ClymJSijiioTMDVlOX1sc_lsxaMVYO62Hpd7nLCi0kU"
 
 # Initialize Supabase Client
 @st.cache_resource

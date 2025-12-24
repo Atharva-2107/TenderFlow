@@ -1,7 +1,5 @@
 import streamlit as st
-<<<<<<< HEAD
 from pages.introductory_page import intro_page
-=======
 import pandas as pd
 import plotly.express as px
 from supabase import create_client, Client
@@ -16,7 +14,7 @@ load_dotenv()
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 LLAMA_KEY = os.getenv("LLAMAPARSE_CLOUD_API_KEY")
->>>>>>> 707901b828b74bca5cd53fefe229ed4374bb625d
+
 
 st.set_page_config(
     page_title="TenderFlow",
@@ -24,16 +22,13 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-<<<<<<< HEAD
 if "page" not in st.session_state:
     st.session_state.page = "intro"
 
-=======
 # Initialize Supabase Client
 @st.cache_resource
 def get_supabase():
     return create_client(SUPABASE_URL, SUPABASE_KEY)
->>>>>>> 707901b828b74bca5cd53fefe229ed4374bb625d
 
 if st.session_state.page == "intro":
     intro_page()

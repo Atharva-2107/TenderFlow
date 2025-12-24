@@ -18,7 +18,8 @@ load_dotenv(env_path)
 # Fetch Keys from Environment
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-API_URL = "http://127.0.0.1:8000"
+LLAMA_KEY = os.getenv("LLAMAPARSE_CLOUD_API_KEY")
+
 
 st.set_page_config(
     page_title="TenderFlow",

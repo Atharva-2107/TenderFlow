@@ -15,7 +15,7 @@ LLAMA_KEY = os.getenv("LLAMAPARSE_CLOUD_API_KEY")
 app = FastAPI()
 
 # 2. Connect to the database
-supabase: Client = create_client(URL, KEY)
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 @app.get("/")
 def home():

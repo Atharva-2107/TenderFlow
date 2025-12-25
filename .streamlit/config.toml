@@ -1,0 +1,7 @@
+[server]
+# This makes Streamlit check for file changes every time you save
+runOnSave = true
+
+[browser]
+# This gathers usage statistics (optional, set to false for privacy)
+gatherUsageStats = false

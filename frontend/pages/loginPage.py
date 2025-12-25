@@ -66,13 +66,13 @@ def local_css():
         
         .login-box::before {
             content: '';
-            position: absolute;
+            position:absolute;
             top: 0;
             left: 0;
             right: 0;
             height: 6px;
             background: linear-gradient(90deg, #667eea, #764ba2, #f093fb);
-            background-size: 200% 100%;
+            background-size: 500% 500%;
             animation: shimmer 3s linear infinite;
         }
         
@@ -115,7 +115,7 @@ def local_css():
         }
         
         .brand-subtitle {
-            color: #64748b;
+            color: #1C4D8D;
             font-size: 14px;
             font-weight: 500;
             margin-top: 8px;

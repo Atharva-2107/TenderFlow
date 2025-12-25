@@ -67,17 +67,17 @@ if token and not st.session_state.authenticated and supabase:
         cookie_manager.delete("tf_access_token")
 
 # --- 4. AUTHENTICATION LOGIC ---
-def login_user(email, password):
-    try:
-        res = supabase.auth.sign_in_with_password({"email": email, "password": password})
-        st.session_state.authenticated = True
-        st.session_state.user = res.user
-        # Save token to browser (expires in 7 days)
-        cookie_manager.set("tf_access_token", res.session.access_token, key="login_cookie")
-        st.session_state.page = "dashboard"
-        st.rerun()
-    except Exception as e:
-        st.error(f"Login failed: {str(e)}")
+# def login_user(email, password):
+#     try:
+#         res = supabase.auth.sign_in_with_password({"email": email, "password": password})
+#         st.session_state.authenticated = True
+#         st.session_state.user = res.user
+#         # Save token to browser (expires in 7 days)
+#         cookie_manager.set("tf_access_token", res.session.access_token, key="login_cookie")
+#         st.session_state.page = "dashboard"
+#         st.rerun()
+#     except Exception as e:
+#         st.error(f"Login failed: {str(e)}")
 
 def logout_user():
     if supabase:
@@ -96,19 +96,20 @@ if st.session_state.page == "intro":
 
 # 2. Login Page
 elif st.session_state.page == "login":
-    st.title("🔐 Login to TenderFlow")
-    with st.form("login_form"):
-        email = st.text_input("Email")
-        password = st.text_input("Password", type="password")
-        if st.form_submit_button("Sign In", type="primary"):
-            login_user(email, password)
+    st.switch_page("pages/loginPage.py")
+    # st.title("🔐 Login to TenderFlow")
+    # with st.form("login_form"):
+    #     email = st.text_input("Email")
+    #     password = st.text_input("Password", type="password")
+    #     if st.form_submit_button("Sign In", type="primary"):
+    #         login_user(email, password)
     
-    if st.button("Don't have an account? Sign Up"):
-        st.session_state.page = "signup"
-        st.rerun()
-    if st.button("← Back to Intro"):
-        st.session_state.page = "intro"
-        st.rerun()
+    # if st.button("Don't have an account? Sign Up"):
+    #     st.session_state.page = "signup"
+    #     st.rerun()
+    # if st.button("← Back to Intro"):
+    #     st.session_state.page = "intro"
+    #     st.rerun()
 
 # 3. Sign Up Page
 elif st.session_state.page == "signup":

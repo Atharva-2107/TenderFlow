@@ -9,6 +9,7 @@ from supabase import create_client, Client
 # --- 1. IMPORT YOUR CUSTOM PAGES ---
 # This looks into your pages folder and grabs the intro_page function
 from pages.introductory_page import intro_page
+import extra_streamlit_components as stx
 
 # --- 2. INITIALIZATION & SECRETS ---
 # Load secrets from the root folder
@@ -19,7 +20,7 @@ load_dotenv(env_path)
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 LLAMA_KEY = os.getenv("LLAMAPARSE_CLOUD_API_KEY")
-
+API_URL = "http://127.0.0.1:8000"
 
 st.set_page_config(
     page_title="TenderFlow",
@@ -27,6 +28,12 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed"
 )
+
+# Initialize Cookie Manager for "Stay Logged In"
+def get_cookie_manager():
+    return stx.CookieManager()
+
+cookie_manager = get_cookie_manager()
 
 # Initialize Supabase Client
 @st.cache_resource
@@ -38,13 +45,26 @@ def get_supabase():
 
 supabase = get_supabase()
 
-# --- 3. SESSION STATE MANAGEMENT ---
+# --- 2. SESSION STATE MANAGEMENT ---
 if 'page' not in st.session_state:
-    st.session_state.page = "intro"
+    st.session_state.page = "intro" # Default starting page
 if 'authenticated' not in st.session_state:
     st.session_state.authenticated = False
 if 'user' not in st.session_state:
     st.session_state.user = None
+
+
+# Attempt to recover session from cookies on startup
+token = cookie_manager.get(cookie="tf_access_token")
+if token and not st.session_state.authenticated and supabase:
+    try:
+        # Recover session using the token
+        res = supabase.auth.set_session(token, token)
+        st.session_state.authenticated = True
+        st.session_state.user = res.user
+        st.session_state.page = "dashboard" # Jump to dashboard if cookie found
+    except:
+        cookie_manager.delete("tf_access_token")
 
 # --- 4. AUTHENTICATION LOGIC ---
 def login_user(email, password):
@@ -52,6 +72,8 @@ def login_user(email, password):
         res = supabase.auth.sign_in_with_password({"email": email, "password": password})
         st.session_state.authenticated = True
         st.session_state.user = res.user
+        # Save token to browser (expires in 7 days)
+        cookie_manager.set("tf_access_token", res.session.access_token, key="login_cookie")
         st.session_state.page = "dashboard"
         st.rerun()
     except Exception as e:
@@ -63,6 +85,7 @@ def logout_user():
     st.session_state.authenticated = False
     st.session_state.user = None
     st.session_state.page = "intro"
+    cookie_manager.delete("tf_access_token", key="logout_cookie")
     st.rerun()
 
 # --- 5. ROUTING LOGIC ---

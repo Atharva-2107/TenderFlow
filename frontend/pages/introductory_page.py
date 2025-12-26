@@ -31,7 +31,7 @@ def intro_page():
         #MainMenu {{visibility: hidden;}}
 
         .stApp {{
-            background:linear-gradient(rgba(11, 17, 23, 0.85), rgba(11, 17, 23, 0.95)), {bg_css};
+            background:radial-gradient(circle at 20% 30%, #1a1c4b 0%, #0f111a 100%);
             background-size: cover;
             background-position: center;
             background-attachment: fixed;

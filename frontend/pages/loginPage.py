@@ -16,18 +16,37 @@ def inject_exact_brand_theme():
         /* Left Side Mesh Gradient */
         .stApp::before {
             content: ""; position: fixed; top: 0; left: 0; width: 50vw; height: 100vh;
-            background: linear-gradient(rgba(11, 17, 23, 0.85), rgba(11, 17, 23, 0.95));
+            background: radial-gradient(circle at 20% 30%, #1a1c4b 0%, #0f111a 100%);
             border-right: 1px solid rgba(255, 255, 255, 0.05); z-index: 0;
         }
 
-        /* Ghost Input Styling */
+        /* --- UPDATED INPUT STYLING --- */
         div[data-baseweb="input"] {
-            background-color: transparent !important; border: none !important;
-            border-bottom: 1.5px solid #2d313e !important; border-radius: 0px !important;
-            padding: 10px 0px !important; margin-bottom: 10px;
+            background-color: rgba(255, 255, 255, 0.03) !important; 
+            border: 1px solid #2d313e !important; 
+            border-radius: 8px !important;
+            padding: 8px 12px !important; 
+            transition: all 0.3s ease-in-out !important;
         }
-        div[data-baseweb="input"]:focus-within { border-bottom: 1.5px solid #a855f7 !important; }
-        input { color: #ffffff !important; font-size: 16px !important; }
+        
+        /* Focus state with glow */
+        div[data-baseweb="input"]:focus-within { 
+            border: 1px solid #a855f7 !important; 
+            box-shadow: 0 0 15px rgba(168, 85, 247, 0.2) !important;
+            background-color: rgba(168, 85, 247, 0.05) !important;
+        }
+        
+        input { 
+            color: #ffffff !important; 
+            font-size: 15px !important; 
+            font-weight: 400 !important;
+        }
+        
+        /* Placeholder styling */
+        input::placeholder {
+            color: #4b5563 !important;
+            opacity: 1;
+        }
 
         /* CENTERED BUTTON */
         div.stButton { display: flex; justify-content: center; width: 100%; margin-top: 30px; }
@@ -36,17 +55,22 @@ def inject_exact_brand_theme():
             color: white !important; border-radius: 50px !important;
             padding: 14px 60px !important; font-weight: 700 !important;
             width: auto !important; min-width: 240px; border: none !important;
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
+        }
+        button[kind="primary"]:hover {
+            box-shadow: 0 6px 20px rgba(168, 85, 247, 0.4);
+            transform: translateY(-1px);
         }
 
         /* IMAGE AND TEXT GAP FIX */
         [data-testid="stImage"] {
             display: flex;
             justify-content: center;
-            margin-bottom: 0px !important; /* Force zero margin below image */
+            margin-bottom: 0px !important; 
         }
         
         [data-testid="stImage"] img {
-            margin-bottom: -40px !important; /* Pull image container inward */
+            margin-bottom: -40px !important; 
         }
 
         [data-testid="stForm"] { border: none !important; padding: 0 !important; }
@@ -82,7 +106,6 @@ with col_login:
         else:
             st.markdown("<h2 style='color:white; text-align:center;'>TenderFlow</h2>", unsafe_allow_html=True)
 
-        # THE GAP KILLER: Negative margin-top pulls this text RIGHT under the logo
         st.markdown("""
             <div style='text-align: center; margin-top: -35px; margin-bottom: 30px;'>
                 <p style='color: #6366f1; font-size: 12px; font-weight: 700; letter-spacing: 4px; text-transform: uppercase; line-height: 0;'>
@@ -92,6 +115,7 @@ with col_login:
         """, unsafe_allow_html=True)
         
         with st.form("login_flow"):
+            # These will now follow the new "Glass/Box" style defined in CSS
             st.text_input("Work Email", placeholder="Work Email", label_visibility="collapsed")
             st.text_input("Password", type="password", placeholder="Password", label_visibility="collapsed")
             st.form_submit_button("Enter Portal", type="primary")

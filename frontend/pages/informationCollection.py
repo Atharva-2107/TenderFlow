@@ -10,7 +10,7 @@ st.markdown("""
 
     /* Dark Premium Background */
     .stApp {
-        background: radial-gradient(circle at center, #1a1c2c 0%, #0d0e14 100%);
+        background: radial-gradient(circle at 20% 30%, #1a1c4b 0%, #0f111a 100%);
         font-family: 'Inter', sans-serif;
         color: #e0e0e0;
     }

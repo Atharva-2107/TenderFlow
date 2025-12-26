@@ -16,7 +16,7 @@ def inject_exact_brand_theme():
         /* Left Side Mesh Gradient */
         .stApp::before {
             content: ""; position: fixed; top: 0; left: 0; width: 50vw; height: 100vh;
-            background: radial-gradient(circle at 20% 30%, #1a1c4b 0%, #0f111a 100%);
+            background: linear-gradient(rgba(11, 17, 23, 0.85), rgba(11, 17, 23, 0.95));
             border-right: 1px solid rgba(255, 255, 255, 0.05); z-index: 0;
         }
 
@@ -63,7 +63,7 @@ with col_branding:
         <div style='padding-left: 15%;'>
             <div style='background: #6366f1; width: 45px; height: 5px; border-radius: 10px; margin-bottom: 25px;'></div>
             <h1 style='color: white; font-size: 60px; font-weight: 800; line-height: 1; letter-spacing: -2px; margin: 0;'>
-                TenderFlow<br><span style='color: #a855f7;'>Intelligence.</span>
+                TenderFlow<br><span style='color: #D4AF37;'>Intelligence.</span>
             </h1>
             <p style='color: #94a3b8; font-size: 18px; margin-top: 25px;'>Proprietary AI for procurement.</p>
         </div>

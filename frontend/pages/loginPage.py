@@ -26,51 +26,22 @@ def inject_exact_brand_theme():
 
         /* Left panel */
         .stApp::before {
-            content: ""; position: fixed; top: 0; left: 0; width: 50vw; height: 100vh;
-            background: radial-gradient(circle at 20% 30%, #1a1c4b 0%, #0f111a 100%);
-            border-right: 1px solid rgba(255, 255, 255, 0.05); z-index: 0;
+            content: "";
+            position: fixed;
+            top: 0; left: 0;
+            width: 50vw; height: 100vh;
+            background: linear-gradient(rgba(11,17,23,.85), rgba(11,17,23,.95));
+            border-right: 1px solid rgba(255,255,255,.05);
+            z-index: 0;
         }
 
-        /* --- UPDATED INPUT STYLING --- */
+        /* Inputs */
         div[data-baseweb="input"] {
-            background-color: rgba(255, 255, 255, 0.03) !important; 
-            border: 1px solid #2d313e !important; 
-            border-radius: 8px !important;
-            padding: 8px 12px !important; 
-            transition: all 0.3s ease-in-out !important;
-        }
-        
-        /* Focus state with glow */
-        div[data-baseweb="input"]:focus-within { 
-            border: 1px solid #a855f7 !important; 
-            box-shadow: 0 0 15px rgba(168, 85, 247, 0.2) !important;
-            background-color: rgba(168, 85, 247, 0.05) !important;
-        }
-        
-        input { 
-            color: #ffffff !important; 
-            font-size: 15px !important; 
-            font-weight: 400 !important;
-        }
-        
-        /* Placeholder styling */
-        input::placeholder {
-            color: #4b5563 !important;
-            opacity: 1;
-        }
-
-        /* CENTERED BUTTON */
-        div.stButton { display: flex; justify-content: center; width: 100%; margin-top: 30px; }
-        button[kind="primary"] {
-            background: linear-gradient(90deg, #6366f1 0%, #a855f7 100%) !important;
-            color: white !important; border-radius: 50px !important;
-            padding: 14px 60px !important; font-weight: 700 !important;
-            width: auto !important; min-width: 240px; border: none !important;
-            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
-        }
-        button[kind="primary"]:hover {
-            box-shadow: 0 6px 20px rgba(168, 85, 247, 0.4);
-            transform: translateY(-1px);
+            background: transparent !important;
+            border: none !important;
+            border-bottom: 1.5px solid #2d313e !important;
+            padding: 15px 0 !important;
+            height: 60px !important;
         }
 
         div[data-baseweb="input"]:focus-within {
@@ -104,11 +75,7 @@ def inject_exact_brand_theme():
         div.stButton {
             display: flex;
             justify-content: center;
-            margin-bottom: 0px !important; 
-        }
-        
-        [data-testid="stImage"] img {
-            margin-bottom: -40px !important; 
+            margin-top: 40px;
         }
 
         button[kind="primary"] {
@@ -182,18 +149,9 @@ with col_login:
                 unsafe_allow_html=True
             )
 
-        st.markdown("""
-            <div style='text-align: center; margin-top: -35px; margin-bottom: 30px;'>
-                <p style='color: #6366f1; font-size: 12px; font-weight: 700; letter-spacing: 4px; text-transform: uppercase; line-height: 0;'>
-                    Secure Access Portal
-                </p>
-            </div>
-        """, unsafe_allow_html=True)
-        
         with st.form("login_flow"):
-            # These will now follow the new "Glass/Box" style defined in CSS
-            st.text_input("Work Email", placeholder="Work Email", label_visibility="collapsed")
-            st.text_input("Password", type="password", placeholder="Password", label_visibility="collapsed")
+            st.text_input("Work Email")
+            st.text_input("Password", type="password")
             st.form_submit_button("Enter Portal", type="primary")
 
         st.markdown(

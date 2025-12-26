@@ -1,5 +1,4 @@
 import streamlit as st
-<<<<<<< HEAD
 from supabase import create_client
 import extra_streamlit_components as stx
 import os
@@ -325,7 +324,7 @@ with center_col:
             st.rerun()
 
     st.markdown('</div>', unsafe_allow_html=True)
-=======
+
 import os
 
 # --- PAGE CONFIG ---
@@ -424,4 +423,3 @@ with col_login:
             st.form_submit_button("Enter Portal", type="primary")
 
         st.markdown("<p style='text-align:center; color:#2d313e; font-size:10px; margin-top:50px;'>AUTHORISED PERSONNEL ONLY</p>", unsafe_allow_html=True)
->>>>>>> 8ac450a0ddeef27c9c24e20cac1318507b3dee78

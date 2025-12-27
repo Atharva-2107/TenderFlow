@@ -7,14 +7,10 @@ from dotenv import load_dotenv
 from supabase import create_client
 from streamlit_cookies_manager import EncryptedCookieManager
 
-# -------------------------------------------------
 # PAGE CONFIG
-# -------------------------------------------------
 st.set_page_config(page_title="TenderFlow AI | Login", layout="wide")
 
-# -------------------------------------------------
 # LOAD .ENV (ROBUST)
-# -------------------------------------------------
 def load_env():
     current = Path(__file__).resolve()
     for parent in current.parents:
@@ -37,9 +33,7 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# -------------------------------------------------
 # COOKIE MANAGER (AUTO 7-DAY LOGIN)
-# -------------------------------------------------
 cookies = EncryptedCookieManager(
     prefix="tenderflow_",
     password="CHANGE_THIS_SECRET"
@@ -63,18 +57,14 @@ def is_logged_in():
 if is_logged_in():
     st.switch_page("pages/dashboard.py")
 
-# -------------------------------------------------
 # UTILS
-# -------------------------------------------------
 def get_base64_of_bin_file(path):
     if os.path.exists(path):
         with open(path, "rb") as f:
             return base64.b64encode(f.read()).decode()
     return None
 
-# -------------------------------------------------
 # THEME + FINAL BUTTON OVERRIDE (PURPLE)
-# -------------------------------------------------
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
@@ -97,18 +87,18 @@ header, footer { visibility:hidden; }
     z-index:0;
 }
 
-/* 🔥 FINAL, UNBREAKABLE PURPLE BUTTON */
+/* FINAL, UNBREAKABLE PURPLE BUTTON */
 div[data-testid="stFormSubmitButton"] > button {
     background-color: #7c3aed !important;
     color: #ffffff !important;
-    border-radius: 50px !important;
-    padding: 8px 34px !important;   /* 👈 thinner vertically */
-    line-height: 1.2 !important;   /* 👈 prevents extra height */
+    border-radius: 8px !important;
+    padding: 8px 18px !important;  
+    line-height: 1.2 !important;  
     font-size: 16px !important;
     font-weight: 600 !important;
-    border: none !important;
-
-    white-space: nowrap !important;   /* ✅ THIS FIXES IT */
+    border: 1.5px solid #8b5cf6 !important;
+            
+    white-space: nowrap !important;   
 }
 
 div[data-testid="stFormSubmitButton"] > button:hover {
@@ -125,12 +115,12 @@ div[data-testid="stFormSubmitButton"] {
 /* SIGN UP TEXT */
 .signup-text {
     text-align: center;
-    margin-top: -15px;
+    margin-top: -10px;
     font-size: 14px;
     color: #94a3b8;
-    max-width: 240px;
-    margin-left: auto;
-    margin-right: auto;
+    max-width: 400px;
+    margin-left: 5px;
+    margin-right: none;
     transform: translateX(-5px);
 }
 
@@ -146,9 +136,7 @@ div[data-testid="stFormSubmitButton"] {
 </style>
 """, unsafe_allow_html=True)
 
-# -------------------------------------------------
 # LAYOUT
-# -------------------------------------------------
 col_branding, col_login = st.columns([1.2, 1])
 
 # LEFT BRANDING
@@ -168,7 +156,7 @@ with col_branding:
 
 # RIGHT LOGIN
 with col_login:
-    st.markdown("<div style='height:18vh'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height:8vh'></div>", unsafe_allow_html=True)
     _, box, _ = st.columns([0.2, 0.6, 0.2])
 
     with box:
@@ -187,9 +175,7 @@ with col_login:
                 </div>
             """, unsafe_allow_html=True)
 
-        # -------------------------------------------------
         # EMAIL LOGIN FORM
-        # -------------------------------------------------
         with st.form("login_form"):
             email = st.text_input("Work Email")
             password = st.text_input("Password", type="password")
@@ -200,8 +186,7 @@ with col_login:
 
                 st.markdown("""
                 <div class="signup-text">
-                    Not registered yet?
-                    <a href="/Signup" target="_self">Sign Up</a>
+                    Not registered yet? <a href="/Signup" target="_self"> Sign Up</a>
                 </div>
                 """, unsafe_allow_html=True)
 
@@ -219,9 +204,7 @@ with col_login:
                 except Exception:
                     st.error("Login failed")
 
-        # -------------------------------------------------
         # GOOGLE LOGIN
-        # -------------------------------------------------
         st.markdown("<div style='margin-top:25px'></div>", unsafe_allow_html=True)
 
         oauth = supabase.auth.sign_in_with_oauth({

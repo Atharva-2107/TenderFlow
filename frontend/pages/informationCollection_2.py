@@ -4,6 +4,7 @@ import base64
 from pathlib import Path
 
 # PAGE CONFIG
+st.toast("Basic Information recorded.")
 st.set_page_config(page_title="TenderFlow | Compliance", layout="wide")
 
 # UTILS: Robust Base64 Loading
@@ -75,7 +76,7 @@ st.markdown("""
         border-radius: 8px !important;
     }
 
-    /* NEXT BUTTON */
+    /* BUTTONS */
     div.stButton {
         display: flex;
         justify-content: center;
@@ -136,9 +137,15 @@ with c2:
     dpiit_cert = st.file_uploader("DPIIT (Startup) Certificate (Optional)", type=['pdf', 'jpg', 'png'])
 
 # --- ACTION ---
-b1, b2, b3 = st.columns([1,1,1])
+b1, b2, b3, b4, b5 = st.columns([1,2,1,2,1])
 
 with b2:
-    if st.button(" Finish Setup "):
-        st.balloons()
-        st.success("Verification documents submitted successfully!")
+    if st.button(" <- Back "):
+        # Switch back to the first info page
+        st.switch_page("pages/informationCollection.py")
+
+with b4:
+    if st.button(" Next -> "):
+        st.switch_page("pages/informationCollection_3.py")
+        # st.balloons()
+        # st.success("Verification documents submitted successfully!")

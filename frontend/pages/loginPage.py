@@ -13,7 +13,7 @@ from streamlit_cookies_manager import EncryptedCookieManager
 st.set_page_config(page_title="TenderFlow AI | Login", layout="wide")
 
 # -------------------------------------------------
-# LOAD .ENV
+# LOAD .ENV (ROBUST)
 # -------------------------------------------------
 def load_env():
     current = Path(__file__).resolve()
@@ -38,7 +38,7 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # -------------------------------------------------
-# COOKIE MANAGER
+# COOKIE MANAGER (AUTO 7-DAY LOGIN)
 # -------------------------------------------------
 cookies = EncryptedCookieManager(
     prefix="tenderflow_",
@@ -73,7 +73,7 @@ def get_base64_of_bin_file(path):
     return None
 
 # -------------------------------------------------
-# THEME + BUTTON STYLE
+# THEME + FINAL BUTTON OVERRIDE (PURPLE)
 # -------------------------------------------------
 st.markdown("""
 <style>
@@ -97,19 +97,51 @@ header, footer { visibility:hidden; }
     z-index:0;
 }
 
-/* 🔥 ENTER PORTAL BUTTON COLOR */
-button[data-testid="stFormSubmitButton"] {
-    background: #22c55e !important;
-    color: white !important;
+/* 🔥 FINAL, UNBREAKABLE PURPLE BUTTON */
+div[data-testid="stFormSubmitButton"] > button {
+    background-color: #7c3aed !important;
+    color: #ffffff !important;
     border-radius: 50px !important;
-    padding: 14px 42px !important;
+    padding: 8px 34px !important;   /* 👈 thinner vertically */
+    line-height: 1.2 !important;   /* 👈 prevents extra height */
     font-size: 16px !important;
     font-weight: 600 !important;
     border: none !important;
+
+    white-space: nowrap !important;   /* ✅ THIS FIXES IT */
 }
 
-button[data-testid="stFormSubmitButton"]:hover {
-    background: linear-gradient(135deg, #4f46e5, #9333ea) !important;
+div[data-testid="stFormSubmitButton"] > button:hover {
+    background-color: #6d28d9 !important;
+    color: #ffffff !important;
+}
+
+/* CENTER SUBMIT BUTTON */
+div[data-testid="stFormSubmitButton"] {
+    display: flex !important;
+    justify-content: center !important;
+}
+
+/* SIGN UP TEXT */
+.signup-text {
+    text-align: center;
+    margin-top: -15px;
+    font-size: 14px;
+    color: #94a3b8;
+    max-width: 240px;
+    margin-left: auto;
+    margin-right: auto;
+    transform: translateX(-5px);
+}
+
+.signup-text a {
+    color: #6366f1;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.signup-text a:hover {
+    text-decoration: underline;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -156,15 +188,22 @@ with col_login:
             """, unsafe_allow_html=True)
 
         # -------------------------------------------------
-        # EMAIL LOGIN FORM (CENTERED BUTTON)
+        # EMAIL LOGIN FORM
         # -------------------------------------------------
         with st.form("login_form"):
             email = st.text_input("Work Email")
             password = st.text_input("Password", type="password")
 
-            c1, c2, c3 = st.columns([1, 2, 1])
+            c1, c2, c3 = st.columns([1, 1, 1])
             with c2:
-                submit = st.form_submit_button("Enter Portal")
+                submit = st.form_submit_button("Enter Portal", type="primary")
+
+                st.markdown("""
+                <div class="signup-text">
+                    Not registered yet?
+                    <a href="/Signup" target="_self">Sign Up</a>
+                </div>
+                """, unsafe_allow_html=True)
 
             if submit:
                 try:
@@ -212,6 +251,4 @@ with col_login:
             <p style='text-align:center;color:#2d313e;font-size:10px;margin-top:50px'>
             AUTHORISED PERSONNEL ONLY
             </p>
-            """,
-            unsafe_allow_html=True
-        )
+        """, unsafe_allow_html=True)

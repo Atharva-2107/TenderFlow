@@ -3,7 +3,6 @@ import os
 import base64
 from datetime import datetime, timedelta
 from pathlib import Path
-
 from dotenv import load_dotenv
 from supabase import create_client
 from streamlit_cookies_manager import EncryptedCookieManager
@@ -14,7 +13,7 @@ from streamlit_cookies_manager import EncryptedCookieManager
 st.set_page_config(page_title="TenderFlow AI | Login", layout="wide")
 
 # -------------------------------------------------
-# ROBUST .ENV LOADER (SEARCHES UPWARD)
+# LOAD .ENV
 # -------------------------------------------------
 def load_env():
     current = Path(__file__).resolve()
@@ -39,7 +38,7 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # -------------------------------------------------
-# COOKIE MANAGER (AUTO 7-DAY LOGIN)
+# COOKIE MANAGER
 # -------------------------------------------------
 cookies = EncryptedCookieManager(
     prefix="tenderflow_",
@@ -49,13 +48,13 @@ cookies = EncryptedCookieManager(
 if not cookies.ready():
     st.stop()
 
-def login_user(email: str):
+def login_user(email):
     cookies["logged_in"] = "true"
     cookies["user_email"] = email
     cookies["expiry"] = (datetime.utcnow() + timedelta(days=7)).isoformat()
     cookies.save()
 
-def is_logged_in() -> bool:
+def is_logged_in():
     if cookies.get("logged_in") == "true":
         expiry = cookies.get("expiry")
         return expiry and datetime.utcnow() < datetime.fromisoformat(expiry)
@@ -74,34 +73,46 @@ def get_base64_of_bin_file(path):
     return None
 
 # -------------------------------------------------
-# THEME (UNCHANGED)
+# THEME + BUTTON STYLE
 # -------------------------------------------------
-def inject_exact_brand_theme():
-    st.markdown("""
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
 
-    .stApp {
-        background-color:#0f111a;
-        font-family:'Inter',sans-serif;
-    }
+.stApp {
+    background-color:#0f111a;
+    font-family:'Inter',sans-serif;
+}
 
-    header, footer { visibility:hidden; }
-    .block-container { padding:0 !important; }
+header, footer { visibility:hidden; }
+.block-container { padding:0 !important; }
 
-    .stApp::before {
-        content:"";
-        position:fixed;
-        top:0; left:0;
-        width:50vw; height:100vh;
-        background:linear-gradient(rgba(11,17,23,.85), rgba(11,17,23,.95));
-        border-right:1px solid rgba(255,255,255,.05);
-        z-index:0;
-    }
-    </style>
-    """, unsafe_allow_html=True)
+.stApp::before {
+    content:"";
+    position:fixed;
+    top:0; left:0;
+    width:50vw; height:100vh;
+    background:radial-gradient(circle at 20% 30%, #1a1c4b 0%, #0f111a 100%);
+    border-right:1px solid rgba(255,255,255,.05);
+    z-index:0;
+}
 
-inject_exact_brand_theme()
+/* 🔥 ENTER PORTAL BUTTON COLOR */
+button[data-testid="stFormSubmitButton"] {
+    background: #22c55e !important;
+    color: white !important;
+    border-radius: 50px !important;
+    padding: 14px 42px !important;
+    font-size: 16px !important;
+    font-weight: 600 !important;
+    border: none !important;
+}
+
+button[data-testid="stFormSubmitButton"]:hover {
+    background: linear-gradient(135deg, #4f46e5, #9333ea) !important;
+}
+</style>
+""", unsafe_allow_html=True)
 
 # -------------------------------------------------
 # LAYOUT
@@ -115,7 +126,7 @@ with col_branding:
         <div style='padding-left:15%'>
             <h1 style='color:white;font-size:60px;font-weight:800;line-height:1'>
                 TenderFlow<br>
-                <span style='color:#D4AF37'>Intelligence.</span>
+                <span style='color:#a855f7'>Intelligence.</span>
             </h1>
             <p style='color:#94a3b8;font-size:18px;margin-top:25px'>
                 Proprietary AI for procurement.
@@ -144,14 +155,16 @@ with col_login:
                 </div>
             """, unsafe_allow_html=True)
 
-        # -------------------------
-        # EMAIL LOGIN
-        # -------------------------
+        # -------------------------------------------------
+        # EMAIL LOGIN FORM (CENTERED BUTTON)
+        # -------------------------------------------------
         with st.form("login_form"):
             email = st.text_input("Work Email")
             password = st.text_input("Password", type="password")
 
-            submit = st.form_submit_button("Enter Portal")
+            c1, c2, c3 = st.columns([1, 2, 1])
+            with c2:
+                submit = st.form_submit_button("Enter Portal")
 
             if submit:
                 try:
@@ -159,7 +172,6 @@ with col_login:
                         "email": email,
                         "password": password
                     })
-
                     if res.user:
                         login_user(email)
                         st.switch_page("pages/dashboard.py")
@@ -168,9 +180,9 @@ with col_login:
                 except Exception:
                     st.error("Login failed")
 
-        # -------------------------
-        # GOOGLE LOGIN (SUPABASE)
-        # -------------------------
+        # -------------------------------------------------
+        # GOOGLE LOGIN
+        # -------------------------------------------------
         st.markdown("<div style='margin-top:25px'></div>", unsafe_allow_html=True)
 
         oauth = supabase.auth.sign_in_with_oauth({
@@ -196,7 +208,10 @@ with col_login:
         </a>
         """, unsafe_allow_html=True)
 
-        st.markdown(
-            "<p style='text-align:center;color:#2d313e;font-size:10px;margin-top:50px'>AUTHORISED PERSONNEL ONLY</p>",
+        st.markdown("""
+            <p style='text-align:center;color:#2d313e;font-size:10px;margin-top:50px'>
+            AUTHORISED PERSONNEL ONLY
+            </p>
+            """,
             unsafe_allow_html=True
         )

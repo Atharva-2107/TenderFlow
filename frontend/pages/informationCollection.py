@@ -206,10 +206,11 @@ st.markdown("""
         display: flex;
         justify-content: center;
         margin-top: 20px;
+        margin-left: 120px;
     }
 
     div.stButton > button {
-        background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%) !important;
+        background: #a855f7;
         color: white !important;
         border: none !important;
         padding: 12px 0px !important;

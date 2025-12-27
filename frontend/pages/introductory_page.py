@@ -70,7 +70,7 @@ def intro_page():
         }}
 
         .primary-tagline {{
-            color: #D4AF37; /* Accent Gold */
+            color: #a855f7; /* Accent Gold */
             font-size: 1.6rem;
             font-weight: 600;
             margin: 25px 0 10px 0;
@@ -99,7 +99,7 @@ def intro_page():
         }}
 
         div.stButton > button:hover {{
-            background-color: #D4AF37 !important;
+            background-color: #a855f7 !important;
             color: #F8F9FA !important;
             transform: translateY(-2px);
             box-shadow: 0 8px 15px rgba(212, 175, 55, 0.2);
@@ -141,6 +141,6 @@ def intro_page():
     # Uses columns to create perfect center alignment
     c1, c2, c3 = st.columns([1.5, 1, 1.5])
     with c2:
-        if st.button("Sign In", key="btn_signin", use_container_width=True):
+        if st.button("Sign UP", key="btn_signin", use_container_width=True):
             st.session_state.page = "signup"
             st.rerun()

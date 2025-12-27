@@ -83,7 +83,7 @@ st.markdown("""
         padding: 12px 16px !important;
     }
 
-    /* FINAL PURPLE BUTTON OVERRIDE*/
+    /* BUTTONS */
     div.stButton > button {
         background-color: #7c3aed !important;
         color: #ffffff !important;
@@ -165,4 +165,6 @@ auth_name = st.text_input("Authorized Signatory Name", placeholder="Full legal n
 b1, b2, b3 = st.columns([2, 1, 2])
 with b2: 
     if st.button(" Next -> "):
-        st.toast("Profile Saved Successfully")
+        # This switches to the second file in your pages folder
+        st.switch_page("pages/informationCollection_2.py")
+        # st.toast("Basic Information recorded.")

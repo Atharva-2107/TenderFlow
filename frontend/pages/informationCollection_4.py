@@ -5,6 +5,7 @@ from datetime import date
 from pathlib import Path
 
 # PAGE CONFIG
+st.toast("Financial details recorded.")
 st.set_page_config(page_title="TenderFlow | Experience", layout="wide")
 
 # UTILS: Robust Base64 Loading
@@ -99,6 +100,27 @@ st.markdown("""
         color: #a855f7 !important;
         border: 1px solid #a855f7 !important;
     }
+            
+    /* BUTTONS */
+    div.stButton {
+        display: flex;
+        justify-content: center;
+    }
+
+    div.stButton > button {
+        background-color: #7c3aed !important;
+        color: #ffffff !important;
+        border-radius: 8px !important;
+        padding: 12px 80px !important;
+        font-weight: 600 !important;
+        border: 1.5px solid #8b5cf6 !important;
+        margin-top: 50px;
+    }
+
+    div.stButton > button:hover {
+        background-color: #6d28d9 !important;
+        border-color: #7c3aed !important;
+    }
 
     footer {visibility: hidden;}
     </style>
@@ -131,7 +153,7 @@ with st.form("experience_form", clear_on_submit=True):
         client_name = st.text_input("Client Name")
         client_type = st.selectbox("Client Type", ["Govt", "Pvt", "PSU", "Other"])
         work_category = st.selectbox("Work Category", ["Roads", "Service", "IT", "Construction", "Other"])
-        scope_of_work = st.text_area("Scope of Work (just text)", height=110)
+        scope_of_work = st.text_area("Scope of Work (just text)", height=130)
 
     with c2:
         contract_val = st.text_input("Contract Value")
@@ -150,12 +172,16 @@ with st.form("experience_form", clear_on_submit=True):
     st.markdown('</div>', unsafe_allow_html=True)
 
 # --- FINAL ACTION ---
-st.markdown('<div class="finish-btn-container">', unsafe_allow_html=True)
-b1, b2, b3 = st.columns([1, 1.5, 1])
+st.markdown("<div style='margin-top:20px'></div>", unsafe_allow_html=True)
+b1, b2, b3, b4, b5 = st.columns([1,2,1,2,1])
 
 with b2:
-    # use_container_width=True is REQUIRED for the CSS to apply properly
-    if st.button(" Port to DASHBOARD! ", use_container_width=True):
+    if st.button(" <- Back "):
+        # Switch back to the first info page
+        st.switch_page("pages/informationCollection_3.py")
+
+with b4:
+    if st.button(" Next -> "):
+        st.switch_page("pages/dashboard.py")
         st.balloons()
-        st.success("Registration complete!")
-st.markdown('</div>', unsafe_allow_html=True)
+        st.success("Verification documents submitted successfully!")

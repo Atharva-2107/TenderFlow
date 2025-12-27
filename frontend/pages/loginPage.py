@@ -64,14 +64,14 @@ def get_base64_of_bin_file(path):
             return base64.b64encode(f.read()).decode()
     return None
 
-# THEME + FINAL BUTTON OVERRIDE (PURPLE)
+# THEME + CSS
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
 
 .stApp {
     background-color:#0f111a;
-    font-family:'Inter',sans-serif;
+    font-family:'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
 header, footer { visibility:hidden; }
@@ -87,41 +87,34 @@ header, footer { visibility:hidden; }
     z-index:0;
 }
 
-/* FINAL, UNBREAKABLE PURPLE BUTTON */
+/* SUBMIT BUTTON */
 div[data-testid="stFormSubmitButton"] > button {
     background-color: #7c3aed !important;
     color: #ffffff !important;
     border-radius: 8px !important;
-    padding: 8px 18px !important;  
-    line-height: 1.2 !important;  
+    padding: 8px 18px !important;
+    line-height: 1.2 !important;
     font-size: 16px !important;
     font-weight: 600 !important;
     border: 1.5px solid #8b5cf6 !important;
-            
-    white-space: nowrap !important;   
+    white-space: nowrap !important;
 }
 
-div[data-testid="stFormSubmitButton"] > button:hover {
-    background-color: #6d28d9 !important;
-    color: #ffffff !important;
-}
-
-/* CENTER SUBMIT BUTTON */
 div[data-testid="stFormSubmitButton"] {
     display: flex !important;
     justify-content: center !important;
 }
 
-/* SIGN UP TEXT */
+/* 🔥 SIGN UP TEXT — SINGLE LINE FIX */
 .signup-text {
-    text-align: center;
-    margin-top: -10px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
     font-size: 14px;
     color: #94a3b8;
-    max-width: 400px;
-    margin-left: 5px;
-    margin-right: none;
-    transform: translateX(-5px);
+    margin-top: -10px;
 }
 
 .signup-text a {
@@ -156,7 +149,7 @@ with col_branding:
 
 # RIGHT LOGIN
 with col_login:
-    st.markdown("<div style='height:8vh'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height:2vh'></div>", unsafe_allow_html=True)
     _, box, _ = st.columns([0.2, 0.6, 0.2])
 
     with box:
@@ -175,7 +168,7 @@ with col_login:
                 </div>
             """, unsafe_allow_html=True)
 
-        # EMAIL LOGIN FORM
+        # LOGIN FORM
         with st.form("login_form"):
             email = st.text_input("Work Email")
             password = st.text_input("Password", type="password")
@@ -184,11 +177,12 @@ with col_login:
             with c2:
                 submit = st.form_submit_button("Enter Portal", type="primary")
 
-                st.markdown("""
-                <div class="signup-text">
-                    Not registered yet? <a href="/Signup" target="_self"> Sign Up</a>
-                </div>
-                """, unsafe_allow_html=True)
+            st.markdown("""
+            <div class="signup-text">
+                <span>Not registered yet?</span>
+                <a href="/signPage.py" target="_self">Sign Up</a>
+            </div>
+            """, unsafe_allow_html=True)
 
             if submit:
                 try:
@@ -215,8 +209,8 @@ with col_login:
         })
 
         st.markdown(f"""
-        <a href="{oauth.url}">
-            <button style="
+        <a href="{oauth.url}" style="text-decoration:none;">
+            <div style="
                 width:100%;
                 padding:14px;
                 border-radius:50px;
@@ -224,9 +218,12 @@ with col_login:
                 color:white;
                 border:1px solid #2d313e;
                 font-size:16px;
-                margin-top:10px;">
+                margin-top:10px;
+                display:flex;
+                justify-content:center;
+                align-items:center;">
                 Continue with Google
-            </button>
+            </div>
         </a>
         """, unsafe_allow_html=True)
 

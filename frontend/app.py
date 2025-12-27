@@ -113,20 +113,21 @@ elif st.session_state.page == "login":
 
 # 3. Sign Up Page
 elif st.session_state.page == "signup":
-    st.title("✨ Create Account")
-    with st.form("signup_form"):
-        new_email = st.text_input("Email")
-        new_pass = st.text_input("Password", type="password")
-        if st.form_submit_button("Create Account"):
-            try:
-                supabase.auth.sign_up({"email": new_email, "password": new_pass})
-                st.success("Check your email for the confirmation link!")
-            except Exception as e:
-                st.error(str(e))
+    st.switch_page("pages/signPage.py")
+    # st.title("✨ Create Account")
+    # with st.form("signup_form"):
+    #     new_email = st.text_input("Email")
+    #     new_pass = st.text_input("Password", type="password")
+    #     if st.form_submit_button("Create Account"):
+    #         try:
+    #             supabase.auth.sign_up({"email": new_email, "password": new_pass})
+    #             st.success("Check your email for the confirmation link!")
+    #         except Exception as e:
+    #             st.error(str(e))
     
-    if st.button("Already have an account? Login"):
-        st.session_state.page = "login"
-        st.rerun()
+    # if st.button("Already have an account? Login"):
+    #     st.session_state.page = "login"
+    #     st.rerun()
 
 # 4. Main Dashboard (Protected Content)
 elif st.session_state.page == "dashboard":

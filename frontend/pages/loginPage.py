@@ -185,27 +185,39 @@ with col_login:
             with c2:
                 submit = st.form_submit_button("Enter Portal", type="primary")
 
-            st.markdown("""
-            <div class="signup-text">
-                <span>Not registered yet?</span>
-                <a href="/signPage.py" target="_self">Sign Up</a>
+        if submit:
+            try:
+                res = supabase.auth.sign_in_with_password({
+                    "email": email,
+                    "password": password
+                })
+                if res.user:
+                    login_user(email)
+                    st.switch_page("pages/dashboard.py")
+                else:
+                    st.error("Invalid credentials")
+            except Exception:
+                st.error("Login failed")
+
+        st.markdown("""
+            <div style="text-align:center; margin-top:4px;">
+            Don't have an account?
+            <a href="?go_signUp=true"
+            style="
+            font-size:17px;
+            color:#6366f1;
+            font-weight:500;
+            text-decoration:none;
+            cursor:pointer;
+            ">
+            SignUp
+            </a>
             </div>
             """, unsafe_allow_html=True)
 
-            if submit:
-                try:
-                    res = supabase.auth.sign_in_with_password({
-                        "email": email,
-                        "password": password
-                    })
-                    if res.user:
-                        login_user(email)
-                        st.switch_page("pages/dashboard.py")
-                    else:
-                        st.error("Invalid credentials")
-                except Exception:
-                    st.error("Login failed")
-
+# Handle navigation
+        if st.query_params.get("go_signUp") == "true":
+            st.switch_page("pages/signPage.py")
         # GOOGLE LOGIN
         st.markdown("<div style='margin-top:25px'></div>", unsafe_allow_html=True)
 
@@ -219,14 +231,14 @@ with col_login:
         st.markdown(f"""
         <a href="{oauth.url}" style="text-decoration:none;">
             <div style="
-                width:100%;
+                width:260px;
                 padding:14px;
                 border-radius:50px;
                 background:#111827;
                 color:white;
                 border:1px solid #2d313e;
                 font-size:16px;
-                margin-top:10px;
+                margin:5px auto 30px;
                 display:flex;
                 justify-content:center;
                 align-items:center;">

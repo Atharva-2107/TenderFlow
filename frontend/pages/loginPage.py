@@ -87,17 +87,25 @@ header, footer { visibility:hidden; }
     z-index:0;
 }
 
-/* SUBMIT BUTTON */
+/* 🔒 HARD-LOCKED SUBMIT BUTTON (FIXED) */
 div[data-testid="stFormSubmitButton"] > button {
     background-color: #7c3aed !important;
     color: #ffffff !important;
     border-radius: 8px !important;
-    padding: 8px 18px !important;
-    line-height: 1.2 !important;
+
+    height: 40px !important;
+    min-height: 40px !important;
+    max-height: 40px !important;
+    line-height: 40px !important;
+
+    padding: 0 18px !important;   /* horizontal only */
     font-size: 16px !important;
     font-weight: 600 !important;
     border: 1.5px solid #8b5cf6 !important;
+
     white-space: nowrap !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
 }
 
 div[data-testid="stFormSubmitButton"] {
@@ -105,7 +113,7 @@ div[data-testid="stFormSubmitButton"] {
     justify-content: center !important;
 }
 
-/* 🔥 SIGN UP TEXT — SINGLE LINE FIX */
+/* SIGN UP TEXT */
 .signup-text {
     display: flex;
     justify-content: center;

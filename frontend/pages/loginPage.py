@@ -1,16 +1,19 @@
 import streamlit as st
 import os
 import base64
-from datetime import datetime, timedelta
+import datetime
 from pathlib import Path
 from dotenv import load_dotenv
 from supabase import create_client
-from streamlit_cookies_manager import EncryptedCookieManager
 
+# -------------------------------------------------
 # PAGE CONFIG
+# -------------------------------------------------
 st.set_page_config(page_title="TenderFlow AI | Login", layout="wide")
 
+# -------------------------------------------------
 # LOAD .ENV (ROBUST)
+# -------------------------------------------------
 def load_env():
     current = Path(__file__).resolve()
     for parent in current.parents:
@@ -33,38 +36,32 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# COOKIE MANAGER (AUTO 7-DAY LOGIN)
-cookies = EncryptedCookieManager(
-    prefix="tenderflow_",
-    password="CHANGE_THIS_SECRET"
-)
-
-if not cookies.ready():
-    st.stop()
-
+# -------------------------------------------------
+# AUTH STATE (SESSION-BASED)
+# -------------------------------------------------
 def login_user(email):
-    cookies["logged_in"] = "true"
-    cookies["user_email"] = email
-    cookies["expiry"] = (datetime.utcnow() + timedelta(days=7)).isoformat()
-    cookies.save()
+    st.session_state["logged_in"] = True
+    st.session_state["user_email"] = email
+    st.session_state["login_time"] = datetime.utcnow()
 
 def is_logged_in():
-    if cookies.get("logged_in") == "true":
-        expiry = cookies.get("expiry")
-        return expiry and datetime.utcnow() < datetime.fromisoformat(expiry)
-    return False
+    return st.session_state.get("logged_in", False)
 
 if is_logged_in():
     st.switch_page("pages/dashboard.py")
 
+# -------------------------------------------------
 # UTILS
+# -------------------------------------------------
 def get_base64_of_bin_file(path):
     if os.path.exists(path):
         with open(path, "rb") as f:
             return base64.b64encode(f.read()).decode()
     return None
 
+# -------------------------------------------------
 # THEME + CSS
+# -------------------------------------------------
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
@@ -87,22 +84,18 @@ header, footer { visibility:hidden; }
     z-index:0;
 }
 
-/* 🔒 HARD-LOCKED SUBMIT BUTTON (FIXED) */
 div[data-testid="stFormSubmitButton"] > button {
     background-color: #7c3aed !important;
     color: #ffffff !important;
     border-radius: 8px !important;
-
     height: 40px !important;
     min-height: 40px !important;
     max-height: 40px !important;
     line-height: 40px !important;
-
-    padding: 0 18px !important;   /* horizontal only */
+    padding: 0 18px !important;
     font-size: 16px !important;
     font-weight: 600 !important;
     border: 1.5px solid #8b5cf6 !important;
-
     white-space: nowrap !important;
     overflow: hidden !important;
     box-sizing: border-box !important;
@@ -113,7 +106,6 @@ div[data-testid="stFormSubmitButton"] {
     justify-content: center !important;
 }
 
-/* SIGN UP TEXT */
 .signup-text {
     display: flex;
     justify-content: center;
@@ -137,10 +129,14 @@ div[data-testid="stFormSubmitButton"] {
 </style>
 """, unsafe_allow_html=True)
 
+# -------------------------------------------------
 # LAYOUT
+# -------------------------------------------------
 col_branding, col_login = st.columns([1.2, 1])
 
+# -------------------------------------------------
 # LEFT BRANDING
+# -------------------------------------------------
 with col_branding:
     st.markdown("<div style='height:30vh'></div>", unsafe_allow_html=True)
     st.markdown("""
@@ -155,7 +151,9 @@ with col_branding:
         </div>
     """, unsafe_allow_html=True)
 
+# -------------------------------------------------
 # RIGHT LOGIN
+# -------------------------------------------------
 with col_login:
     st.markdown("<div style='height:2vh'></div>", unsafe_allow_html=True)
     _, box, _ = st.columns([0.2, 0.6, 0.2])
@@ -176,7 +174,9 @@ with col_login:
                 </div>
             """, unsafe_allow_html=True)
 
+        # -------------------------
         # LOGIN FORM
+        # -------------------------
         with st.form("login_form"):
             email = st.text_input("Work Email")
             password = st.text_input("Password", type="password")
@@ -213,12 +213,14 @@ with col_login:
             SignUp
             </a>
             </div>
-            """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
 
-# Handle navigation
         if st.query_params.get("go_signUp") == "true":
             st.switch_page("pages/signPage.py")
+
+        # -------------------------
         # GOOGLE LOGIN
+        # -------------------------
         st.markdown("<div style='margin-top:25px'></div>", unsafe_allow_html=True)
 
         oauth = supabase.auth.sign_in_with_oauth({

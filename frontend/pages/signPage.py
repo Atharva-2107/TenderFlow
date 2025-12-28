@@ -1,16 +1,19 @@
 import streamlit as st
 import os
 import base64
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from dotenv import load_dotenv
 from supabase import create_client
-from streamlit_cookies_manager import EncryptedCookieManager
 
+# -------------------------------------------------
 # PAGE CONFIG
+# -------------------------------------------------
 st.set_page_config(page_title="TenderFlow AI | Sign Up", layout="wide")
 
+# -------------------------------------------------
 # LOAD .ENV (ROBUST)
+# -------------------------------------------------
 def load_env():
     current = Path(__file__).resolve()
     for parent in current.parents:
@@ -33,29 +36,18 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# COOKIE MANAGER
-cookies = EncryptedCookieManager(
-    prefix="tenderflow_",
-    password="CHANGE_THIS_SECRET"
-)
-
-if not cookies.ready():
-    st.stop()
-
-def login_user(email):
-    cookies["logged_in"] = "true"
-    cookies["user_email"] = email
-    cookies["expiry"] = (datetime.utcnow() + timedelta(days=7)).isoformat()
-    cookies.save()
-
+# -------------------------------------------------
 # UTILS
+# -------------------------------------------------
 def get_base64_of_bin_file(path):
     if os.path.exists(path):
         with open(path, "rb") as f:
             return base64.b64encode(f.read()).decode()
     return None
 
+# -------------------------------------------------
 # THEME + CSS (UNCHANGED)
+# -------------------------------------------------
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
@@ -78,7 +70,6 @@ header, footer { visibility:hidden; }
     z-index:0;
 }
 
-/* SUBMIT BUTTON */
 div[data-testid="stFormSubmitButton"] > button {
     background-color: #7c3aed !important;
     color: #ffffff !important;
@@ -92,67 +83,23 @@ div[data-testid="stFormSubmitButton"] > button {
     font-size: 16px !important;
     font-weight: 600 !important;
     border: 1.5px solid #8b5cf6 !important;
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    box-sizing: border-box !important;
 }
 
 div[data-testid="stFormSubmitButton"] {
     display: flex !important;
     justify-content: center !important;
 }
-
-/* SIGN UP TEXT */
-.signup-text {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 4px;
-    white-space: nowrap;
-    font-size: 14px;
-    color: #94a3b8;
-    margin-top: -10px;
-}
-            
-
-/* LOGIN BUTTON AS LINK (ONLY THIS BUTTON) */
-.login-link {
-    display: flex;
-    justify-content: center;
-}
-
-.login-link [data-testid="stBaseButton-secondary"] button {
-    background: none !important;
-    border: none !important;
-    box-shadow: none !important;
-
-    padding: 0 !important;
-    margin-top: 4px !important;
-
-    color: #6366f1 !important;
-    font-size: 13px !important;   /* slightly smaller */
-    font-weight: 500 !important;
-
-    height: auto !important;
-    min-height: auto !important;
-    line-height: normal !important;
-
-    cursor: pointer !important;
-}
-
-.login-link [data-testid="stBaseButton-secondary"] button:hover {
-    text-decoration: underline !important;
-}
-
-
-
 </style>
 """, unsafe_allow_html=True)
 
+# -------------------------------------------------
 # LAYOUT
+# -------------------------------------------------
 col_branding, col_signup = st.columns([1.2, 1])
 
+# -------------------------------------------------
 # LEFT BRANDING
+# -------------------------------------------------
 with col_branding:
     st.markdown("<div style='height:30vh'></div>", unsafe_allow_html=True)
     st.markdown("""
@@ -167,7 +114,9 @@ with col_branding:
         </div>
     """, unsafe_allow_html=True)
 
+# -------------------------------------------------
 # RIGHT SIGNUP
+# -------------------------------------------------
 with col_signup:
     st.markdown("<div style='height:2vh'></div>", unsafe_allow_html=True)
     _, box, _ = st.columns([0.2, 0.6, 0.2])
@@ -188,7 +137,9 @@ with col_signup:
                 </div>
             """, unsafe_allow_html=True)
 
+        # -------------------------
         # SIGN UP FORM
+        # -------------------------
         with st.form("signup_form"):
             email = st.text_input("Work Email")
             password = st.text_input("Password", type="password")
@@ -198,68 +149,63 @@ with col_signup:
             with c2:
                 submit = st.form_submit_button("Create Account", type="primary")
 
-            if submit:
-                if password != confirm_password:
-                    st.error("Passwords do not match")
-                else:
-                    try:
-                        res = supabase.auth.sign_up({
-                            "email": email,
-                            "password": password
-                        })
-                        if res.user:
-                            st.success("Account created successfully. Please check your email.")
-                        else:
-                            st.error("Sign up failed")
-                    except Exception:
+        if submit:
+            if password != confirm_password:
+                st.error("Passwords do not match")
+            else:
+                try:
+                    res = supabase.auth.sign_up({
+                        "email": email,
+                        "password": password
+                    })
+                    if res.user:
+                        st.success("Account created successfully. Please verify your email.")
+                    else:
                         st.error("Sign up failed")
+                except Exception:
+                    st.error("Sign up failed")
 
-        # 🔥 FIXED NAVIGATION
+        # -------------------------
+        # NAVIGATION
+        # -------------------------
         st.markdown("""
         <div style="text-align:center; margin-top:4px;">
         Already have an account?
         <a href="?go_login=true"
-        style="
-            font-size:17px;
-            color:#6366f1;
-            font-weight:500;
-            text-decoration:none;
-            cursor:pointer;
-       ">
+           style="font-size:17px;color:#6366f1;font-weight:500;text-decoration:none;">
         Login
         </a>
         </div>
         """, unsafe_allow_html=True)
 
-# Handle navigation
-    if st.query_params.get("go_login") == "true":
-        st.switch_page("pages/loginPage.py")
+        if st.query_params.get("go_login") == "true":
+            st.switch_page("pages/loginPage.py")
 
-
-
+        # -------------------------
         # GOOGLE SIGN UP
-    oauth = supabase.auth.sign_in_with_oauth({
+        # -------------------------
+        oauth = supabase.auth.sign_in_with_oauth({
             "provider": "google",
             "options": {
                 "redirect_to": "http://localhost:8501"
             }
         })
 
-    st.markdown(f"""
+        st.markdown(f"""
         <a href="{oauth.url}" style="text-decoration:none;">
             <div style="
-            width:260px;              /* 👈 controls button width */
-            padding:14px;
-            border-radius:50px;
-            background:#111827;
-            color:white;
-            border:1px solid #2d313e;
-            font-size:16px;
-            margin:10px auto 30px;    /* 👈 centers horizontally */
-            display:flex;
-            justify-content:center;
-            align-items:center;">
-            Continue with Google
+                width:260px;
+                padding:14px;
+                border-radius:50px;
+                background:#111827;
+                color:white;
+                border:1px solid #2d313e;
+                font-size:16px;
+                margin:10px auto 30px;
+                display:flex;
+                justify-content:center;
+                align-items:center;">
+                Continue with Google
             </div>
         </a>
         """, unsafe_allow_html=True)

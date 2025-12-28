@@ -27,6 +27,15 @@ def get_base64_of_bin_file(path):
 # -------------------------------------------------
 st.markdown("""
 <style>
+    /* HIDE HEADER ANCHOR ICONS (-) */
+    button[title="View header anchor"] {
+        display: none !important;
+    }
+    .stHtmlHeader a , .stMarkdown a{
+        display: none !important;
+    }
+    header { visibility: hidden; }
+            
     .main {
         background-color: #0B0F14;
     }

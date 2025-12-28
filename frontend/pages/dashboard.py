@@ -34,7 +34,7 @@ st.markdown("""
     .stHtmlHeader a , .stMarkdown a{
         display: none !important;
     }
-    header { visibility: hidden; }
+    header { visibility: None; }
             
     .main {
         background-color: #0B0F14;

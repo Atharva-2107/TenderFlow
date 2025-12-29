@@ -2,11 +2,72 @@ import streamlit as st
 import os
 import base64
 from pathlib import Path
+from dotenv import load_dotenv
+from supabase import create_client
 
 # PAGE CONFIG
-st.toast("Basic Information recorded.")
 st.set_page_config(page_title="TenderFlow | Compliance", layout="wide")
+st.toast("Basic Information recorded.")
 
+if st.session_state.get("onboarding_step", 1) < 2:
+    st.switch_page("pages/informationCollection.py")
+    st.stop()
+    
+load_dotenv() 
+   
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+
+if not SUPABASE_URL or not SUPABASE_KEY:
+    st.error("Supabase environment variables not loaded")
+    st.stop()
+
+sb_session = st.session_state.get("sb_session")
+user = st.session_state.get("user")
+
+if not sb_session or not user:
+    st.switch_page("pages/loginPage.py")
+    st.stop()
+user_id = user.id
+
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+try:
+    refreshed = supabase.auth.refresh_session(sb_session.refresh_token)
+    st.session_state["sb_session"] = refreshed.session
+    sb_session = refreshed.session
+    if sb_session is None:
+        st.error("Session expired. Please log in again.")
+        st.switch_page("pages/loginPage.py")
+        st.stop()
+except Exception:
+    st.error("Session expired. Please log in again.")
+    st.switch_page("pages/loginPage.py")
+    st.stop()
+    
+supabase.postgrest.auth(sb_session.access_token)
+
+res_test = supabase.rpc("auth_uid_test").execute()
+st.write("auth.uid():", res_test.data)
+
+def upload_file(file, filename):
+    if not file:
+        return None
+
+    path = f"{user_id}/{filename}"
+
+    supabase.storage.from_("compliance_docs").upload(
+        path,
+        file.getvalue(),
+        {"content-type": file.type}
+    )
+
+    return path
+
+# Already onboarded → dashboard
+if st.session_state.get("onboarding_complete") is True:
+    st.switch_page("pages/dashboard.py")
+    st.stop()
+       
 # UTILS: Robust Base64 Loading
 def get_base64_of_bin_file(path):
     try:
@@ -146,6 +207,35 @@ with b2:
 
 with b4:
     if st.button(" Next -> "):
-        st.switch_page("pages/informationCollection_3.py")
-        # st.balloons()
-        # st.success("Verification documents submitted successfully!")
+        try:
+            # Upload documents
+            firm_cert_path = upload_file(firm_cert, "firm_certificate")
+            poa_path = upload_file(poa_auth, "poa_authorization")
+            msme_path = upload_file(msme_cert, "msme_certificate")
+            dpiit_path = upload_file(dpiit_cert, "dpiit_certificate")
+
+            # Save to database
+            data = {
+                "user_id": user_id,
+                "gst_number": gst_num,
+                "bank_account_number": bank_acc,
+                "ifsc_code": ifsc,
+                "pan_number": pan_card,
+                "firm_certificate_url": firm_cert_path,
+                "poa_certificate_url": poa_path,
+                "msme_certificate_url": msme_path,
+                "dpiit_certificate_url": dpiit_path,
+            }
+            st.write({
+                "sb_session_exists": sb_session is not None,
+                "access_token_exists": bool(sb_session.access_token),
+                "user_id_session": user_id
+            })
+            supabase.table("business_compliance").upsert(data).execute()
+
+            # Move to next onboarding step
+            st.session_state["onboarding_step"] = 3
+            st.switch_page("pages/informationCollection_3.py")
+
+        except Exception as e:
+            st.error(f"Error saving compliance data: {e}")

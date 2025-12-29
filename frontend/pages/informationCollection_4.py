@@ -1,13 +1,68 @@
 import streamlit as st
 import os
 import base64
-from datetime import date
 from pathlib import Path
+from dotenv import load_dotenv
+from supabase import create_client
+
 
 # PAGE CONFIG
-st.toast("Financial details recorded.")
 st.set_page_config(page_title="TenderFlow | Experience", layout="wide")
+st.toast("Financial details recorded.")
 
+if st.session_state.get("onboarding_step", 3) < 4:
+    st.switch_page("pages/informationCollection.py")
+    st.stop()
+    
+load_dotenv() 
+   
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+
+if not SUPABASE_URL or not SUPABASE_KEY:
+    st.error("Supabase environment variables not loaded")
+    st.stop()
+
+sb_session = st.session_state.get("sb_session")
+user = st.session_state.get("user")
+
+if not sb_session or not user:
+    st.switch_page("pages/loginPage.py")
+    st.stop()
+user_id = user.id
+
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+try:
+    refreshed = supabase.auth.refresh_session(sb_session.refresh_token)
+    st.session_state["sb_session"] = refreshed.session
+    sb_session = refreshed.session
+    if sb_session is None:
+        st.error("Session expired. Please log in again.")
+        st.switch_page("pages/loginPage.py")
+        st.stop()
+except Exception:
+    st.error("Session expired. Please log in again.")
+    st.switch_page("pages/loginPage.py")
+    st.stop()
+    
+supabase.postgrest.auth(sb_session.access_token)
+
+res_test = supabase.rpc("auth_uid_test").execute()
+st.write("auth.uid():", res_test.data)
+
+def upload_file(file, filename):
+    if not file:
+        return None
+
+    path = f"{user_id}/{filename}"
+
+    supabase.storage.from_("compliance_docs").upload(
+        path,
+        file.getvalue(),
+        {"content-type": file.type}
+    )
+
+    return path
 # UTILS: Robust Base64 Loading
 def get_base64_of_bin_file(path):
     try:
@@ -168,8 +223,41 @@ with st.form("experience_form", clear_on_submit=True):
     _, add_col, _ = st.columns([1, 1, 1])
     with add_col:
         # Form submit buttons are slightly different, so we style them separately
-        st.form_submit_button("＋ ADD EXPERIENCE", use_container_width=True)
-    st.markdown('</div>', unsafe_allow_html=True)
+        #st.form_submit_button("＋ ADD EXPERIENCE", use_container_width=True)
+    #st.markdown('</div>', unsafe_allow_html=True)
+        if st.form_submit_button("＋ ADD EXPERIENCE", use_container_width=True):
+
+            try:
+                cert_path = upload_file(
+                    comp_cert,
+                    f"completion_cert_{project_name.replace(' ', '_')}"
+                )
+
+                portfolio_path = upload_file(
+                    portfolio,
+                    f"portfolio_{project_name.replace(' ', '_')}"
+                )
+
+                data = {
+                    "user_id": user_id,
+                    "project_name": project_name,
+                    "client_name": client_name,
+                    "client_type": client_type,
+                    "work_category": work_category,
+                    "scope_of_work": scope_of_work,
+                    "contract_value": contract_val,
+                    "completion_date": comp_date.isoformat() if comp_date else None,
+                    "completion_status": comp_status,
+                    "completion_certificate_url": cert_path,
+                    "portfolio_url": portfolio_path
+                }
+
+                supabase.table("experience_records").insert(data).execute()
+
+                st.success("Experience added successfully")
+
+            except Exception as e:
+                st.error(f"Error saving experience: {e}")
 
 # --- FINAL ACTION ---
 st.markdown("<div style='margin-top:20px'></div>", unsafe_allow_html=True)
@@ -181,7 +269,12 @@ with b2:
         st.switch_page("pages/informationCollection_3.py")
 
 with b4:
-    if st.button(" Next -> "):
+    if st.button(" Finish & Go to Dashboard "):
+        supabase.table("profiles") \
+            .update({"onboarding_complete": True}) \
+            .eq("id", user_id) \
+            .execute()
+        # also keep session state
+        st.session_state["onboarding_complete"] = True
         st.switch_page("pages/dashboard.py")
-        st.balloons()
-        st.success("Verification documents submitted successfully!")
+        st.stop()

@@ -150,20 +150,42 @@ with col_signup:
                 submit = st.form_submit_button("Create Account", type="primary")
 
         if submit:
-            if password != confirm_password:
+            if not email or not password or not confirm_password:
+                st.error("All fields are required")
+            elif password != confirm_password:
                 st.error("Passwords do not match")
+            elif len(password) < 6:
+                st.error("Password must be at least 6 characters")
             else:
                 try:
+            # 1. Sign up the user
                     res = supabase.auth.sign_up({
-                        "email": email,
+                        "email": email.strip(),
                         "password": password
                     })
+            
                     if res.user:
-                        st.success("Account created successfully. Please verify your email.")
-                    else:
-                        st.error("Sign up failed")
-                except Exception:
-                    st.error("Sign up failed")
+                        # 2. IMMEDIATELY sign in to get a session
+                        login_res = supabase.auth.sign_in_with_password({
+                            "email": email.strip(),
+                            "password": password
+                        })
+                
+                        if login_res.session:
+                            st.session_state["sb_session"] = login_res.session
+                            st.session_state["user"] = login_res.user
+                            st.session_state["authenticated"] = True
+
+                            # onboarding starts
+                            st.session_state["onboarding_step"] = 1
+                            st.session_state["onboarding_complete"] = False
+
+                            st.switch_page("pages/informationCollection.py")
+                        else:
+                            st.info("Account created. Please verify your email and log in.")
+                except Exception as e:
+                    st.error(f"Sign up failed: {e}")
+
 
         # -------------------------
         # NAVIGATION

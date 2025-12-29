@@ -1,11 +1,43 @@
+#from requests import session
 import streamlit as st
 import os
 import base64
 from datetime import date
 from pathlib import Path
+from supabase import create_client
+import supabase
 
-# PAGE CONFIG
-st.set_page_config(page_title="TenderFlow | Basic Information", layout="wide")
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+
+if not SUPABASE_URL or not SUPABASE_KEY:
+    st.error("Supabase environment variables not loaded")
+    st.stop()
+
+sb_session = st.session_state.get("sb_session")
+user = st.session_state.get("user")
+
+if not sb_session or not user:
+    st.switch_page("pages/loginPage.py")
+    st.stop()
+user_id = user.id
+
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+supabase.postgrest.auth(sb_session.access_token)
+
+if "user" not in st.session_state:
+    # Not logged in at all
+    st.switch_page("pages/loginPage.py")
+    st.stop()
+
+# If onboarding already done → dashboard
+if "user" not in st.session_state or st.session_state["user"] is None:
+    st.error("Session expired. Please log in again.")
+    st.switch_page("pages/loginPage.py")
+    st.stop()
+
+user = st.session_state["user"]
+user_id = user.id
 
 # UTILS: Robust Base64 Loading
 def get_base64_of_bin_file(path):
@@ -161,10 +193,49 @@ if not same_as_reg:
 auth_name = st.text_input("Authorized Signatory Name", placeholder="Full legal name")
 
 # --- ACTION ---
-# st.markdown("<hr>", unsafe_allow_html=True)
+st.markdown("<div style='margin-top:20px'></div>", unsafe_allow_html=True)
 b1, b2, b3 = st.columns([2, 1, 2])
+
 with b2: 
     if st.button(" Next -> "):
-        # This switches to the second file in your pages folder
-        st.switch_page("pages/informationCollection_2.py")
-        # st.toast("Basic Information recorded.")
+        # 1. Validation: Ensure mandatory fields are filled
+        if not company_name or not email or not auth_name:
+            st.error("Please fill in all mandatory fields (Company Name, Email, and Signatory).")
+        else:
+            try:
+                # 2. Get the current authenticated user
+                #user_res = supabase.auth.get_user()
+                #if user_res.user:
+                   # user_id = user_res.user.id
+                    
+                    # 3. Prepare the data payload
+                    # Note: Match these keys exactly to your Supabase table columns
+                profile_data = {
+                    "id": user_id,
+                    "company_name": company_name,
+                    "org_type": org_type,
+                    "incorp_date": str(incorp_date),
+                    "email": email,
+                    "phone_number": phone,
+                    "designation": designation,
+                    "reg_address": reg_address,
+                    "office_address": reg_address if same_as_reg else office_address,
+                    "authorized_signatory": auth_name,
+                    #"updated_at": "now()"
+                }
+
+                    # 4. Upsert to Supabase
+                    # This creates the record if new, or updates if it exists
+                res = supabase.table("profiles").upsert(profile_data).execute()
+
+                if res.data:
+                    st.success("Information saved!")
+                        # 5. Move to the next step of onboarding
+                    st.session_state["onboarding_step"] = 2
+                    st.switch_page("pages/informationCollection_2.py")
+                else:
+                    st.error("Session expired. Please log in again.")
+                    st.switch_page("app.py")
+                    
+            except Exception as e:
+                st.error(f"Error saving data: {str(e)}")

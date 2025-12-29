@@ -117,8 +117,7 @@ def intro_page():
     # 3. Login Button (Pinned to Top-Right)
     st.markdown('<div class="login-positioner">', unsafe_allow_html=True)
     if st.button("Login", key="btn_login"):
-        st.session_state.page = "login"
-        st.rerun()
+        st.switch_page("pages/loginPage.py")
     st.markdown('</div>', unsafe_allow_html=True)
 
     # 4. Hero Content Section
@@ -142,5 +141,7 @@ def intro_page():
     c1, c2, c3 = st.columns([1.5, 1, 1.5])
     with c2:
         if st.button("Sign UP", key="btn_signin", use_container_width=True):
-            st.session_state.page = "signup"
-            st.rerun()
+            st.switch_page("pages/signPage.py")
+    
+if __name__ == "__main__" or True:
+    intro_page()

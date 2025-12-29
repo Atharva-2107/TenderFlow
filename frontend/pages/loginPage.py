@@ -5,12 +5,18 @@ import datetime
 from pathlib import Path
 from dotenv import load_dotenv
 from supabase import create_client
+from utils.auth_guard import auth_and_onboarding_guard
+
 
 # -------------------------------------------------
 # PAGE CONFIG
 # -------------------------------------------------
 st.set_page_config(page_title="TenderFlow AI | Login", layout="wide")
 
+# redirect already logged in users
+if st.session_state.get("authenticated"):
+    st.switch_page("pages/dashboard.py")
+    st.stop()
 # -------------------------------------------------
 # LOAD .ENV (ROBUST)
 # -------------------------------------------------
@@ -35,21 +41,6 @@ if not SUPABASE_URL or not SUPABASE_KEY:
     st.stop()
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-
-# -------------------------------------------------
-# AUTH STATE (SESSION-BASED)
-# -------------------------------------------------
-def login_user(email):
-    st.session_state["logged_in"] = True
-    st.session_state["user_email"] = email
-    st.session_state["login_time"] = datetime.utcnow()
-
-def is_logged_in():
-    return st.session_state.get("logged_in", False)
-
-if is_logged_in():
-    st.switch_page("pages/dashboard.py")
-
 # -------------------------------------------------
 # UTILS
 # -------------------------------------------------
@@ -184,21 +175,48 @@ with col_login:
             c1, c2, c3 = st.columns([1, 1, 1])
             with c2:
                 submit = st.form_submit_button("Enter Portal", type="primary")
-
         if submit:
-            try:
-                res = supabase.auth.sign_in_with_password({
-                    "email": email,
-                    "password": password
-                })
-                if res.user:
-                    login_user(email)
-                    st.switch_page("pages/dashboard.py")
-                else:
-                    st.error("Invalid credentials")
-            except Exception:
-                st.error("Login failed")
+            if not email or not password:
+                st.error("Email and password are required")
+            else:
+                try:
+                    res = supabase.auth.sign_in_with_password({
+                        "email": email.strip(),
+                        "password": password
+                        })
+            # ✅ CORRECT success condition
+                    if res.session:
+                        st.session_state["sb_session"] = res.session
+                        st.session_state["user"] = res.user
+                        st.session_state["authenticated"] = True
 
+                        # If onboarding incomplete → resume onboarding
+                        profile = (
+                            supabase.table("profiles")
+                            .select("onboarding_complete")
+                            .eq("id", res.user.id)
+                            .single()
+                            .execute()
+                        )
+                        # ✅ SAFELY extract onboarding flag
+                        profile_data = profile.data or {}
+                        onboarding_done = bool(profile_data.get("onboarding_complete", False))
+
+                        # Save to session
+                        st.session_state["onboarding_complete"] = onboarding_done
+
+                        # Route correctly
+                        if onboarding_done:
+                            st.switch_page("pages/dashboard.py")
+                        else:
+                            st.switch_page("pages/informationCollection.py")
+
+                        st.stop()
+                    else:
+                        st.error("Invalid email or password")
+
+                except Exception as e:
+                    st.error(f"Login failed: {e}")
         st.markdown("""
             <div style="text-align:center; margin-top:4px;">
             Don't have an account?

@@ -2,10 +2,66 @@ import streamlit as st
 import os
 import base64
 from pathlib import Path
+from dotenv import load_dotenv
+from supabase import create_client
 
 # PAGE CONFIG
-st.toast("Legal & Tax Compliance details recorded.")
 st.set_page_config(page_title="TenderFlow | Financial Capacity", layout="wide")
+st.toast("Legal & Tax Compliance details recorded.")
+
+if st.session_state.get("onboarding_step", 2) < 3:
+    st.switch_page("pages/informationCollection.py")
+    st.stop()
+    
+load_dotenv() 
+   
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+
+if not SUPABASE_URL or not SUPABASE_KEY:
+    st.error("Supabase environment variables not loaded")
+    st.stop()
+
+sb_session = st.session_state.get("sb_session")
+user = st.session_state.get("user")
+
+if not sb_session or not user:
+    st.switch_page("pages/loginPage.py")
+    st.stop()
+user_id = user.id
+
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+try:
+    refreshed = supabase.auth.refresh_session(sb_session.refresh_token)
+    st.session_state["sb_session"] = refreshed.session
+    sb_session = refreshed.session
+    if sb_session is None:
+        st.error("Session expired. Please log in again.")
+        st.switch_page("pages/loginPage.py")
+        st.stop()
+except Exception:
+    st.error("Session expired. Please log in again.")
+    st.switch_page("pages/loginPage.py")
+    st.stop()
+    
+supabase.postgrest.auth(sb_session.access_token)
+
+res_test = supabase.rpc("auth_uid_test").execute()
+st.write("auth.uid():", res_test.data)
+
+def upload_file(file, filename):
+    if not file:
+        return None
+
+    path = f"{user_id}/{filename}"
+
+    supabase.storage.from_("compliance_docs").upload(
+        path,
+        file.getvalue(),
+        {"content-type": file.type}
+    )
+
+    return path
 
 # UTILS: Robust Base64 Loading
 def get_base64_of_bin_file(path):
@@ -150,6 +206,27 @@ with b2:
         # Switch back to the first info page
         st.switch_page("pages/informationCollection_2.py")
 
-with b4: 
-    if st.button(" Next Step -> "):
+if st.button(" Next -> "):
+    try:
+        balance_sheet_path = upload_file(balance_sheet, "balance_sheet.pdf")
+        ca_cert_path = upload_file(ca_cert, "ca_certificate.pdf")
+
+        data = {
+            "user_id": user_id,
+            "avg_annual_turnover": avg_turnover,
+            "fy_wise_turnover": fy_wise,
+            "balance_sheet_url": balance_sheet_path,
+            "ca_certificate_url": ca_cert_path,
+        }
+        st.write({
+                "sb_session_exists": sb_session is not None,
+                "access_token_exists": bool(sb_session.access_token),
+                "user_id_session": user_id
+            })
+        supabase.table("financials").upsert(data).execute()
+
+        st.session_state["onboarding_step"] = 4
         st.switch_page("pages/informationCollection_4.py")
+
+    except Exception as e:
+        st.error(f"Error saving financial data: {e}")

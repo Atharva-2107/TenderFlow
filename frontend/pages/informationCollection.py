@@ -7,6 +7,14 @@ from pathlib import Path
 from supabase import create_client
 import supabase
 
+if not st.session_state.get("authenticated"):
+    st.switch_page("pages/loginPage.py")
+    st.stop()
+
+if st.session_state.get("onboarding_complete"):
+    st.switch_page("pages/dashboard.py")
+    st.stop()
+    
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
@@ -196,46 +204,41 @@ auth_name = st.text_input("Authorized Signatory Name", placeholder="Full legal n
 st.markdown("<div style='margin-top:20px'></div>", unsafe_allow_html=True)
 b1, b2, b3 = st.columns([2, 1, 2])
 
-with b2: 
+with b2:
     if st.button(" Next -> "):
-        # 1. Validation: Ensure mandatory fields are filled
+
+        # 1️⃣ Validation
         if not company_name or not email or not auth_name:
             st.error("Please fill in all mandatory fields (Company Name, Email, and Signatory).")
-        else:
-            try:
-                # 2. Get the current authenticated user
-                #user_res = supabase.auth.get_user()
-                #if user_res.user:
-                   # user_id = user_res.user.id
-                    
-                    # 3. Prepare the data payload
-                    # Note: Match these keys exactly to your Supabase table columns
-                profile_data = {
-                    "id": user_id,
-                    "company_name": company_name,
-                    "org_type": org_type,
-                    "incorp_date": str(incorp_date),
-                    "email": email,
-                    "phone_number": phone,
-                    "designation": designation,
-                    "reg_address": reg_address,
-                    "office_address": reg_address if same_as_reg else office_address,
-                    "authorized_signatory": auth_name,
-                    #"updated_at": "now()"
-                }
+            st.stop()
 
-                    # 4. Upsert to Supabase
-                    # This creates the record if new, or updates if it exists
-                res = supabase.table("profiles").upsert(profile_data).execute()
+        try:
+            # 2️⃣ Prepare payload
+            profile_data = {
+                "id": user_id,  # auth.users.id
+                "company_name": company_name,
+                "org_type": org_type,
+                "incorp_date": str(incorp_date),
+                "email": email,
+                "phone_number": phone,
+                "designation": designation,
+                "reg_address": reg_address,
+                "office_address": reg_address if same_as_reg else office_address,
+                "authorized_signatory": auth_name,
+                "onboarding_step": 2
+            }
 
-                if res.data:
-                    st.success("Information saved!")
-                        # 5. Move to the next step of onboarding
-                    st.session_state["onboarding_step"] = 2
-                    st.switch_page("pages/informationCollection_2.py")
-                else:
-                    st.error("Session expired. Please log in again.")
-                    st.switch_page("app.py")
-                    
-            except Exception as e:
-                st.error(f"Error saving data: {str(e)}")
+            # 3️⃣ UPSERT (SAFE)
+            supabase.table("profiles") \
+                .upsert(profile_data, on_conflict="id") \
+                .execute()
+
+            # 4️⃣ Update session
+            st.session_state["onboarding_step"] = 2
+
+            # 5️⃣ Redirect
+            st.switch_page("pages/informationCollection_2.py")
+            st.stop()
+
+        except Exception as e:
+            st.error(f"Error saving data: {e}")

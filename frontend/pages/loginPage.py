@@ -5,7 +5,7 @@ import datetime
 from pathlib import Path
 from dotenv import load_dotenv
 from supabase import create_client
-from utils.auth_guard import auth_and_onboarding_guard
+#from utils.auth_guard import auth_and_onboarding_guard
 
 
 # -------------------------------------------------
@@ -184,32 +184,32 @@ with col_login:
                         "email": email.strip(),
                         "password": password
                         })
-            # ✅ CORRECT success condition
                     if res.session:
                         st.session_state["sb_session"] = res.session
                         st.session_state["user"] = res.user
                         st.session_state["authenticated"] = True
 
-                        # If onboarding incomplete → resume onboarding
                         profile = (
                             supabase.table("profiles")
-                            .select("onboarding_complete")
+                            .select("onboarding_complete, onboarding_step")
                             .eq("id", res.user.id)
-                            .single()
+                            .maybe_single()
                             .execute()
-                        )
-                        # ✅ SAFELY extract onboarding flag
+                        )   
+
                         profile_data = profile.data or {}
-                        onboarding_done = bool(profile_data.get("onboarding_complete", False))
 
-                        # Save to session
-                        st.session_state["onboarding_complete"] = onboarding_done
+                        onboarding_complete = bool(profile_data.get("onboarding_complete", False))
+                        onboarding_step = int(profile_data.get("onboarding_step", 1))
 
-                        # Route correctly
-                        if onboarding_done:
+                        # store in session
+                        st.session_state["onboarding_complete"] = onboarding_complete
+                        st.session_state["onboarding_step"] = onboarding_step
+
+                        if onboarding_complete:
                             st.switch_page("pages/dashboard.py")
                         else:
-                            st.switch_page("pages/informationCollection.py")
+                            st.switch_page(f"pages/informationCollection_{onboarding_step}.py")
 
                         st.stop()
                     else:
@@ -239,33 +239,33 @@ with col_login:
         # -------------------------
         # GOOGLE LOGIN
         # -------------------------
-        st.markdown("<div style='margin-top:25px'></div>", unsafe_allow_html=True)
+        # st.markdown("<div style='margin-top:25px'></div>", unsafe_allow_html=True)
 
-        oauth = supabase.auth.sign_in_with_oauth({
-            "provider": "google",
-            "options": {
-                "redirect_to": "http://localhost:8501"
-            }
-        })
+        # oauth = supabase.auth.sign_in_with_oauth({
+        #     "provider": "google",
+        #     "options": {
+        #         "redirect_to": "http://localhost:8501"
+        #     }
+        # })
 
-        st.markdown(f"""
-        <a href="{oauth.url}" style="text-decoration:none;">
-            <div style="
-                width:260px;
-                padding:14px;
-                border-radius:50px;
-                background:#111827;
-                color:white;
-                border:1px solid #2d313e;
-                font-size:16px;
-                margin:5px auto 30px;
-                display:flex;
-                justify-content:center;
-                align-items:center;">
-                Continue with Google
-            </div>
-        </a>
-        """, unsafe_allow_html=True)
+        # st.markdown(f"""
+        # <a href="{oauth.url}" style="text-decoration:none;">
+        #     <div style="
+        #         width:260px;
+        #         padding:14px;
+        #         border-radius:50px;
+        #         background:#111827;
+        #         color:white;
+        #         border:1px solid #2d313e;
+        #         font-size:16px;
+        #         margin:5px auto 30px;
+        #         display:flex;
+        #         justify-content:center;
+        #         align-items:center;">
+        #         Continue with Google
+        #     </div>
+        # </a>
+        # """, unsafe_allow_html=True)
 
         st.markdown("""
             <p style='text-align:center;color:#2d313e;font-size:10px;margin-top:50px'>

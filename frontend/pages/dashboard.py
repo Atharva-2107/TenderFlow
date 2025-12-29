@@ -6,10 +6,15 @@ import os
 from supabase import create_client
 # Import the new reusable component
 from components.navbar import render_navbar
-from utils.auth_guard import auth_and_onboarding_guard
+#from utils.auth_guard import auth_and_onboarding_guard
 
 if not st.session_state.get("authenticated"):
     st.switch_page("pages/loginPage.py")
+    st.stop()
+
+if not st.session_state.get("onboarding_complete"):
+    step = st.session_state.get("onboarding_step", 1)
+    st.switch_page(f"pages/informationCollection_{step}.py")
     st.stop()
 
 user = st.session_state["user"]
@@ -22,10 +27,7 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-auth_and_onboarding_guard(
-    require_auth=True,
-    require_onboarding_complete=True
-)
+#auth_and_onboarding_guard(supabase)
 
 
 # -------------------------------------------------

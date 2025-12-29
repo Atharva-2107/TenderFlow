@@ -9,8 +9,12 @@ from supabase import create_client
 st.set_page_config(page_title="TenderFlow | Compliance", layout="wide")
 st.toast("Basic Information recorded.")
 
-if st.session_state.get("onboarding_step", 1) < 2:
-    st.switch_page("pages/informationCollection.py")
+if not st.session_state.get("authenticated"):
+    st.switch_page("pages/loginPage.py")
+    st.stop()
+
+if st.session_state.get("onboarding_complete"):
+    st.switch_page("pages/dashboard.py")
     st.stop()
     
 load_dotenv() 
@@ -45,9 +49,6 @@ except Exception:
     st.stop()
     
 supabase.postgrest.auth(sb_session.access_token)
-
-res_test = supabase.rpc("auth_uid_test").execute()
-st.write("auth.uid():", res_test.data)
 
 def upload_file(file, filename):
     if not file:
@@ -208,15 +209,33 @@ with b2:
 with b4:
     if st.button(" Next -> "):
         try:
-            # Upload documents
-            firm_cert_path = upload_file(firm_cert, "firm_certificate")
-            poa_path = upload_file(poa_auth, "poa_authorization")
-            msme_path = upload_file(msme_cert, "msme_certificate")
-            dpiit_path = upload_file(dpiit_cert, "dpiit_certificate")
+            # --- SAFETY CHECK ---
+            if not sb_session or not sb_session.access_token:
+                st.error("Session expired. Please log in again.")
+                st.switch_page("pages/loginPage.py")
+                st.stop()
 
-            # Save to database
+            # --- UNIQUE FILE NAMES ---
+            firm_cert_path = upload_file(
+                firm_cert,
+                f"firm_certificate_{user_id}"
+            )
+            poa_path = upload_file(
+                poa_auth,
+                f"poa_authorization_{user_id}"
+            )
+            msme_path = upload_file(
+                msme_cert,
+                f"msme_certificate_{user_id}"
+            )
+            dpiit_path = upload_file(
+                dpiit_cert,
+                f"dpiit_certificate_{user_id}"
+            )
+
+            # --- DATA PAYLOAD ---
             data = {
-                "user_id": user_id,
+                "user_id": user_id,  # must be UNIQUE
                 "gst_number": gst_num,
                 "bank_account_number": bank_acc,
                 "ifsc_code": ifsc,
@@ -226,16 +245,23 @@ with b4:
                 "msme_certificate_url": msme_path,
                 "dpiit_certificate_url": dpiit_path,
             }
-            st.write({
-                "sb_session_exists": sb_session is not None,
-                "access_token_exists": bool(sb_session.access_token),
-                "user_id_session": user_id
-            })
-            supabase.table("business_compliance").upsert(data).execute()
 
-            # Move to next onboarding step
+            # --- UPSERT (CRITICAL FIX) ---
+            supabase.table("business_compliance") \
+                .upsert(data, on_conflict="user_id") \
+                .execute()
+
+            # --- ADVANCE ONBOARDING STEP ---
+            supabase.table("profiles") \
+                .update({"onboarding_step": 3}) \
+                .eq("id", user_id) \
+                .execute()
+
             st.session_state["onboarding_step"] = 3
+
+            # --- REDIRECT ---
             st.switch_page("pages/informationCollection_3.py")
+            st.stop()
 
         except Exception as e:
             st.error(f"Error saving compliance data: {e}")

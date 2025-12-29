@@ -10,8 +10,12 @@ from supabase import create_client
 st.set_page_config(page_title="TenderFlow | Experience", layout="wide")
 st.toast("Financial details recorded.")
 
-if st.session_state.get("onboarding_step", 3) < 4:
-    st.switch_page("pages/informationCollection.py")
+if not st.session_state.get("authenticated"):
+    st.switch_page("pages/loginPage.py")
+    st.stop()
+
+if st.session_state.get("onboarding_complete"):
+    st.switch_page("pages/dashboard.py")
     st.stop()
     
 load_dotenv() 
@@ -46,9 +50,6 @@ except Exception:
     st.stop()
     
 supabase.postgrest.auth(sb_session.access_token)
-
-res_test = supabase.rpc("auth_uid_test").execute()
-st.write("auth.uid():", res_test.data)
 
 def upload_file(file, filename):
     if not file:
@@ -270,11 +271,16 @@ with b2:
 
 with b4:
     if st.button(" Finish & Go to Dashboard "):
-        supabase.table("profiles") \
-            .update({"onboarding_complete": True}) \
-            .eq("id", user_id) \
-            .execute()
-        # also keep session state
+        # 1. Update DB (source of truth)
+        supabase.table("profiles").update({
+            "onboarding_step": 999,
+            "onboarding_complete": True
+        }).eq("id", user_id).execute()
+
+        # 2. Update session cache
         st.session_state["onboarding_complete"] = True
+        st.session_state["onboarding_step"] = 999
+
+        # 3. Redirect
         st.switch_page("pages/dashboard.py")
         st.stop()

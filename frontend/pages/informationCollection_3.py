@@ -9,8 +9,12 @@ from supabase import create_client
 st.set_page_config(page_title="TenderFlow | Financial Capacity", layout="wide")
 st.toast("Legal & Tax Compliance details recorded.")
 
-if st.session_state.get("onboarding_step", 2) < 3:
-    st.switch_page("pages/informationCollection.py")
+if not st.session_state.get("authenticated"):
+    st.switch_page("pages/loginPage.py")
+    st.stop()
+
+if st.session_state.get("onboarding_complete"):
+    st.switch_page("pages/dashboard.py")
     st.stop()
     
 load_dotenv() 
@@ -45,9 +49,6 @@ except Exception:
     st.stop()
     
 supabase.postgrest.auth(sb_session.access_token)
-
-res_test = supabase.rpc("auth_uid_test").execute()
-st.write("auth.uid():", res_test.data)
 
 def upload_file(file, filename):
     if not file:
@@ -208,25 +209,48 @@ with b2:
 
 if st.button(" Next -> "):
     try:
-        balance_sheet_path = upload_file(balance_sheet, "balance_sheet.pdf")
-        ca_cert_path = upload_file(ca_cert, "ca_certificate.pdf")
+        # --- SAFETY CHECK ---
+        if not sb_session or not sb_session.access_token:
+            st.error("Session expired. Please log in again.")
+            st.switch_page("pages/loginPage.py")
+            st.stop()
 
+        # --- UNIQUE FILE NAMES (IMPORTANT) ---
+        balance_sheet_path = upload_file(
+            balance_sheet,
+            f"balance_sheet_{user_id}.pdf"
+        )
+        ca_cert_path = upload_file(
+            ca_cert,
+            f"ca_certificate_{user_id}.pdf"
+        )
+
+        # --- DATA PAYLOAD ---
         data = {
-            "user_id": user_id,
+            "user_id": user_id,   # must be UNIQUE or PRIMARY KEY
             "avg_annual_turnover": avg_turnover,
             "fy_wise_turnover": fy_wise,
             "balance_sheet_url": balance_sheet_path,
             "ca_certificate_url": ca_cert_path,
         }
-        st.write({
-                "sb_session_exists": sb_session is not None,
-                "access_token_exists": bool(sb_session.access_token),
-                "user_id_session": user_id
-            })
-        supabase.table("financials").upsert(data).execute()
+
+        # --- UPSERT (SAFE) ---
+        supabase.table("financials") \
+            .upsert(data, on_conflict="user_id") \
+            .execute()
+
+        # --- ADVANCE ONBOARDING STEP ---
+        supabase.table("profiles") \
+            .update({"onboarding_step": 4}) \
+            .eq("id", user_id) \
+            .execute()
 
         st.session_state["onboarding_step"] = 4
+
+        # --- REDIRECT ---
         st.switch_page("pages/informationCollection_4.py")
+        st.stop()
 
     except Exception as e:
         st.error(f"Error saving financial data: {e}")
+

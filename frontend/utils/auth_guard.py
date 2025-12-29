@@ -1,38 +1,49 @@
 import streamlit as st
 
+import streamlit as st
 
-def auth_and_onboarding_guard(
-    *,
-    require_auth: bool = True,
-    require_onboarding_complete: bool = False,
-    redirect_login: str = "pages/loginPage.py",
-    redirect_onboarding: str = "pages/informationCollection.py",
-):
-    """
-    Centralized auth + onboarding guard for Streamlit pages.
-    Uses ONLY st.session_state (no Supabase calls).
-
-    Parameters:
-    - require_auth: block unauthenticated users
-    - require_onboarding_complete: block users who haven't finished onboarding
-    """
-
-    # 1️⃣ Auth check
-    if require_auth and not st.session_state.get("authenticated"):
-        st.switch_page(redirect_login)
-        st.stop()
-
-    # 2️⃣ User object check
+def auth_and_onboarding_guard(supabase):
     user = st.session_state.get("user")
-    if require_auth and not user:
-        st.switch_page(redirect_login)
+
+    if not user:
+        st.switch_page("pages/loginPage.py")
         st.stop()
 
-    # 3️⃣ Onboarding check (optional)
-    if require_onboarding_complete:
-        if not st.session_state.get("onboarding_complete", False):
-            st.switch_page(redirect_onboarding)
-            st.stop()
+    user_id = user.id
 
-    # ✅ Passed all checks
-    return True
+    res = (
+        supabase
+        .table("profiles")
+        .select("onboarding_step, onboarding_complete")
+        .eq("id", user_id)
+        .execute()   # ❌ NO .single()
+    )
+
+    # 🚨 NO PROFILE ROW YET → start onboarding
+    if not res.data or len(res.data) == 0:
+        st.session_state["onboarding_step"] = 1
+        st.session_state["onboarding_complete"] = False
+        st.switch_page("pages/informationCollection.py")
+        st.stop()
+
+    profile = res.data[0]
+
+    onboarding_complete = bool(profile.get("onboarding_complete"))
+    step = int(profile.get("onboarding_step") or 1)
+
+    st.session_state["onboarding_step"] = step
+    st.session_state["onboarding_complete"] = onboarding_complete
+
+    if onboarding_complete:
+        st.switch_page("pages/dashboard.py")
+        st.stop()
+
+    routes = {
+        1: "pages/informationCollection.py",
+        2: "pages/informationCollection_2.py",
+        3: "pages/informationCollection_3.py",
+        4: "pages/informationCollection_4.py",
+    }
+
+    st.switch_page(routes.get(step, "pages/informationCollection.py"))
+    st.stop()

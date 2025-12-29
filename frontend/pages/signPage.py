@@ -206,28 +206,28 @@ with col_signup:
         # -------------------------
         # GOOGLE SIGN UP
         # -------------------------
-        oauth = supabase.auth.sign_in_with_oauth({
-            "provider": "google",
-            "options": {
-                "redirect_to": "http://localhost:8501"
-            }
-        })
+        # oauth = supabase.auth.sign_in_with_oauth({
+        #     "provider": "google",
+        #     "options": {
+        #         "redirect_to": "http://localhost:8501"
+        #     }
+        # })
 
-        st.markdown(f"""
-        <a href="{oauth.url}" style="text-decoration:none;">
-            <div style="
-                width:260px;
-                padding:14px;
-                border-radius:50px;
-                background:#111827;
-                color:white;
-                border:1px solid #2d313e;
-                font-size:16px;
-                margin:10px auto 30px;
-                display:flex;
-                justify-content:center;
-                align-items:center;">
-                Continue with Google
-            </div>
-        </a>
-        """, unsafe_allow_html=True)
+        # st.markdown(f"""
+        # <a href="{oauth.url}" style="text-decoration:none;">
+        #     <div style="
+        #         width:260px;
+        #         padding:14px;
+        #         border-radius:50px;
+        #         background:#111827;
+        #         color:white;
+        #         border:1px solid #2d313e;
+        #         font-size:16px;
+        #         margin:10px auto 30px;
+        #         display:flex;
+        #         justify-content:center;
+        #         align-items:center;">
+        #         Continue with Google
+        #     </div>
+        # </a>
+        # """, unsafe_allow_html=True)

@@ -8,18 +8,14 @@ from supabase import create_client
 #from utils.auth_guard import auth_and_onboarding_guard
 
 
-# -------------------------------------------------
 # PAGE CONFIG
-# -------------------------------------------------
 st.set_page_config(page_title="TenderFlow AI | Login", layout="wide")
 
 # redirect already logged in users
 if st.session_state.get("authenticated"):
     st.switch_page("pages/dashboard.py")
     st.stop()
-# -------------------------------------------------
-# LOAD .ENV (ROBUST)
-# -------------------------------------------------
+# LOAD .ENV 
 def load_env():
     current = Path(__file__).resolve()
     for parent in current.parents:
@@ -41,18 +37,15 @@ if not SUPABASE_URL or not SUPABASE_KEY:
     st.stop()
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-# -------------------------------------------------
 # UTILS
-# -------------------------------------------------
 def get_base64_of_bin_file(path):
     if os.path.exists(path):
         with open(path, "rb") as f:
             return base64.b64encode(f.read()).decode()
     return None
 
-# -------------------------------------------------
+
 # THEME + CSS
-# -------------------------------------------------
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
@@ -120,14 +113,10 @@ div[data-testid="stFormSubmitButton"] {
 </style>
 """, unsafe_allow_html=True)
 
-# -------------------------------------------------
 # LAYOUT
-# -------------------------------------------------
 col_branding, col_login = st.columns([1.2, 1])
 
-# -------------------------------------------------
 # LEFT BRANDING
-# -------------------------------------------------
 with col_branding:
     st.markdown("<div style='height:30vh'></div>", unsafe_allow_html=True)
     st.markdown("""
@@ -142,9 +131,7 @@ with col_branding:
         </div>
     """, unsafe_allow_html=True)
 
-# -------------------------------------------------
 # RIGHT LOGIN
-# -------------------------------------------------
 with col_login:
     st.markdown("<div style='height:2vh'></div>", unsafe_allow_html=True)
     _, box, _ = st.columns([0.2, 0.6, 0.2])
@@ -165,9 +152,7 @@ with col_login:
                 </div>
             """, unsafe_allow_html=True)
 
-        # -------------------------
         # LOGIN FORM
-        # -------------------------
         with st.form("login_form"):
             email = st.text_input("Work Email")
             password = st.text_input("Password", type="password")

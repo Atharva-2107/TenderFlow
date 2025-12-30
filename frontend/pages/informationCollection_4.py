@@ -64,7 +64,7 @@ def upload_file(file, filename):
     )
 
     return path
-# UTILS: Robust Base64 Loading
+# UTILS
 def get_base64_of_bin_file(path):
     try:
         if os.path.exists(path):
@@ -74,7 +74,6 @@ def get_base64_of_bin_file(path):
         return None
     return None
 
-# --- REFINED PREMIUM DARK CSS ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
@@ -201,7 +200,7 @@ st.markdown("""
         </div>
         """, unsafe_allow_html=True)
 
-# --- FORM ---
+# FORM 
 with st.form("experience_form", clear_on_submit=True):
     c1, c2 = st.columns(2, gap="large")
     with c1:
@@ -223,9 +222,6 @@ with st.form("experience_form", clear_on_submit=True):
     st.markdown('<div class="add-btn-container">', unsafe_allow_html=True)
     _, add_col, _ = st.columns([1, 1, 1])
     with add_col:
-        # Form submit buttons are slightly different, so we style them separately
-        #st.form_submit_button("＋ ADD EXPERIENCE", use_container_width=True)
-    #st.markdown('</div>', unsafe_allow_html=True)
         if st.form_submit_button("＋ ADD EXPERIENCE", use_container_width=True):
 
             try:
@@ -260,7 +256,7 @@ with st.form("experience_form", clear_on_submit=True):
             except Exception as e:
                 st.error(f"Error saving experience: {e}")
 
-# --- FINAL ACTION ---
+
 st.markdown("<div style='margin-top:20px'></div>", unsafe_allow_html=True)
 b1, b2, b3, b4, b5 = st.columns([1,2,1,2,1])
 
@@ -271,7 +267,7 @@ with b2:
 
 with b4:
     if st.button(" Finish & Go to Dashboard "):
-        # 1. Update DB (source of truth)
+        # 1. Update DB 
         supabase.table("profiles").update({
             "onboarding_step": 999,
             "onboarding_complete": True

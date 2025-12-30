@@ -64,7 +64,7 @@ def upload_file(file, filename):
 
     return path
 
-# UTILS: Robust Base64 Loading
+# UTILS
 def get_base64_of_bin_file(path):
     try:
         if os.path.exists(path):
@@ -74,7 +74,7 @@ def get_base64_of_bin_file(path):
         return None
     return None
 
-# --- REFINED PREMIUM DARK CSS ---
+
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
@@ -161,7 +161,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# LOGO (Keeping your positioning)
+# LOGO
 current_file_path = Path(__file__).resolve()
 logo_path = current_file_path.parent / "assets" / "logo.png"
 logo_base64 = get_base64_of_bin_file(logo_path)
@@ -173,7 +173,7 @@ if logo_base64:
         </div>
     """, unsafe_allow_html=True)
 
-# --- CONTENT ---
+# CONTENT 
 st.markdown("""
         <div class="centered-header">
             <h1>Financial Capacity</h1>
@@ -181,7 +181,6 @@ st.markdown("""
         </div>
         """, unsafe_allow_html=True)
 
-# --- BALANCED LAYOUT TO PREVENT "EMPTY" LOOK ---
 c1, c2 = st.columns(2, gap='large')
 
 with c1:
@@ -197,7 +196,6 @@ with c2:
     st.markdown("<div style='margin-top: 25px;'></div>", unsafe_allow_html=True)
     ca_cert = st.file_uploader("Upload CA Certificate", type=['pdf'])
 
-# --- ACTION ---
 st.markdown("<div style='margin-top:20px'></div>", unsafe_allow_html=True)
 
 b1, b2, b3, b4, b5 = st.columns([1,2,1,2,1])
@@ -209,13 +207,13 @@ with b2:
 
 if st.button(" Next -> "):
     try:
-        # --- SAFETY CHECK ---
+        # SAFETY CHECK 
         if not sb_session or not sb_session.access_token:
             st.error("Session expired. Please log in again.")
             st.switch_page("pages/loginPage.py")
             st.stop()
 
-        # --- UNIQUE FILE NAMES (IMPORTANT) ---
+        # UNIQUE FILE NAMES (
         balance_sheet_path = upload_file(
             balance_sheet,
             f"balance_sheet_{user_id}.pdf"
@@ -225,21 +223,20 @@ if st.button(" Next -> "):
             f"ca_certificate_{user_id}.pdf"
         )
 
-        # --- DATA PAYLOAD ---
+        # DATA PAYLOAD 
         data = {
-            "user_id": user_id,   # must be UNIQUE or PRIMARY KEY
+            "user_id": user_id,   
             "avg_annual_turnover": avg_turnover,
             "fy_wise_turnover": fy_wise,
             "balance_sheet_url": balance_sheet_path,
             "ca_certificate_url": ca_cert_path,
         }
 
-        # --- UPSERT (SAFE) ---
+        #UPSERT 
         supabase.table("financials") \
             .upsert(data, on_conflict="user_id") \
             .execute()
 
-        # --- ADVANCE ONBOARDING STEP ---
         supabase.table("profiles") \
             .update({"onboarding_step": 4}) \
             .eq("id", user_id) \
@@ -247,7 +244,7 @@ if st.button(" Next -> "):
 
         st.session_state["onboarding_step"] = 4
 
-        # --- REDIRECT ---
+        # REDIRECT 
         st.switch_page("pages/informationCollection_4.py")
         st.stop()
 

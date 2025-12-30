@@ -69,7 +69,7 @@ if st.session_state.get("onboarding_complete") is True:
     st.switch_page("pages/dashboard.py")
     st.stop()
        
-# UTILS: Robust Base64 Loading
+# UTILS: 
 def get_base64_of_bin_file(path):
     try:
         if os.path.exists(path):
@@ -79,7 +79,7 @@ def get_base64_of_bin_file(path):
         return None
     return None
 
-# --- PREMIUM DARK CSS ---
+#PREMIUM DARK CSS
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
@@ -163,7 +163,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# LOGO (Using your preferred positioning)
+# LOGO 
 current_file_path = Path(__file__).resolve()
 logo_path = current_file_path.parent / "assets" / "logo.png"
 logo_base64 = get_base64_of_bin_file(logo_path)
@@ -175,7 +175,7 @@ if logo_base64:
         </div>
     """, unsafe_allow_html=True)
 
-# --- CONTENT ---
+# CONTENT
 st.markdown("""
         <div class="centered-header">
             <h1>Legal & Tax Compliance</h1>
@@ -198,7 +198,7 @@ with c2:
     msme_cert = st.file_uploader("MSME Certificate (Optional)", type=['pdf', 'jpg', 'png'])
     dpiit_cert = st.file_uploader("DPIIT (Startup) Certificate (Optional)", type=['pdf', 'jpg', 'png'])
 
-# --- ACTION ---
+# ACTION
 b1, b2, b3, b4, b5 = st.columns([1,2,1,2,1])
 
 with b2:
@@ -209,13 +209,13 @@ with b2:
 with b4:
     if st.button(" Next -> "):
         try:
-            # --- SAFETY CHECK ---
+            # SAFETY CHECK
             if not sb_session or not sb_session.access_token:
                 st.error("Session expired. Please log in again.")
                 st.switch_page("pages/loginPage.py")
                 st.stop()
 
-            # --- UNIQUE FILE NAMES ---
+            # UNIQUE FILE NAME
             firm_cert_path = upload_file(
                 firm_cert,
                 f"firm_certificate_{user_id}"
@@ -233,9 +233,9 @@ with b4:
                 f"dpiit_certificate_{user_id}"
             )
 
-            # --- DATA PAYLOAD ---
+            #  DATA PAYLOAD 
             data = {
-                "user_id": user_id,  # must be UNIQUE
+                "user_id": user_id,  
                 "gst_number": gst_num,
                 "bank_account_number": bank_acc,
                 "ifsc_code": ifsc,
@@ -246,12 +246,12 @@ with b4:
                 "dpiit_certificate_url": dpiit_path,
             }
 
-            # --- UPSERT (CRITICAL FIX) ---
+            # UPSERT 
             supabase.table("business_compliance") \
                 .upsert(data, on_conflict="user_id") \
                 .execute()
 
-            # --- ADVANCE ONBOARDING STEP ---
+            # ADVANCE ONBOARDING STEP 
             supabase.table("profiles") \
                 .update({"onboarding_step": 3}) \
                 .eq("id", user_id) \
@@ -259,7 +259,7 @@ with b4:
 
             st.session_state["onboarding_step"] = 3
 
-            # --- REDIRECT ---
+            # REDIRECT
             st.switch_page("pages/informationCollection_3.py")
             st.stop()
 

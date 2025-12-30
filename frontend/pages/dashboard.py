@@ -4,9 +4,7 @@ import plotly.express as px
 from pathlib import Path
 import os
 from supabase import create_client
-# Import the new reusable component
 from components.navbar import render_navbar
-#from utils.auth_guard import auth_and_onboarding_guard
 
 if not st.session_state.get("authenticated"):
     st.switch_page("pages/loginPage.py")
@@ -30,22 +28,17 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 #auth_and_onboarding_guard(supabase)
 
 
-# -------------------------------------------------
 # PAGE CONFIG
-# -------------------------------------------------
 st.set_page_config(
     page_title="TenderFlow AI",
     layout="wide"
 )
 
-# -------------------------------------------------
+
 # CALL REUSABLE NAVBAR
-# -------------------------------------------------
 render_navbar()
 
-# -------------------------------------------------
 # GLOBAL STYLING
-# -------------------------------------------------
 st.markdown("""
 <style>
     /* HIDE HEADER ANCHOR ICONS (-) */
@@ -85,9 +78,8 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# -------------------------------------------------
+
 # SIDEBAR
-# -------------------------------------------------
 with st.sidebar:
     # Space for the fixed navbar
     st.markdown("<br><br>", unsafe_allow_html=True)
@@ -95,7 +87,7 @@ with st.sidebar:
     st.caption("Tender Intelligence Platform")
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # ---- NAVIGATION ----
+    # NAVIGATION 
     st.button("Overview", use_container_width=True)
     st.button("Active Tenders", use_container_width=True)
     st.button("Bid Intelligence", use_container_width=True)
@@ -105,7 +97,7 @@ with st.sidebar:
 
     st.markdown("<br><br>", unsafe_allow_html=True)
 
-    # ---- PROFILE POPOVER ----
+    # PROFILE POPOVER
     with st.popover("👤   Riddhi", use_container_width=True):
         st.markdown("**Riddhi Chauhan**")
         st.caption("Bid Manager")
@@ -115,9 +107,8 @@ with st.sidebar:
         st.button("🔄 Switch Organization", use_container_width=True)
         st.button("⏻ Logout", use_container_width=True)
 
-# -------------------------------------------------
+
 # DASHBOARD MAIN CONTENT
-# -------------------------------------------------
 header_left, header_right = st.columns([4, 1])
 
 with header_left:
@@ -128,7 +119,7 @@ with header_right:
     st.markdown("<div style='margin-top:14px'></div>", unsafe_allow_html=True)
     st.button("➕ New Tender", use_container_width=True)
 
-# --- KPI STRIP ---
+#  KPI STRIP 
 k1, k2, k3, k4, k5 = st.columns(5)
 k1.metric("Active", "42")
 k2.metric("Due < 7d", "9")
@@ -136,7 +127,7 @@ k3.metric("Avg Win %", "67%")
 k4.metric("Prep Time", "3 days")
 k5.metric("Compliance", "96%")
 
-# --- ACTIVE TENDERS TABLE ---
+#ACTIVE TENDERS TABLE
 st.markdown("### Active Tenders")
 tenders = pd.DataFrame({
     "Tender": ["Mumbai Metro", "NH Infra", "Smart City", "Rail Electrification"],
@@ -147,7 +138,7 @@ tenders = pd.DataFrame({
 })
 st.dataframe(tenders, use_container_width=True, hide_index=True)
 
-# --- PIPELINE + RISK ---
+# PIPELINE + RISK
 left, right = st.columns(2)
 pipeline = pd.DataFrame({
     "Stage": ["Identified", "Drafting", "Review", "Submitted"],
@@ -170,7 +161,7 @@ with right:
     fig2.update_layout(margin=dict(l=10, r=10, t=30, b=10))
     st.plotly_chart(fig2, use_container_width=True)
 
-# --- ALERTS + AI TRUST ---
+# ALERTS + AI TRUST
 a1, a2 = st.columns([1.2, 1])
 with a1:
     st.markdown("### Alerts")
@@ -183,5 +174,5 @@ with a2:
     st.success("✔ Local Embeddings Enabled")
     st.info("1 tender pending manual review")
 
-# --- FOOTER ---
+# FOOTER
 st.caption("TenderFlow AI • Secure • Compliant • Hallucination-Proof")

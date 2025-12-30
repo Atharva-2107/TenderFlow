@@ -47,7 +47,7 @@ if "user" not in st.session_state or st.session_state["user"] is None:
 user = st.session_state["user"]
 user_id = user.id
 
-# UTILS: Robust Base64 Loading
+# UTILS
 def get_base64_of_bin_file(path):
     try:
         if os.path.exists(path):
@@ -57,7 +57,7 @@ def get_base64_of_bin_file(path):
         return None
     return None
 
-# REFINED DARK CSS 
+#cSs
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
@@ -170,7 +170,7 @@ if logo_base64:
 else:
     st.markdown("<h2 style='color:#a855f7; margin-bottom:20px;'>TenderFlow</h2>", unsafe_allow_html=True)
 
-# --- CONTENT ---
+# CONTENT
 st.markdown("""
         <div class="centered-header">
             <h1>Basic Information</h1>
@@ -178,7 +178,7 @@ st.markdown("""
         </div>
         """, unsafe_allow_html=True)
 
-# --- FORM LAYOUT ---
+# FORM LAYOUT
 c1, c2 = st.columns(2, gap="large")
 
 with c1:
@@ -200,20 +200,20 @@ if not same_as_reg:
 
 auth_name = st.text_input("Authorized Signatory Name", placeholder="Full legal name")
 
-# --- ACTION ---
+# ACTION
 st.markdown("<div style='margin-top:20px'></div>", unsafe_allow_html=True)
 b1, b2, b3 = st.columns([2, 1, 2])
 
 with b2:
     if st.button(" Next -> "):
 
-        # 1️⃣ Validation
+        # Validation
         if not company_name or not email or not auth_name:
             st.error("Please fill in all mandatory fields (Company Name, Email, and Signatory).")
             st.stop()
 
         try:
-            # 2️⃣ Prepare payload
+            # Prepare payload
             profile_data = {
                 "id": user_id,  # auth.users.id
                 "company_name": company_name,
@@ -228,15 +228,15 @@ with b2:
                 "onboarding_step": 2
             }
 
-            # 3️⃣ UPSERT (SAFE)
+            # UPSERT (SAFE)
             supabase.table("profiles") \
                 .upsert(profile_data, on_conflict="id") \
                 .execute()
 
-            # 4️⃣ Update session
+            # Update session
             st.session_state["onboarding_step"] = 2
 
-            # 5️⃣ Redirect
+            # Redirect
             st.switch_page("pages/informationCollection_2.py")
             st.stop()
 

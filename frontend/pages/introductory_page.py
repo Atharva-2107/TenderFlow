@@ -2,7 +2,6 @@ import streamlit as st
 import base64
 from pathlib import Path
 
-# Setup paths
 ROOT_DIR = Path(__file__).parent.parent
 BG_IMAGE = ROOT_DIR / "assets" / "bg.png"
 
@@ -15,11 +14,9 @@ def get_base64(bin_file):
         return None
 
 def intro_page():
-    # 1. Background Image Handling
     bin_str = get_base64(BG_IMAGE)
     bg_css = f'url("data:image/png;base64,{bin_str}")' if bin_str else "none"
 
-    # 2. Complete Professional CSS
     st.markdown(
         f"""
         <style>
@@ -114,13 +111,11 @@ def intro_page():
         unsafe_allow_html=True
     )
 
-    # 3. Login Button (Pinned to Top-Right)
     st.markdown('<div class="login-positioner">', unsafe_allow_html=True)
     if st.button("Login", key="btn_login"):
         st.switch_page("pages/loginPage.py")
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # 4. Hero Content Section
     st.markdown(
         """
         <div class="hero-container">
@@ -136,8 +131,6 @@ def intro_page():
         unsafe_allow_html=True
     )
 
-    # 5. Centered Sign In Button
-    # Uses columns to create perfect center alignment
     c1, c2, c3 = st.columns([1.5, 1, 1.5])
     with c2:
         if st.button("Sign UP", key="btn_signin", use_container_width=True):

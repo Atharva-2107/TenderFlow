@@ -777,4 +777,4 @@ if st.session_state.copy_success:
     time.sleep(1)
     st.session_state.copy_success = False
     st.session_state.copy_status = "📋 Copy Summary"
-    # No rerun here to prevent infinite loops
+    # No rerun here to prevent infinite loop

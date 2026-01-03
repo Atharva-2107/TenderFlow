@@ -67,7 +67,7 @@ st.markdown("""
     .section-header {
         font-size: 1.5rem;
         font-weight: bold;
-        color: #1f2937;
+        color: #64748B;
         margin-bottom: 1rem;
         padding-bottom: 0.5rem;
         border-bottom: 3px solid #3b82f6;
@@ -179,30 +179,48 @@ with left_panel:
     
     # Section navigation
     for section_name, section_data in st.session_state.sections.items():
-        status_icon = section_data['status']
-        if status_icon == '✅':
+        status_icon = section_data["status"]
+
+        if status_icon == "✅":
             status_text = "Ready"
             status_color = "#10b981"
-        elif status_icon == '⚠':
+        elif status_icon == "⚠":
             status_text = "Needs Review"
             status_color = "#f59e0b"
         else:
             status_text = "Missing Data"
             status_color = "#ef4444"
-        
+
         is_active = section_name == st.session_state.current_section
-        
-        if st.button(
-            f"{status_icon} {section_name}",
-            key=f"nav_{section_name}",
-            use_container_width=True,
-            type="primary" if is_active else "secondary"
-        ):
-            st.session_state.current_section = section_name
-            st.rerun()
-        
-        st.markdown(f"<small style='color: {status_color}; margin-left: 1rem;'>{status_text}</small>", unsafe_allow_html=True)
-        st.markdown("<br>", unsafe_allow_html=True)
+
+        # ONE container per section (important)
+        with st.container():
+            if st.button(
+                f"{status_icon} {section_name}",
+                key=f"nav_{section_name}",
+                use_container_width=True,
+                type="primary" if is_active else "secondary",
+            ):
+                st.session_state.current_section = section_name
+
+            # Status directly tied to THIS button
+            st.markdown(
+                f"""
+                <div style="
+                    text-align: center;
+                    margin-top: -10px;
+                    margin-bottom: 30px;
+                    font-size: 12px;
+                    font-weight: 600;
+                    line-height: 1.2;
+                    color: {status_color};
+                ">
+                    {status_text}
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
 
 # MAIN WORKSPACE
 with main_workspace:
@@ -341,7 +359,7 @@ Please upload a tender document to generate detailed content."""
 
 # RIGHT PANEL - Controls
 with right_panel:
-    st.markdown('<div class="control-panel">', unsafe_allow_html=True)
+    # st.markdown('<div class="control-panel">', unsafe_allow_html=True)
     
     st.markdown("### ⚙️ Generation Controls")
     

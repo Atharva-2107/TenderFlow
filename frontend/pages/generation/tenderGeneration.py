@@ -210,7 +210,7 @@ with left_panel:
                     text-align: center;
                     margin-top: -10px;
                     margin-bottom: 30px;
-                    font-size: 12px;
+                    font-size: 15px;
                     font-weight: 600;
                     line-height: 1.2;
                     color: {status_color};

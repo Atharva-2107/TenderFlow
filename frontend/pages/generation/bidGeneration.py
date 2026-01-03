@@ -14,7 +14,7 @@ def bid_generation_page():
             font-family: 'Inter', sans-serif;
             font-size: 2.6rem;
             font-weight: 800;
-            color: #0F172A;
+            color: #64748B;
             letter-spacing: -0.025em;
             margin-bottom: 0.2rem;
         }
@@ -22,7 +22,7 @@ def bid_generation_page():
             font-family: 'Inter', sans-serif;
             font-size: 1.25rem;
             font-weight: 600;
-            color: #1E293B;
+            color: #64748B;
             margin-top: 2rem;
             margin-bottom: 1rem;
             display: flex;

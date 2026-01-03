@@ -7,7 +7,7 @@ def risk_analysis_page():
     # --- 1. ENHANCED STYLING ---
     st.markdown("""
         <style>
-        .risk-header { font-size: 2.2rem; font-weight: 700; color: #1e293b; }
+        .risk-header { font-size: 2.2rem; font-weight: 700; color: #64748B; }
         .risk-tag {
             padding: 4px 12px;
             border-radius: 20px;

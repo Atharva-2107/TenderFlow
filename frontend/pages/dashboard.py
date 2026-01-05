@@ -540,35 +540,22 @@ with chart_col1:
 
 with chart_col2:
     st.markdown('<div class="chart-card">', unsafe_allow_html=True)
-    st.markdown('<div class="chart-title">Bid / No Bid</div>', unsafe_allow_html=True)
-    st.markdown('<div class="chart-subtitle">DECISION (ALL TIME)</div>', unsafe_allow_html=True)
+    st.markdown('<div class="chart-title">Tenders by Category</div>', unsafe_allow_html=True)
+    st.markdown('<div class="chart-subtitle">BUMBER OF TENDERS(ALL TIME)</div>', unsafe_allow_html=True)
+
+    #Tenders per ccategory
+    categories = ['Federal', 'State', 'Commercial', 'Other']
+    tender_counts = [45, 30, 20, 6] #Replacement of real data for NOW
+    colors =['#6366f1','#38bdf8','#22c55e','#f59e0b']
     
-    # Horizontal bar chart
     fig = go.Figure()
-    fig.add_trace(go.Bar(
-        y=['Bid', 'No Bid'],
-        x=[66, 33],
-        orientation='h',
-        marker=dict(color=['#6366f1', '#94a3b8']),
-        text=['66%', '33%'],
-        textposition='outside',
-        hovertemplate='<b>%{y}</b><br>%{x}%<extra></extra>'
-    ))
-    
-    fig.update_layout(
-        height=200,
-        margin=dict(t=20, b=20, l=0, r=0),
-        xaxis=dict(showgrid=False, showticklabels=False, range=[0, 100]),
-        yaxis=dict(showgrid=False),
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
-        showlegend=False
-    )
-    
+    fig.add_trace(go.Bar(x=categories,y=tender_counts,marker_color=colors,text=tender_counts,textposition='auto',hovertemplate='<b>%{x}</b><b>%{y} tenders<extra></extra>'))
+    fig.update_layout(height=250, margin=dict(t=20, b=20, l=0, r=0), paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)',xaxis=dict(showgrid=False),yaxis=dict(showgrid=True, gridcolor='#252a4a'),showlegend=False)
+
     st.plotly_chart(fig, use_container_width=True)
-    
-    st.markdown('<div style="text-align: center; font-size: 0.875rem; color: #64748b; margin-top: 1rem;">Average bid score: 62.22</div>', unsafe_allow_html=True)
-    
+    st.markdown('<div style="text=align: center; font-size: 0.875rem; color: #64748b; margin-top: 1rem;">Total Tenders: {}</div>'.format(sum(tender_counts)), unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
     # # Bid Activity over time
     # st.markdown('<div class="chart-title" style="margin-top: 2rem;">Bid Activity</div>', unsafe_allow_html=True)
     # st.markdown('<div class="chart-subtitle">OPPORTUNITIES REGISTERED (ALL TIME)</div>', unsafe_allow_html=True)
@@ -603,40 +590,52 @@ with chart_col2:
 
 with chart_col3:
     st.markdown('<div class="chart-card">', unsafe_allow_html=True)
-    st.markdown('<div class="chart-title">Resource Allocation</div>', unsafe_allow_html=True)
-    st.markdown('<div class="chart-subtitle">TASKS (ALL TIME)</div>', unsafe_allow_html=True)
+    st.markdown('<div class="chart-title">Top Higehest Bids</div>', unsafe_allow_html=True)
+    st.markdown('<div class="chart-subtitle">BY VALUE(ALL TIME)</div>', unsafe_allow_html=True)
     
-    # Resource allocation data
-    resources = [
-        ("Aaron Godde", 30, 36, "#3b82f6"),
-        ("Aleck Bassingthwaite", 26, 31, "#3b82f6"),
-        ("Nyree McKenzie", 23, 28, "#3b82f6"),
-        ("Carol Wilson", 15, 18, "#3b82f6"),
-        ("Aaron Godde (2)", 2, 3, "#e2e8f0"),
-        ("Tyson Young", 1, 2, "#e2e8f0"),
-        ("Adrian Liu", 0, 0, "#e2e8f0")
-    ]
-    
-    for i, (name, percent, tasks, color) in enumerate(resources):
-        col_a, col_b, col_c, col_d = st.columns([0.15, 0.4, 0.3, 0.15])
-        
-        with col_a:
-            st.markdown(f'<div style="width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, #3b82f6 0%, #38bdf8 100%); display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 0.875rem;">{name[0]}</div>', unsafe_allow_html=True)
-        
-        with col_b:
-            st.markdown(f'<div style="padding-top: 0.5rem; font-size: 0.875rem; color: white;">{name.split("(")[0].strip()}</div>', unsafe_allow_html=True)
-        
-        with col_c:
-            st.markdown(f'<div style="padding-top: 0.5rem;"><div style="display: flex; align-items: center; gap: 0.5rem;"><span style="font-size: 0.75rem; color: white; min-width: 35px;">{percent}%</span><div style="flex: 1; height: 8px; background-color: #252a4a; border-radius: 4px; overflow: hidden;"><div style="height: 100%; background: {color}; width: {percent}%; border-radius: 4px;"></div></div></div></div>', unsafe_allow_html=True)
-        
-        with col_d:
-            st.markdown(f'<div style="padding-top: 0.5rem; text-align: right; font-size: 0.875rem; color: white;">{tasks}</div>', unsafe_allow_html=True)
-        
-        if i < len(resources) - 1:
-            st.markdown('<div style="border-bottom: 1px solid #64748b; margin: 0.5rem 0;"></div>', unsafe_allow_html=True)
-    
-    st.markdown('<div style="text-align: center; font-size: 0.875rem; color: #64748b; margin-top: 1.5rem; padding-top: 1rem; border-top: 2px solid #f1f5f9;">Total tasks: 119</div>', unsafe_allow_html=True)
+    highest_bids = [("P ALpha", 15_200_000),("P Beta", 12_500_000),("P Gamma", 9_800_000), ("P Delta", 7_600_000),("P Epsilsom", 5_00_000)]
+
+    for i, (project, value) in enumerate(highest_bids):
+        st.markdown(f'''
+        <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid #64748b;">
+            <span style="font-weight: 600; color: white;">{i+1}.{project}</span>
+            <span style="color: #60a5fa; font-weight: 600;">${value/1_000_000:.1f}M</span>
+        </div>
+        ''', unsafe_allow_html=True)
+
+    st.markdown(f'<div style="text-align: center; font-size: 0.875rem; color: #64748b; margin-top: 1rem;">Total Bids Listed: {len(highest_bids)}</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
+    # # Resource allocation data
+    # resources = [
+    #     ("Aaron Godde", 30, 36, "#3b82f6"),
+    #     ("Aleck Bassingthwaite", 26, 31, "#3b82f6"),
+    #     ("Nyree McKenzie", 23, 28, "#3b82f6"),
+    #     ("Carol Wilson", 15, 18, "#3b82f6"),
+    #     ("Aaron Godde (2)", 2, 3, "#e2e8f0"),
+    #     ("Tyson Young", 1, 2, "#e2e8f0"),
+    #     ("Adrian Liu", 0, 0, "#e2e8f0")
+    # ]
+    
+    # for i, (name, percent, tasks, color) in enumerate(resources):
+    #     col_a, col_b, col_c, col_d = st.columns([0.15, 0.4, 0.3, 0.15])
+        
+    #     with col_a:
+    #         st.markdown(f'<div style="width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, #3b82f6 0%, #38bdf8 100%); display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 0.875rem;">{name[0]}</div>', unsafe_allow_html=True)
+        
+    #     with col_b:
+    #         st.markdown(f'<div style="padding-top: 0.5rem; font-size: 0.875rem; color: white;">{name.split("(")[0].strip()}</div>', unsafe_allow_html=True)
+        
+    #     with col_c:
+    #         st.markdown(f'<div style="padding-top: 0.5rem;"><div style="display: flex; align-items: center; gap: 0.5rem;"><span style="font-size: 0.75rem; color: white; min-width: 35px;">{percent}%</span><div style="flex: 1; height: 8px; background-color: #252a4a; border-radius: 4px; overflow: hidden;"><div style="height: 100%; background: {color}; width: {percent}%; border-radius: 4px;"></div></div></div></div>', unsafe_allow_html=True)
+        
+    #     with col_d:
+    #         st.markdown(f'<div style="padding-top: 0.5rem; text-align: right; font-size: 0.875rem; color: white;">{tasks}</div>', unsafe_allow_html=True)
+        
+    #     if i < len(resources) - 1:
+    #         st.markdown('<div style="border-bottom: 1px solid #64748b; margin: 0.5rem 0;"></div>', unsafe_allow_html=True)
+    
+    # st.markdown('<div style="text-align: center; font-size: 0.875rem; color: #64748b; margin-top: 1.5rem; padding-top: 1rem; border-top: 2px solid #f1f5f9;">Total tasks: 119</div>', unsafe_allow_html=True)
+    # st.markdown('</div>', unsafe_allow_html=True)
 
 # Bottom section
 st.markdown("<br>", unsafe_allow_html=True)

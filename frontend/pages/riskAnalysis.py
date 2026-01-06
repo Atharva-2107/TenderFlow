@@ -2,6 +2,16 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 import random
+import sys
+from pathlib import Path
+
+# Add project root to Python path
+ROOT_DIR = Path(__file__).resolve().parents[2]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
+from backend.risk_engine import analyze_pdf
+
 
 def risk_analysis_page():
     # --- 1. ENHANCED STYLING ---
@@ -87,7 +97,7 @@ def risk_analysis_page():
             import time; time.sleep(1.5)
             st.write("Categorizing 5 Pillars of Risk...")
             time.sleep(1)
-            st.session_state.analysis_results = simulate_analysis(uploaded_file.name)
+            st.session_state.analysis_results = analyze_pdf(uploaded_file)
             status.update(label="Analysis Complete!", state="complete")
 
     st.divider()

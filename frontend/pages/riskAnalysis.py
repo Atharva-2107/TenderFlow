@@ -20,16 +20,20 @@ def risk_analysis_page():
         .tag-legal { background-color: #e0f2fe; color: #075985; }
         .tag-ops { background-color: #fef3c7; color: #92400e; }
         .tag-payment { background-color: #f3e8ff; color: #6b21a8; }
+        .tag-timeline { background-color: #f3e8ff; color: #6b21a8; }
         
         .risk-card {
             padding: 1.5rem;
             border-radius: 12px;
             margin-bottom: 1.2rem;
-            border: 1px solid #e2e8f0;
-            background-color: white;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            border: 1px solid #1f2937;
+            background-color: #0f172a; /* NEW */
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
             transition: transform 0.2s;
         }
+        .risk-card h4 { color: #e5e7eb; }
+        .risk-card p { color: #cbd5f5; }
+                
         .risk-card:hover { transform: translateY(-2px); }
         .border-red { border-left: 6px solid #ef4444; }
         .border-amber { border-left: 6px solid #f59e0b; }

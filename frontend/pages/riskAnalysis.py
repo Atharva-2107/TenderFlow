@@ -2,6 +2,16 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 import random
+import sys
+from pathlib import Path
+
+# Add project root to Python path
+ROOT_DIR = Path(__file__).resolve().parents[2]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
+from backend.risk_engine import analyze_pdf
+
 
 def risk_analysis_page():
     # --- 1. ENHANCED STYLING ---
@@ -20,16 +30,20 @@ def risk_analysis_page():
         .tag-legal { background-color: #e0f2fe; color: #075985; }
         .tag-ops { background-color: #fef3c7; color: #92400e; }
         .tag-payment { background-color: #f3e8ff; color: #6b21a8; }
+        .tag-timeline { background-color: #f3e8ff; color: #6b21a8; }
         
         .risk-card {
             padding: 1.5rem;
             border-radius: 12px;
             margin-bottom: 1.2rem;
-            border: 1px solid #e2e8f0;
-            background-color: white;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            border: 1px solid #1f2937;
+            background-color: #0f172a; /* NEW */
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
             transition: transform 0.2s;
         }
+        .risk-card h4 { color: #e5e7eb; }
+        .risk-card p { color: #cbd5f5; }
+                
         .risk-card:hover { transform: translateY(-2px); }
         .border-red { border-left: 6px solid #ef4444; }
         .border-amber { border-left: 6px solid #f59e0b; }
@@ -83,7 +97,7 @@ def risk_analysis_page():
             import time; time.sleep(1.5)
             st.write("Categorizing 5 Pillars of Risk...")
             time.sleep(1)
-            st.session_state.analysis_results = simulate_analysis(uploaded_file.name)
+            st.session_state.analysis_results = analyze_pdf(uploaded_file)
             status.update(label="Analysis Complete!", state="complete")
 
     st.divider()

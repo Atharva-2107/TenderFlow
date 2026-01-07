@@ -1,184 +1,3 @@
-# import streamlit as st
-# import pandas as pd
-# import plotly.express as px
-# from pathlib import Path
-# import os
-# from supabase import create_client
-# from components.navbar import render_navbar
-
-# if not st.session_state.get("authenticated"):
-#     st.switch_page("pages/loginPage.py")
-#     st.stop()
-
-# if not st.session_state.get("onboarding_complete"):
-#     step = st.session_state.get("onboarding_step", 1)
-#     st.switch_page(f"pages/informationCollection_{step}.py")
-#     st.stop()
-
-# user = st.session_state["user"]
-
-# SUPABASE_URL = os.getenv("SUPABASE_URL")
-# SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-# if not SUPABASE_URL or not SUPABASE_KEY:
-#     st.error("Supabase environment variables not loaded")
-#     st.stop()
-
-# supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-
-# #auth_and_onboarding_guard(supabase)
-
-
-# # PAGE CONFIG
-# st.set_page_config(
-#     page_title="TenderFlow AI",
-#     layout="wide"
-# )
-
-
-# # CALL REUSABLE NAVBAR
-# render_navbar()
-
-# # GLOBAL STYLING
-# st.markdown("""
-# <style>
-#     /* HIDE HEADER ANCHOR ICONS (-) */
-#     button[title="View header anchor"] {
-#         display: none !important;
-#     }
-#     .stHtmlHeader a , .stMarkdown a{
-#         display: none !important;
-#     }
-    
-#     .main {
-#         background-color: #0B0F14;
-#     }
-
-#     /* Padding adjustment is handled inside navbar.py's CSS, 
-#        but we keep local dashboard styles here */
-#     h1, h2, h3, h4 {
-#         color: #E5E7EB;
-#         font-weight: 600;
-#     }
-
-#     p, span, label {
-#         color: #9CA3AF;
-#         font-size: 0.85rem;
-#     }
-
-#     div[data-testid="metric-container"] {
-#         background-color: #111827;
-#         border: 1px solid #1F2937;
-#         padding: 10px;
-#         border-radius: 8px;
-#     }
-
-#     .js-plotly-plot {
-#         margin-top: -12px;
-#     }
-# </style>
-# """, unsafe_allow_html=True)
-
-
-# # SIDEBAR
-# with st.sidebar:
-#     # Space for the fixed navbar
-#     st.markdown("<br><br>", unsafe_allow_html=True)
-    
-#     st.caption("Tender Intelligence Platform")
-#     st.markdown("<br>", unsafe_allow_html=True)
-
-#     # NAVIGATION 
-#     st.button("Overview", use_container_width=True)
-#     st.button("Active Tenders", use_container_width=True)
-#     st.button("Bid Intelligence", use_container_width=True)
-#     st.button("Compliance", use_container_width=True)
-#     st.button("Alerts", use_container_width=True)
-#     st.button("Settings", use_container_width=True)
-
-#     st.markdown("<br><br>", unsafe_allow_html=True)
-
-#     # PROFILE POPOVER
-#     with st.popover("👤   Riddhi", use_container_width=True):
-#         st.markdown("**Riddhi Chauhan**")
-#         st.caption("Bid Manager")
-#         st.caption("KJ Somaiya Polytechnic")
-#         st.divider()
-#         st.button("⚙ Account Settings", use_container_width=True)
-#         st.button("🔄 Switch Organization", use_container_width=True)
-#         st.button("⏻ Logout", use_container_width=True)
-
-
-# # DASHBOARD MAIN CONTENT
-# header_left, header_right = st.columns([4, 1])
-
-# with header_left:
-#     st.markdown("## Overview")
-#     st.caption("Live snapshot of tender activity, risk, and AI readiness")
-
-# with header_right:
-#     st.markdown("<div style='margin-top:14px'></div>", unsafe_allow_html=True)
-#     st.button("➕ New Tender", use_container_width=True)
-
-# #  KPI STRIP 
-# k1, k2, k3, k4, k5 = st.columns(5)
-# k1.metric("Active", "42")
-# k2.metric("Due < 7d", "9")
-# k3.metric("Avg Win %", "67%")
-# k4.metric("Prep Time", "3 days")
-# k5.metric("Compliance", "96%")
-
-# #ACTIVE TENDERS TABLE
-# st.markdown("### Active Tenders")
-# tenders = pd.DataFrame({
-#     "Tender": ["Mumbai Metro", "NH Infra", "Smart City", "Rail Electrification"],
-#     "Value (₹Cr)": [120, 85, 60, 45],
-#     "Deadline": ["4 days", "9 days", "14 days", "21 days"],
-#     "Compliance": ["92%", "98%", "95%", "97%"],
-#     "AI Status": ["⚠ Review", "✔ Verified", "✔ Verified", "✔ Verified"]
-# })
-# st.dataframe(tenders, use_container_width=True, hide_index=True)
-
-# # PIPELINE + RISK
-# left, right = st.columns(2)
-# pipeline = pd.DataFrame({
-#     "Stage": ["Identified", "Drafting", "Review", "Submitted"],
-#     "Count": [42, 18, 11, 7]
-# })
-# risk = pd.DataFrame({
-#     "Type": ["Missing Docs", "Legal", "Format"],
-#     "Count": [6, 3, 2]
-# })
-
-# with left:
-#     st.markdown("### Tender Pipeline")
-#     fig1 = px.bar(pipeline, x="Stage", y="Count", template="plotly_dark", height=220)
-#     fig1.update_layout(margin=dict(l=10, r=10, t=30, b=10))
-#     st.plotly_chart(fig1, use_container_width=True)
-
-# with right:
-#     st.markdown("### Risk Snapshot")
-#     fig2 = px.bar(risk, x="Type", y="Count", template="plotly_dark", height=220)
-#     fig2.update_layout(margin=dict(l=10, r=10, t=30, b=10))
-#     st.plotly_chart(fig2, use_container_width=True)
-
-# # ALERTS + AI TRUST
-# a1, a2 = st.columns([1.2, 1])
-# with a1:
-#     st.markdown("### Alerts")
-#     st.error("Mumbai Metro — Financial annexure missing")
-#     st.warning("NH Infra — Clause mismatch detected")
-
-# with a2:
-#     st.markdown("### AI Trust Status")
-#     st.success("✔ RAG Verification Active")
-#     st.success("✔ Local Embeddings Enabled")
-#     st.info("1 tender pending manual review")
-
-# # FOOTER
-# st.caption("TenderFlow AI • Secure • Compliant • Hallucination-Proof")
-
-
-
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
@@ -188,7 +7,6 @@ import numpy as np
 from pathlib import Path
 import os
 from supabase import create_client
-#from components.navbar import render_navbar
 import base64
 
 #UTILS
@@ -221,6 +39,12 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 # Page config
 st.set_page_config(page_title="Dashboard", layout="wide", initial_sidebar_state="collapsed")
 
+# ---------------- HANDLE SIDEBAR NAV ----------------
+nav_page = st.query_params.get("nav")
+if nav_page:
+    st.switch_page(nav_page)
+
+
 logo_path = Path(__file__).resolve().parents[1]/"assets"/"logo.png"
 logo_base64 = get_base64_of_bin_file(logo_path)
 
@@ -229,66 +53,10 @@ logo_base64 = get_base64_of_bin_file(logo_path)
 # Custom CSS
 st.markdown("""
 <style>
-    /* Main theme */
-    .stApp {
-        background: #0f111a;
-    }
+    .stApp { background: #0f111a; margin-top: -80px;}
     
-    /* Hide default sidebar */
-    [data-testid="stSidebar"] {
-        display: none;
-    }
-            
-    /* Hide Streamlit top bar (Deploy, menu, etc.) */
-        header[data-testid="stHeader"] {
-            display: none;
-        }
-
-/* Remove extra top padding Streamlit adds */
-.stApp {
-    margin-top: -80px;
-}
-    
-    /* Left Navigation Bar */
-    .left-nav {
-        position: fixed;
-        left: 0;
-        top: 0;
-        width: 70px;
-        height: 100vh;
-        background: #0f111a;
-        border-right: 1px solid #252a4a;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        padding-top: 1rem;
-        z-index: 1000;
-        box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
-    }
-    
-    .nav-icon {
-        width: 45px;
-        height: 45px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin: 0.5rem 0;
-        border-radius: 8px;
-        cursor: pointer;
-        transition: background-color 0.2s;
-        color: #9ca3af;
-        font-size: 1.5rem;
-    }
-    
-    .nav-icon:hover {
-        background-color: #1b1f3b;
-        color: e5e7eb;
-    }
-    
-    .nav-icon.active {
-        background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
-        color: white;
-    }
+    [data-testid="stSidebar"] {display: none;}
+    header[data-testid="stHeader"] {display: none;}
     
     /* Main content area with left margin */
     .main-content {
@@ -299,22 +67,63 @@ st.markdown("""
     /* Header styling */
     .top-header {
         background-color: #0f111a;
-        padding: 1rem 2rem;
+        padding: 10px 20px;
         border-top: 1px solid #252a4a;
         border-bottom: 1px solid #252a4a;
-        margin: -2rem -3rem 2rem -2rem;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
+        margin: 2rem;
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
     }
+            
+    .nav-btn button{
+        background: transparent !important;
+        border: none !important;
+        font-size: 1.4rem !important;
+        color: #9ca3af !important;        
+    }
+            
+    .nav-btn button:hover {
+        color: #e5e7eb !important;
+    }
+    
+    .nav-horizontal {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.nav-right-container {
+    display: flex;
+    align-items: center;
+    gap: 12px;           /* Icons ke beech ki barabar doori */
+    margin-left: auto;   /* Ye icons ko right side push kar dega */
+    padding-right: 20px;
+}
+
+.nav-right-container .stButton button {
+    background: transparent !important;
+    border: 1px solid #252a4a !important;
+    color: #9ca3af !important;
+    font-size: 1.1rem !important;
+    width: 38px !important;
+    height: 38px !important;
+    border-radius: 6px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0 !important;
+}
+
+.nav-right-container .stButton button:hover {
+    border-color: #6366f1 !important;
+    background: #1b1f3b !important;
+    color: white !important;
+}        
     
     .logo-section {
         display: flex;
         align-items: center;
-        gap: 0.5rem;
-        font-size: 1.5rem;
-        font-weight: 700;
-        color: #e5e7eb;
     }
     
     .dashboard-title {
@@ -389,42 +198,40 @@ st.markdown("""
         margin-bottom: 1rem;
         text-transform: uppercase;
     }
+    
 </style>
 """, unsafe_allow_html=True)
 
-# Left Navigation Bar (Fixed)
-st.markdown("""
-<div class="left-nav">
-    <div class="nav-icon active" title="Dashboard">📊</div>
-    <div class="nav-icon" title="List">☰</div>
-    <div class="nav-icon" title="Bookmark">🔖</div>
-    <div class="nav-icon" title="Calendar">📅</div>
-    <div class="nav-icon" title="Users">👤</div>
-    <div style="flex: 1;"></div>
-    <div class="nav-icon" title="Settings">✏️</div>
-    <div class="nav-icon" title="Profile">
-        <div style="width: 35px; height: 35px; border-radius: 50%; background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%);"></div>
-    </div>
-    <div style="font-size: 0.65rem; color: #64748b; margin-top: 0.5rem;">v2.8.6</div>
-</div>
-""", unsafe_allow_html=True)
+# Logo base64 check
+logo_html = f"<img src='data:image/png;base64,{logo_base64}' style='height:70px; width:auto;' />" if logo_base64 else ""
 
-# Main content wrapper
-st.markdown('<div class="main-content">', unsafe_allow_html=True)
+# Header HTML Start
+st.markdown(f'''
+    <div class="top-header">
+        <div class="logo-section">
+            {logo_html}
+        </div>
+        <div class="nav-right-container" id="nav-root">
+''', unsafe_allow_html=True)
 
-# Top Header
-st.markdown(f"""
-<div class="top-header">
-    <div class="logo-section">
-        {"<img src= 'data: image/png;base64," + logo_base64 + "' style= 'height: 60px; width: auto;' />" if logo_base64 else ""}
-    </div>
-    <div style="display: flex; gap: 1rem; align-items: center;">
-        <span style="color: #64748b; cursor: pointer;">What's New</span>
-        <span style="font-size: 1.5rem; cursor: pointer;">🔔</span>
-    </div>
-</div>
-""", unsafe_allow_html=True) 
+header_cols = st.columns([6, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4])
 
+with header_cols[1]:
+    if st.button("⊞", key="h_dash"): st.switch_page("app.py")
+with header_cols[2]:
+    if st.button("✦", key="h_bid"): st.switch_page("pages/bidGeneration.py")
+with header_cols[3]:
+    if st.button("◈", key="h_anl"): st.switch_page("pages/tenderAnalyser.py")
+with header_cols[4]:
+    if st.button("⎘", key="h_gen"): st.switch_page("pages/tenderGeneration.py")
+with header_cols[5]:
+    if st.button("⬈", key="h_risk"): st.switch_page("pages/riskAnalysis.py")
+with header_cols[6]:
+    if st.button("⚙", key="h_set"): st.switch_page("pages/settings.py")
+with header_cols[7]:
+    if st.button("👤", key="h_prof"): st.switch_page("pages/profile.py")
+
+st.markdown('</div></div>', unsafe_allow_html=True)
 # Dashboard header
 st.markdown('<div class="dashboard-title">Dashboard</div>', unsafe_allow_html=True)
 st.markdown('<div class="dashboard-date">Friday, 26 March 2021</div>', unsafe_allow_html=True)
@@ -454,7 +261,7 @@ with kpi1:
     st.markdown("""
     <div class="kpi-card">
         <div class="kpi-header">💰 Project Value Won</div>
-        <div class="kpi-value">$802.21M</div>
+        <div class="kpi-value">₹802.21M</div>
         <div class="kpi-footer">All Time</div>
     </div>
     """, unsafe_allow_html=True)
@@ -472,7 +279,7 @@ with kpi3:
     st.markdown("""
     <div class="kpi-card">
         <div class="kpi-header">✓ Capture Ratio</div>
-        <div class="kpi-value">$802.21M : $1.6B</div>
+        <div class="kpi-value">₹802.21M : ₹1.6B</div>
         <div style="background-color: rgba(255,255,255,0.2); height: 8px; border-radius: 4px; margin-top: 1rem;">
             <div style="background-color: #60a5fa; height: 100%; width: 50%; border-radius: 4px;"></div>
         </div>
@@ -599,7 +406,7 @@ with chart_col3:
         st.markdown(f'''
         <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid #64748b;">
             <span style="font-weight: 600; color: white;">{i+1}.{project}</span>
-            <span style="color: #60a5fa; font-weight: 600;">${value/1_000_000:.1f}M</span>
+            <span style="color: #60a5fa; font-weight: 600;">₹{value/1_000_000:.1f}M</span>
         </div>
         ''', unsafe_allow_html=True)
 

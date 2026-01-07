@@ -4,6 +4,8 @@ import base64
 from pathlib import Path
 from dotenv import load_dotenv
 from supabase import create_client
+import re
+from datetime import date
 
 
 # PAGE CONFIG
@@ -33,8 +35,8 @@ user = st.session_state.get("user")
 if not sb_session or not user:
     st.switch_page("pages/loginPage.py")
     st.stop()
-user_id = user.id
 
+user_id = user.id
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 try:
     refreshed = supabase.auth.refresh_session(sb_session.refresh_token)
@@ -51,6 +53,8 @@ except Exception:
     
 supabase.postgrest.auth(sb_session.access_token)
 
+MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
+
 def upload_file(file, filename):
     if not file:
         return None
@@ -64,6 +68,7 @@ def upload_file(file, filename):
     )
 
     return path
+
 # UTILS
 def get_base64_of_bin_file(path):
     try:
@@ -225,6 +230,30 @@ with st.form("experience_form", clear_on_submit=True):
         if st.form_submit_button("＋ ADD EXPERIENCE", use_container_width=True):
 
             try:
+                if not project_name.strip():
+                    st.error("Project Name is required.")
+                    st.stop()
+
+                if not client_name.strip():
+                    st.error("Client Name is required.")
+                    st.stop()
+
+                if not scope_of_work.strip() or len(scope_of_work) < 30:
+                    st.error("Scope of work must be at least 30 characters.")
+                    st.stop()
+
+                if not contract_val.strip() or not re.search(r"\d", contract_val):
+                    st.error("Contract value must contain a numeric amount.")
+                    st.stop()
+
+                if comp_status == "Completed" and not comp_date:
+                    st.error("Completion date is required for completed projects.")
+                    st.stop()
+
+                if not comp_cert:
+                    st.error("Completion certificate is mandatory.")
+                    st.stop()
+
                 cert_path = upload_file(
                     comp_cert,
                     f"completion_cert_{project_name.replace(' ', '_')}"

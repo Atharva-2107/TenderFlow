@@ -4,6 +4,7 @@ import base64
 from pathlib import Path
 from dotenv import load_dotenv
 from supabase import create_client
+import re
 
 # PAGE CONFIG
 st.set_page_config(page_title="TenderFlow | Compliance", layout="wide")
@@ -32,9 +33,10 @@ user = st.session_state.get("user")
 if not sb_session or not user:
     st.switch_page("pages/loginPage.py")
     st.stop()
-user_id = user.id
 
+user_id = user.id
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+
 try:
     refreshed = supabase.auth.refresh_session(sb_session.refresh_token)
     st.session_state["sb_session"] = refreshed.session
@@ -50,9 +52,15 @@ except Exception:
     
 supabase.postgrest.auth(sb_session.access_token)
 
+MAX_FILE_SIZE = 5 * 1024 * 1024  # (5MB MACXX)
+
 def upload_file(file, filename):
     if not file:
         return None
+    
+    if file.size > MAX_FILE_SIZE:
+        st.error(f"{file.name} exceeds Max size i.e 5MB")
+        st.stop()
 
     path = f"{user_id}/{filename}"
 
@@ -79,12 +87,18 @@ def get_base64_of_bin_file(path):
         return None
     return None
 
+GST_REGEX = r"^\d{2}[A-Z]{5}\d{4}[A-Z]{1}[A-Z\d]{1}Z[A-Z\d]{1}$"
+PAN_REGEX = r"^[A-Z]{5}\d{4}[A-Z]$"
+IFSC_REGEX = r"^[A-Z]{4}0[A-Z0-9]{6}$"
+
+def is_valid(regex, value):
+    return re.match(regex, value)
+
 #PREMIUM DARK CSS
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
 
-    /* NUCLEAR ANCHOR FIX - Removes the (-) icon */
     [data-testid="stHeaderActionElements"], .st-emotion-cache-16idsys p a, button[title="View header anchor"] {
         display: none !important;
     }
@@ -183,32 +197,56 @@ st.markdown("""
         </div>
         """, unsafe_allow_html=True)
 
-# --- FORM LAYOUT ---
+# FORM LAYOUT
 c1, c2 = st.columns(2, gap="large")
 
 with c1:
-    gst_num = st.text_input("GST Registration Number", placeholder="e.g. 22AAAAA0000A1Z5")
-    bank_acc = st.text_input("Bank Account Number", placeholder="Enter Account No.")
-    ifsc = st.text_input("IFSC Code", placeholder="e.g. SBIN0001234")
-    pan_card = st.text_input("PAN Card Number", placeholder="e.g. ABCDE1234F")
+    gst_num = st.text_input("GST Registration Number *", placeholder="e.g. 22AAAAA0000A1Z5").upper()
+    bank_acc = st.text_input("Bank Account Number *", placeholder="Digits only")
+    ifsc = st.text_input("IFSC Code *", placeholder="e.g. SBIN0001234").upper()
+    pan_card = st.text_input("PAN Card Number *", placeholder="e.g. ABCDE1234F").upper()
 
 with c2:
-    firm_cert = st.file_uploader("Firm Registration Certificate", type=['pdf', 'jpg', 'png'])
-    poa_auth = st.file_uploader("Power of Attorney / Authorization", type=['pdf', 'jpg', 'png'])
-    msme_cert = st.file_uploader("MSME Certificate (Optional)", type=['pdf', 'jpg', 'png'])
-    dpiit_cert = st.file_uploader("DPIIT (Startup) Certificate (Optional)", type=['pdf', 'jpg', 'png'])
+    firm_cert = st.file_uploader("Firm Registration Certificate *", type=['pdf', 'jpg', 'png'])
+    poa_auth = st.file_uploader("Power of Attorney / Authorization *", type=['pdf', 'jpg', 'png'])
+    msme_cert = st.file_uploader("MSME Certificate", type=['pdf', 'jpg', 'png'])
+    dpiit_cert = st.file_uploader("DPIIT Certificate", type=['pdf', 'jpg', 'png'])
 
 # ACTION
-b1, b2, b3, b4, b5 = st.columns([1,2,1,2,1])
+_, back_col, _, next_col, _ = st.columns([1,2,1,2,1])
 
-with b2:
+with back_col:
     if st.button(" <- Back "):
-        # Switch back to the first info page
         st.switch_page("pages/informationCollection.py")
 
-with b4:
+with next_col:
     if st.button(" Next -> "):
-        try:
+            
+            #critical checks 
+            if not gst_num or not is_valid(GST_REGEX, gst_num):
+                st.error("Enater valid GST number.")
+                st.stop()
+
+            if not pan_card or not is_valid(PAN_REGEX, pan_card):
+                st.error("Enter a valid Pan number.")
+                st.stop()
+
+            if not bank_acc.isdigit() or not (9 <= len(bank_acc) <= 18):
+                st.error("Bank acc number must be 9 - 18 digits.")
+                st.stop()
+
+            if not ifsc or not is_valid(IFSC_REGEX, ifsc):
+                st.error("enter valid IFSC code")
+                st.stop()
+
+            if not firm_cert:
+                st.error("firm registration cert. Required")
+                st.stop()
+
+            if not poa_auth:
+                st.error("poa (Power of Attorney / Authorization is mandatory) cert. Required")
+                st.stop()
+
             # SAFETY CHECK
             if not sb_session or not sb_session.access_token:
                 st.error("Session expired. Please log in again.")
@@ -244,8 +282,9 @@ with b4:
                 "poa_certificate_url": poa_path,
                 "msme_certificate_url": msme_path,
                 "dpiit_certificate_url": dpiit_path,
-            }
+        }
 
+    try: 
             # UPSERT 
             supabase.table("business_compliance") \
                 .upsert(data, on_conflict="user_id") \
@@ -263,5 +302,5 @@ with b4:
             st.switch_page("pages/informationCollection_3.py")
             st.stop()
 
-        except Exception as e:
+    except Exception as e:
             st.error(f"Error saving compliance data: {e}")

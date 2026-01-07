@@ -6,6 +6,7 @@ from datetime import date
 from pathlib import Path
 from supabase import create_client
 import supabase
+import re
 
 if not st.session_state.get("authenticated"):
     st.switch_page("pages/loginPage.py")
@@ -62,13 +63,8 @@ st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
 
-    /* HIDE HEADER ANCHOR ICONS (-) */
-    button[title="View header anchor"] {
-        display: none !important;
-    }
-    .stHtmlHeader a , .stMarkdown a{
-        display: none !important;
-    }
+    button[title="View header anchor"] { display: none !important;}
+    .stHtmlHeader a , .stMarkdown a{ display: none !important;}
     header { visibility: hidden; }
             
     .stApp {
@@ -148,7 +144,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# LOGO RESOLUTION 
+# LOGO 
 current_file_path = Path(__file__).resolve()
 possible_paths = [
     current_file_path.parent / "assets" / "logo.png",
@@ -163,14 +159,14 @@ for p in possible_paths:
 
 if logo_base64:
     st.markdown(f"""
-        <div style="position: absolute; left: -250px; top: -20px;">
+        <div style="position: absolute; left: -200px; top: -20px;">
             <img src="data:image/png;base64,{logo_base64}" width="190">
         </div>
     """, unsafe_allow_html=True)
 else:
     st.markdown("<h2 style='color:#a855f7; margin-bottom:20px;'>TenderFlow</h2>", unsafe_allow_html=True)
 
-# CONTENT
+# header
 st.markdown("""
         <div class="centered-header">
             <h1>Basic Information</h1>
@@ -178,21 +174,21 @@ st.markdown("""
         </div>
         """, unsafe_allow_html=True)
 
-# FORM LAYOUT
+# FORM inputs
 c1, c2 = st.columns(2, gap="large")
 
 with c1:
-    company_name = st.text_input("Company Name", placeholder="Official name")
+    company_name = st.text_input("Company Name", placeholder="Official name", max_chars=50)
     org_type = st.selectbox("Organization Type", ["Pvt. Ltd.", "LLP", "Partnership", "Proprietorship"])
-    incorp_date = st.date_input("Date of Incorporation", value=date.today())
+    incorp_date = st.date_input("Date of Incorporation", value=date.today(), max_value=date.today())
 
 with c2:
     email = st.text_input("Work Email", placeholder="name@company.com")
-    phone = st.text_input("Phone Number", placeholder="+91")
-    designation = st.text_input("Your Designation", placeholder="e.g. Director")
+    phone = st.text_input("Phone Number", placeholder="+91",max_chars=10)
+    designation = st.text_input("Your Designation", placeholder="e.g. Director",max_chars=25)
 
 st.markdown("<div style='margin-top:20px'></div>", unsafe_allow_html=True)
-reg_address = st.text_area("Registration Address", height=100)
+reg_address = st.text_area("Registration Address", height=100, max_chars=300)
 
 same_as_reg = st.checkbox("Office address same as registration")
 if not same_as_reg:
@@ -200,34 +196,68 @@ if not same_as_reg:
 
 auth_name = st.text_input("Authorized Signatory Name", placeholder="Full legal name")
 
-# ACTION
+#validation 
+EMAIL_REGEX = r"^[\w\.-]+@[\w\.-]+\.\w+$"
+PHONE_REGEX = r"^\+91[6-9]\d{9}$"
+
+def is_valid_email(email):
+    return re.match(EMAIL_REGEX, email)
+
+def is_valid_phone(phone):
+    return re.match(PHONE_REGEX, phone)
+
+# ACTION JACKSON BEEBEE BEEE..
 st.markdown("<div style='margin-top:20px'></div>", unsafe_allow_html=True)
 b1, b2, b3 = st.columns([2, 1, 2])
 
 with b2:
     if st.button(" Next -> "):
 
-        # Validation
-        if not company_name or not email or not auth_name:
-            st.error("Please fill in all mandatory fields (Company Name, Email, and Signatory).")
+        # Validations
+        if not company_name.strip():
+            st.error("company NAme required!")
             st.stop()
 
-        try:
-            # Prepare payload
-            profile_data = {
-                "id": user_id,  # auth.users.id
-                "company_name": company_name,
-                "org_type": org_type,
-                "incorp_date": str(incorp_date),
-                "email": email,
-                "phone_number": phone,
-                "designation": designation,
-                "reg_address": reg_address,
-                "office_address": reg_address if same_as_reg else office_address,
-                "authorized_signatory": auth_name,
-                "onboarding_step": 2
-            }
+        if len(company_name) < 3:
+            st.error("Company name must be atleast 3 chars")
+            st.stop()
 
+        if not email or not is_valid_email(email):
+            st.error("Please enter a valid email id.")
+            st.stop()
+
+        if phone and not is_valid_phone(phone):
+            st.error("Phone number must be in format +91XXXXXXXXXX")
+            st.stop()
+
+        if not reg_address and not office_address.strip():
+            st.error("Office Address required.")
+            st.stop()
+
+        if not auth_name.strip():
+            st.error("Authorized Signatory name is required.")
+            st.stop()
+
+        if len(auth_name) < 3:
+            st.error("Authorized Signatory name must have atleast 3 chars.")
+            st.stop()
+
+        # Prepare payload
+        profile_data = {
+            "id": user_id,  # auth.users.id
+            "company_name": company_name,
+            "org_type": org_type,
+            "incorp_date": str(incorp_date),
+            "email": email,
+            "phone_number": phone,
+            "designation": designation,
+            "reg_address": reg_address,
+            "office_address": reg_address if same_as_reg else office_address,
+            "authorized_signatory": auth_name,
+            "onboarding_step": 2
+        }
+
+        try:
             # UPSERT (SAFE)
             supabase.table("profiles") \
                 .upsert(profile_data, on_conflict="id") \

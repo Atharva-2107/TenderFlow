@@ -4,6 +4,7 @@ import base64
 from pathlib import Path
 from dotenv import load_dotenv
 from supabase import create_client
+import re
 
 # PAGE CONFIG
 st.set_page_config(page_title="TenderFlow | Financial Capacity", layout="wide")
@@ -32,9 +33,10 @@ user = st.session_state.get("user")
 if not sb_session or not user:
     st.switch_page("pages/loginPage.py")
     st.stop()
-user_id = user.id
 
+user_id = user.id
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+
 try:
     refreshed = supabase.auth.refresh_session(sb_session.refresh_token)
     st.session_state["sb_session"] = refreshed.session
@@ -50,9 +52,15 @@ except Exception:
     
 supabase.postgrest.auth(sb_session.access_token)
 
+MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB
+
 def upload_file(file, filename):
     if not file:
         return None
+    
+    if file.size > MAX_FILE_SIZE:
+        st.error(f"{file.name} exceeds 5MB size limit.")
+        st.stop()
 
     path = f"{user_id}/{filename}"
 
@@ -204,50 +212,71 @@ with b2:
     if st.button(" <- Back "):
         # Switch back to the first info page
         st.switch_page("pages/informationCollection_2.py")
+with b4:
+    if st.button(" Next -> "):
+            # SAFETY CHECK 
+            if not sb_session or not sb_session.access_token:
+                st.error("Session expired. Please log in again.")
+                st.switch_page("pages/loginPage.py")
+                st.stop()
 
-if st.button(" Next -> "):
-    try:
-        # SAFETY CHECK 
-        if not sb_session or not sb_session.access_token:
-            st.error("Session expired. Please log in again.")
-            st.switch_page("pages/loginPage.py")
-            st.stop()
+            if not avg_turnover.strip():
+                st.error("Average Annual Turnover is required.")
+                st.stop()
 
-        # UNIQUE FILE NAMES (
-        balance_sheet_path = upload_file(
-            balance_sheet,
-            f"balance_sheet_{user_id}.pdf"
-        )
-        ca_cert_path = upload_file(
-            ca_cert,
-            f"ca_certificate_{user_id}.pdf"
-        )
+            # Allow numbers + words (Lakhs / Cr)
+            if not re.search(r"\d", avg_turnover):
+                st.error("Turnover must contain numeric value.")
+                st.stop()
 
-        # DATA PAYLOAD 
-        data = {
-            "user_id": user_id,   
-            "avg_annual_turnover": avg_turnover,
-            "fy_wise_turnover": fy_wise,
-            "balance_sheet_url": balance_sheet_path,
-            "ca_certificate_url": ca_cert_path,
-        }
+            if not fy_wise.strip():
+                st.error("FY-wise turnover details are required.")
+                st.stop()
 
-        #UPSERT 
-        supabase.table("financials") \
-            .upsert(data, on_conflict="user_id") \
-            .execute()
+            if len(fy_wise.splitlines()) < 2:
+                st.error("Provide turnover for at least 2 financial years.")
+                st.stop()
 
-        supabase.table("profiles") \
-            .update({"onboarding_step": 4}) \
-            .eq("id", user_id) \
-            .execute()
+            if not balance_sheet:
+                st.error("Audited Balance Sheet is mandatory.")
+                st.stop()
 
-        st.session_state["onboarding_step"] = 4
+            if not ca_cert:
+                st.error("CA Certificate is mandatory.")
+                st.stop()
 
-        # REDIRECT 
-        st.switch_page("pages/informationCollection_4.py")
-        st.stop()
+            # UNIQUE FILE NAMES (
+            balance_sheet_path = upload_file(
+                balance_sheet,
+                f"balance_sheet_{user_id}.pdf"
+            )
+            ca_cert_path = upload_file(
+                ca_cert,
+                f"ca_certificate_{user_id}.pdf"
+            )
 
-    except Exception as e:
-        st.error(f"Error saving financial data: {e}")
+            # DATA PAYLOAD 
+            data = {
+                "user_id": user_id,   
+                "avg_annual_turnover": avg_turnover,
+                "fy_wise_turnover": fy_wise,
+                "balance_sheet_url": balance_sheet_path,
+                "ca_certificate_url": ca_cert_path,
+            }
 
+            try:
+                supabase.table("financials") \
+                    .upsert(data, on_conflict="user_id") \
+                    .execute()
+
+                supabase.table("profiles") \
+                    .update({"onboarding_step": 4}) \
+                    .eq("id", user_id) \
+                    .execute()
+
+                st.session_state["onboarding_step"] = 4
+                st.switch_page("pages/informationCollection_4.py")
+                st.stop()
+
+            except Exception as e:
+                st.error(f"Error saving financial data: {e}")

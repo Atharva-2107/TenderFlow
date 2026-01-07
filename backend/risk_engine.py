@@ -12,7 +12,7 @@ MODEL_NAME = "nlpaueb/legal-bert-base-uncased"
 LABELS = ["Financial", "Legal", "Payment", "Timeline", "Resource"]
 
 # ======================================================
-# MODEL LOADING (CACHED — STREAMLIT SAFE)
+# LOAD MODEL ONCE (STREAMLIT SAFE)
 # ======================================================
 @lru_cache(maxsize=1)
 def load_model():
@@ -31,14 +31,9 @@ tokenizer, model = load_model()
 # TEXT CLEANING
 # ======================================================
 def clean_extracted_text(text: str) -> str:
-    # remove cid artifacts
     text = re.sub(r"\(cid:\d+\)", " ", text)
-
-    # normalize whitespace
     text = re.sub(r"\s+", " ", text)
-
     return text.strip()
-
 
 # ======================================================
 # PDF TEXT EXTRACTION
@@ -47,78 +42,72 @@ def extract_text(uploaded_file):
     text = ""
     with pdfplumber.open(uploaded_file) as pdf:
         for page in pdf.pages:
-            page_text = page.extract_text()
-            if page_text:
-                text += page_text + "\n"
-
+            t = page.extract_text()
+            if t:
+                text += t + "\n"
     return clean_extracted_text(text)
 
-
 # ======================================================
-# METADATA / HEADER DETECTION (CRITICAL FIX)
+# METADATA DETECTION (BID DOCS)
 # ======================================================
 METADATA_KEYWORDS = [
     "bid number", "dated", "department name", "organisation name",
-    "office name", "state name", "ministry", "gem/", "bid document",
-    "bid details", "opening date", "closing date", "event based",
-    "catering service", "validity", "from end date"
+    "office name", "gem/", "bid document", "bid details",
+    "opening date", "closing date", "event based", "eligibility",
+    "emd", "tender notice", "letter inviting bid"
 ]
-
 
 def is_metadata_block(text: str) -> bool:
     t = text.lower()
-
-    # keyword-based rejection
     if any(k in t for k in METADATA_KEYWORDS):
         return True
 
-    # too many numbers → metadata
     digit_ratio = sum(c.isdigit() for c in text) / max(len(text), 1)
-    if digit_ratio > 0.25:
+    if digit_ratio > 0.45:
         return True
 
-    # mixed language corruption (Hindi + English headers)
     alpha_ratio = sum(c.isalpha() for c in text) / max(len(text), 1)
     if alpha_ratio < 0.45:
         return True
 
     return False
 
+# ======================================================
+# CONTRACT CLAUSE OVERRIDE
+# ======================================================
+def looks_like_contract_clause(text: str) -> bool:
+    keywords = [
+        "liquidated", "damages", "penalty", "terminate",
+        "termination", "indemnify", "indemnity",
+        "liability", "payment", "invoice",
+        "arbitration", "force majeure",
+        "governing law", "service level", "sla"
+    ]
+    t = text.lower()
+    return any(k in t for k in keywords)
 
 # ======================================================
-# CLAUSE SPLITTING (STRICT)
+# CLAUSE SPLITTING
 # ======================================================
 def split_clauses(text):
-    raw_clauses = re.split(
-        r"\n(?=(?:Clause|Section)?\s*\d+[\.\)])",
-        text,
-        flags=re.IGNORECASE
-    )
-
+    raw = re.split(r"\n(?=\d+[\.\)])", text)
     clauses = []
-    for c in raw_clauses:
+
+    for c in raw:
         c = c.strip()
 
-        # reject numbering junk
-        if re.fullmatch(r"\d+[\.\)]?", c):
+        if len(c) < 60:
             continue
 
-        # reject short text
-        if len(c) < 80:
-            continue
-
-        # reject non-language
         if not re.search(r"[a-zA-Z]{4,}", c):
             continue
 
-        # reject metadata / headers
-        if is_metadata_block(c):
+        if is_metadata_block(c) and not looks_like_contract_clause(c):
             continue
 
         clauses.append(c)
 
     return clauses
-
 
 # ======================================================
 # LEGAL-BERT CLASSIFICATION
@@ -140,14 +129,22 @@ def classify_clause(text):
 
     return LABELS[idx.item()], float(confidence)
 
-
 # ======================================================
 # SEVERITY SCORING
 # ======================================================
-def severity_from_confidence(confidence, clause_len):
+def severity_from_confidence(confidence, text):
     base = confidence * 100
-    length_boost = min(clause_len / 600, 1.2) * 15
-    severity = min(int(base + length_boost), 95)
+
+    if "liquidated" in text.lower() or "damages" in text.lower():
+        base += 30
+    if "terminate" in text.lower():
+        base += 25
+    if "indemn" in text.lower():
+        base += 20
+    if "payment" in text.lower():
+        base += 10
+
+    severity = min(int(base), 95)
 
     if severity >= 75:
         status = "Critical"
@@ -158,7 +155,6 @@ def severity_from_confidence(confidence, clause_len):
 
     return severity, status
 
-
 # ======================================================
 # RISK HIGHLIGHT EXTRACTION
 # ======================================================
@@ -166,27 +162,18 @@ def extract_risk_highlight(clause, category):
     sentences = re.split(r"(?<=[.;])\s+", clause)
 
     KEY_PHRASES = {
-        "Financial": ["penalty", "liquidated", "retention", "escalation"],
-        "Payment": ["payment", "invoice", "credit", "days"],
-        "Legal": ["liable", "indemn", "terminate", "liability"],
-        "Timeline": ["delay", "milestone", "completion"],
+        "Financial": ["liquidated", "penalty", "damages"],
+        "Legal": ["terminate", "indemn", "liability", "arbitration"],
+        "Payment": ["payment", "invoice", "days"],
+        "Timeline": ["delay", "milestone", "uptime"],
         "Resource": ["manpower", "staff", "equipment"]
     }
 
     for s in sentences:
-        s_clean = s.strip()
-        if len(s_clean) < 30:
-            continue
-        if any(k in s_clean.lower() for k in KEY_PHRASES.get(category, [])):
-            return s_clean
+        if any(k in s.lower() for k in KEY_PHRASES.get(category, [])):
+            return s.strip()
 
-    for s in sentences:
-        s_clean = s.strip()
-        if len(s_clean) >= 40:
-            return s_clean
-
-    return clause[:120]
-
+    return sentences[0].strip()
 
 # ======================================================
 # MAIN ENTRY POINT
@@ -200,37 +187,42 @@ def analyze_pdf(uploaded_file):
     for clause in clauses:
         category, confidence = classify_clause(clause)
 
-        if confidence < 0.35:
+        # 🔑 RELAXED CONFIDENCE GATE (CRITICAL FIX)
+        if confidence < 0.10 and not looks_like_contract_clause(clause):
             continue
 
-        severity, status = severity_from_confidence(confidence, len(clause))
+        severity, status = severity_from_confidence(confidence, clause)
         highlight = extract_risk_highlight(clause, category)
 
         results.append({
             "category": category,
-            "clause": highlight[:80],
+            "clause": highlight[:90] + ("..." if len(highlight) > 90 else ""),
             "content": highlight,
             "severity": severity,
             "status": status,
-            "impact": "Key contractual risk identified.",
+            "impact": (
+                f"Key contractual risk identified using Legal-BERT "
+                f"({round(confidence * 100, 1)}% confidence)."
+            ),
             "tag_class": f"tag-{category.lower()}"
         })
 
-    # 👇 ADD HERE
+    # ==================================================
+    # BID-RISK FALLBACK (ONLY IF NOTHING FOUND)
+    # ==================================================
     if not results:
         return [{
             "category": "Financial",
             "clause": "Strict bid eligibility and commercial conditions detected",
             "content": (
                 "This document primarily contains bid eligibility, experience, "
-                "turnover, and administrative conditions. These may pose "
-                "commercial or participation risks for bidders."
+                "and administrative conditions rather than contractual obligations."
             ),
             "severity": 45,
             "status": "Warning",
             "impact": (
-                "Bid-level risk identified. Upload ATC / SLA / Contract document "
-                "for contractual risk analysis."
+                "Bid-level commercial risk identified. Upload ATC / SLA / "
+                "Contract document for contractual risk analysis."
             ),
             "tag_class": "tag-financial"
         }]

@@ -215,7 +215,7 @@ with b2:
 
         # Validations
         if not company_name.strip():
-            st.error("company NAme required!")
+            st.error("company Name required!")
             st.stop()
 
         if len(company_name) < 3:

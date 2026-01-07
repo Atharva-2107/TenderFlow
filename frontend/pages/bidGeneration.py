@@ -89,7 +89,7 @@ def bid_generation_page():
         _, col_mid, _ = st.columns([1, 2, 1]) 
         
         with col_mid:
-            st.markdown('<div class="glass-card" style="text-align: center;">', unsafe_allow_html=True)
+            # st.markdown('<div class="glass-card" style="text-align: center;">', unsafe_allow_html=True)
             st.markdown("### 📂 Initialize New Bid")
             st.write("Upload your technical proposal to begin AI cost extraction.")
             

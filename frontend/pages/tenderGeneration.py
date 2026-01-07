@@ -284,7 +284,8 @@ st.markdown("""
         border-bottom: 3px solid #3b82f6;
     }
     .clause-info {
-        background-color: #f0f9ff;
+        background-color: #f9fafb;
+        color: #3b82f6;
         padding: 0.8rem;
         border-radius: 6px;
         border-left: 3px solid #3b82f6;

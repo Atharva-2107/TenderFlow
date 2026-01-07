@@ -184,7 +184,7 @@ with c1:
 
 with c2:
     email = st.text_input("Work Email", placeholder="name@company.com")
-    phone = st.text_input("Phone Number", placeholder="+91",max_chars=10)
+    phone = st.text_input("Phone Number",max_chars=13, placeholder="+91XXXXXXXXXX")
     designation = st.text_input("Your Designation", placeholder="e.g. Director",max_chars=25)
 
 st.markdown("<div style='margin-top:20px'></div>", unsafe_allow_html=True)

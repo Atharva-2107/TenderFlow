@@ -165,7 +165,7 @@ with col_signup:
                             st.session_state["onboarding_step"] = 1
                             st.session_state["onboarding_complete"] = False
 
-                            st.switch_page("pages/informationCollection.py")
+                            st.switch_page("pages/informationCollection_1.py")  
                         else:
                             st.info("Account created. Please verify your email and log in.")
                 except Exception as e:

@@ -104,7 +104,7 @@ def bid_generation_page():
     left_col, right_col = st.columns([1.8, 1.2], gap="large")
 
     with left_col:
-        st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+        # st.markdown('<div class="glass-card">', unsafe_allow_html=True)
         st.markdown('<p class="label-text">Resource Ledger</p>', unsafe_allow_html=True)
         
         if 'cost_df' not in st.session_state:
@@ -127,7 +127,7 @@ def bid_generation_page():
         st.markdown(f"<div style='text-align: right; color: #A855F7; font-family: JetBrains Mono; font-size: 1.2rem;'>Prime Cost: ${total_prime:,.2f}</div>", unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
-        st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+        # st.markdown('<div class="glass-card">', unsafe_allow_html=True)
         st.markdown('<p class="label-text">Pricing Strategy</p>', unsafe_allow_html=True)
         c_s1, c_s2 = st.columns(2)
         overhead_pct = c_s1.slider("Overhead Recovery (%)", 0, 30, 12)

@@ -217,19 +217,19 @@ st.markdown(f'''
 header_cols = st.columns([6, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4])
 
 with header_cols[1]:
-    if st.button("⊞", key="h_dash"): st.switch_page("app.py")
+    if st.button("⊞", key="h_dash", help="Dashboard"): st.switch_page("app.py")
 with header_cols[2]:
-    if st.button("✦", key="h_bid"): st.switch_page("pages/bidGeneration.py")
+    if st.button("✦", key="h_bid", help="Bid Generation"): st.switch_page("pages/bidGeneration.py")
 with header_cols[3]:
-    if st.button("◈", key="h_anl"): st.switch_page("pages/tenderAnalyser.py")
+    if st.button("◈", key="h_anl", help="Tender Analysis "): st.switch_page("pages/tenderAnalyser.py")
 with header_cols[4]:
-    if st.button("⎘", key="h_gen"): st.switch_page("pages/tenderGeneration.py")
+    if st.button("⎘", key="h_gen", help="Tender Generation"): st.switch_page("pages/tenderGeneration.py")
 with header_cols[5]:
-    if st.button("⬈", key="h_risk"): st.switch_page("pages/riskAnalysis.py")
+    if st.button("⬈", key="h_risk", help="Risk Analysis"): st.switch_page("pages/riskAnalysis.py")
 with header_cols[6]:
-    if st.button("⚙", key="h_set"): st.switch_page("pages/settings.py")
+    if st.button("⚙", key="h_set", help="Settings"): st.switch_page("pages/settings.py")
 with header_cols[7]:
-    if st.button("👤", key="h_prof"): st.switch_page("pages/profile.py")
+    if st.button("👤", key="h_prof", help="Profile"): st.switch_page("pages/profile.py")
 
 st.markdown('</div></div>', unsafe_allow_html=True)
 # Dashboard header

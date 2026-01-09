@@ -28,7 +28,7 @@ def risk_analysis_page():
         }
         .tag-financial { background-color: #fee2e2; color: #991b1b; }
         .tag-legal { background-color: #e0f2fe; color: #075985; }
-        .tag-ops { background-color: #fef3c7; color: #92400e; }
+        .tag-resource { background-color: #fef3c7; color: #92400e; }
         .tag-payment { background-color: #f3e8ff; color: #6b21a8; }
         .tag-timeline { background-color: #f3e8ff; color: #6b21a8; }
         
@@ -151,8 +151,8 @@ def risk_analysis_page():
             else:
                 st.success("No high-severity risks found with current filters.")
 
-            if st.button("Generate Mitigation Strategy", type="primary"):
-                st.write("✨ *Gemini is analyzing negotiation paths for your specific risks...*")
+            # if st.button("Generate Mitigation Strategy", type="primary"):
+            #     st.write("✨ *Gemini is analyzing negotiation paths for your specific risks...*")
 
         st.divider()
 
@@ -178,3 +178,4 @@ def risk_analysis_page():
 
 if __name__ == "__main__":
     risk_analysis_page()
+

@@ -12,7 +12,7 @@ MODEL_NAME = "nlpaueb/legal-bert-base-uncased"
 LABELS = ["Financial", "Legal", "Payment", "Timeline", "Resource"]
 
 # ======================================================
-# LOAD MODEL ONCE (STREAMLIT SAFE)
+# LOAD MODEL ONCE (SAFE)
 # ======================================================
 @lru_cache(maxsize=1)
 def load_model():
@@ -48,37 +48,36 @@ def extract_text(uploaded_file):
     return clean_extracted_text(text)
 
 # ======================================================
-# METADATA DETECTION (BID DOCS)
+# METADATA DETECTION
 # ======================================================
 METADATA_KEYWORDS = [
     "bid number", "dated", "department name", "organisation name",
-    "office name", "gem/", "bid document", "bid details",
-    "opening date", "closing date", "event based", "eligibility",
-    "emd", "tender notice", "letter inviting bid"
+    "office name", "bid document", "opening date", "closing date",
+    "emd", "tender notice", "eligibility"
 ]
 
 def is_metadata_block(text: str) -> bool:
     t = text.lower()
+
     if any(k in t for k in METADATA_KEYWORDS):
         return True
 
     digit_ratio = sum(c.isdigit() for c in text) / max(len(text), 1)
-    if digit_ratio > 0.45:
-        return True
-
     alpha_ratio = sum(c.isalpha() for c in text) / max(len(text), 1)
-    if alpha_ratio < 0.45:
+
+    if digit_ratio > 0.45 or alpha_ratio < 0.45:
         return True
 
     return False
 
 # ======================================================
-# CONTRACT CLAUSE OVERRIDE
+# CONTRACT CLAUSE DETECTION
 # ======================================================
 def looks_like_contract_clause(text: str) -> bool:
     keywords = [
-        "liquidated", "damages", "penalty", "terminate",
-        "termination", "indemnify", "indemnity",
+        "liquidated", "damages", "penalty",
+        "terminate", "termination",
+        "indemnify", "indemnity",
         "liability", "payment", "invoice",
         "arbitration", "force majeure",
         "governing law", "service level", "sla"
@@ -98,10 +97,8 @@ def split_clauses(text):
 
         if len(c) < 60:
             continue
-
         if not re.search(r"[a-zA-Z]{4,}", c):
             continue
-
         if is_metadata_block(c) and not looks_like_contract_clause(c):
             continue
 
@@ -110,9 +107,9 @@ def split_clauses(text):
     return clauses
 
 # ======================================================
-# LEGAL-BERT CLASSIFICATION
+# SINGLE-DOMINANT AI CLASSIFICATION (KEY FIX)
 # ======================================================
-def classify_clause(text):
+def classify_clause(text, threshold=0.18):
     inputs = tokenizer(
         text,
         truncation=True,
@@ -125,23 +122,32 @@ def classify_clause(text):
         outputs = model(**inputs)
 
     probs = softmax(outputs.logits, dim=1)[0]
-    confidence, idx = torch.max(probs, dim=0)
 
-    return LABELS[idx.item()], float(confidence)
+    detections = []
+    for i, p in enumerate(probs):
+        conf = float(p)
+        if conf >= threshold:
+            detections.append((LABELS[i], conf))
+
+    return detections
+
 
 # ======================================================
-# SEVERITY SCORING
+# SEVERITY SCORING (UNCHANGED LOGIC)
 # ======================================================
 def severity_from_confidence(confidence, text):
     base = confidence * 100
+    t = text.lower()
 
-    if "liquidated" in text.lower() or "damages" in text.lower():
+    if "liquidated" in t or "damages" in t:
         base += 30
-    if "terminate" in text.lower():
+    if "terminate" in t:
         base += 25
-    if "indemn" in text.lower():
+    if "indemn" in t:
         base += 20
-    if "payment" in text.lower():
+    if "payment" in t:
+        base += 10
+    if "delay" in t:
         base += 10
 
     severity = min(int(base), 95)
@@ -176,6 +182,54 @@ def extract_risk_highlight(clause, category):
     return sentences[0].strip()
 
 # ======================================================
+# TRUE AI-DRIVEN EXPLANATION (CATEGORY-LED)
+# ======================================================
+def generate_ai_impact(category, text):
+    t = text.lower()
+
+    if category == "Financial":
+        return (
+            "The clause imposes financial obligations or penalties that could "
+            "increase project cost if conditions are breached."
+        )
+
+    if category == "Timeline":
+        return (
+            "The clause links obligations to strict timelines, increasing exposure "
+            "to penalties or performance issues in case of delay."
+        )
+
+    if category == "Legal":
+        if "terminate" in t:
+            return (
+                "The clause allows contract termination under defined conditions, "
+                "which increases legal and commercial exposure."
+            )
+        if "indemn" in t or "liability" in t:
+            return (
+                "The clause transfers legal liability to one party, potentially "
+                "increasing litigation or compliance risk."
+            )
+        return (
+            "The clause defines enforceable legal rights and obligations that may "
+            "affect contract control or dispute outcomes."
+        )
+
+    if category == "Payment":
+        return (
+            "The clause governs payment structure or timelines, which may affect "
+            "cash flow and financial planning."
+        )
+
+    if category == "Resource":
+        return (
+            "The clause places operational obligations related to manpower, "
+            "equipment, or service availability."
+        )
+
+    return "The clause introduces contractual obligations that may carry execution risk."
+
+# ======================================================
 # MAIN ENTRY POINT
 # ======================================================
 def analyze_pdf(uploaded_file):
@@ -185,44 +239,44 @@ def analyze_pdf(uploaded_file):
     results = []
 
     for clause in clauses:
-        category, confidence = classify_clause(clause)
+        detections = classify_clause(clause)
 
-        # 🔑 RELAXED CONFIDENCE GATE (CRITICAL FIX)
-        if confidence < 0.10 and not looks_like_contract_clause(clause):
+        if not detections:
             continue
 
-        severity, status = severity_from_confidence(confidence, clause)
-        highlight = extract_risk_highlight(clause, category)
 
-        results.append({
-            "category": category,
-            "clause": highlight[:90] + ("..." if len(highlight) > 90 else ""),
-            "content": highlight,
-            "severity": severity,
-            "status": status,
-            "impact": (
-                f"Key contractual risk identified using Legal-BERT "
-                f"({round(confidence * 100, 1)}% confidence)."
-            ),
-            "tag_class": f"tag-{category.lower()}"
-        })
+        for category, confidence in detections:
+
+            highlight = extract_risk_highlight(clause, category)
+            severity, status = severity_from_confidence(confidence, clause)
+
+            results.append({
+                "category": category,
+                "clause": highlight[:90] + ("..." if len(highlight) > 90 else ""),
+                "content": highlight,
+                "severity": severity,
+                "status": status,
+                "impact": generate_ai_impact(category, clause),
+                "tag_class": f"tag-{category.lower()}"
+            })
+
 
     # ==================================================
-    # BID-RISK FALLBACK (ONLY IF NOTHING FOUND)
+    # BID DOCUMENT FALLBACK
     # ==================================================
     if not results:
         return [{
             "category": "Financial",
-            "clause": "Strict bid eligibility and commercial conditions detected",
+            "clause": "Bid eligibility and administrative conditions detected",
             "content": (
-                "This document primarily contains bid eligibility, experience, "
-                "and administrative conditions rather than contractual obligations."
+                "The document primarily contains eligibility, experience, and "
+                "administrative requirements rather than enforceable contract clauses."
             ),
-            "severity": 45,
+            "severity": 40,
             "status": "Warning",
             "impact": (
-                "Bid-level commercial risk identified. Upload ATC / SLA / "
-                "Contract document for contractual risk analysis."
+                "The document appears to be bid-focused. Contractual risk analysis "
+                "will be more meaningful on ATC, SLA, or final agreement documents."
             ),
             "tag_class": "tag-financial"
         }]

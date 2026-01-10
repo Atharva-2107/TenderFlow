@@ -17,6 +17,25 @@ def risk_analysis_page():
     # --- 1. ENHANCED STYLING ---
     st.markdown("""
         <style>
+
+        /* ===== PAGE BACKGROUND (ONLY CHANGE) ===== */
+        /* ===== FORCE GRADIENT BACKGROUND ===== */
+        .stApp {
+            background: radial-gradient(circle at 20% 30%, #1a1c4b 0%, #0f111a 100%) !important;
+        }
+
+        /* This is the KEY part */
+        [data-testid="stAppViewContainer"] {
+            background: transparent !important;
+        }
+
+        /* Optional: header bar */
+        [data-testid="stHeader"] {
+            background: rgba(2, 6, 23, 0.85) !important;
+        }
+
+
+        /* ===== EXISTING STYLES (UNCHANGED) ===== */
         .risk-header { font-size: 2.2rem; font-weight: 700; color: #64748B; }
         .risk-tag {
             padding: 4px 12px;
@@ -37,7 +56,7 @@ def risk_analysis_page():
             border-radius: 12px;
             margin-bottom: 1.2rem;
             border: 1px solid #1f2937;
-            background-color: #0f172a; /* NEW */
+            background-color: #0f172a;
             box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
             transition: transform 0.2s;
         }
@@ -48,6 +67,7 @@ def risk_analysis_page():
         .border-red { border-left: 6px solid #ef4444; }
         .border-amber { border-left: 6px solid #f59e0b; }
         .border-green { border-left: 6px solid #22c55e; }
+
         </style>
     """, unsafe_allow_html=True)
 
@@ -151,9 +171,6 @@ def risk_analysis_page():
             else:
                 st.success("No high-severity risks found with current filters.")
 
-            # if st.button("Generate Mitigation Strategy", type="primary"):
-            #     st.write("✨ *Gemini is analyzing negotiation paths for your specific risks...*")
-
         st.divider()
 
         # --- 6. DYNAMIC CLAUSE FEED ---
@@ -178,4 +195,3 @@ def risk_analysis_page():
 
 if __name__ == "__main__":
     risk_analysis_page()
-

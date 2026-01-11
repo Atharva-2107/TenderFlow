@@ -3,10 +3,9 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import streamlit.components.v1 as components
-from supabase import create_client
 import os
 
-#UTILS
+# AUTH & ONBOARDING GUARD
 if not st.session_state.get("authenticated"):
     st.switch_page("pages/loginPage.py")
     st.stop()
@@ -14,25 +13,29 @@ if not st.session_state.get("authenticated"):
 if not st.session_state.get("onboarding_complete"):
     step = st.session_state.get("onboarding_step", 1)
     st.switch_page(f"pages/informationCollection_{step}.py")
+    st.stop()
 
 user = st.session_state["user"]
 
+# SUPABASE
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+
 if not SUPABASE_URL or not SUPABASE_KEY:
     st.error("Supabase environment variables not loaded")
     st.stop()
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
+
 # PAGE CONFIG
 st.set_page_config(
     page_title="Tenderflow",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
-# SESSION STATE FOR NAVIGATION
+# SESSION STATE
 if "page" not in st.session_state:
     st.session_state.page = "Dashboard"
 
@@ -49,29 +52,25 @@ html, body, [class*="css"] {
     background: radial-gradient(circle at 20% 30%, #1a1c4b 0%, #0f111a 100%);
 }
 
-/* SIDEBAR */
-section[data-testid="stSidebar"] {
+/* HEADER */
+.header-title {
+    font-size: 22px;
+    font-weight: 600;
+    color: #f8fafc;
+}
+
+/* HEADER NAV CONTAINER */
+.header-nav {
     background: linear-gradient(
         135deg,
         rgba(255,255,255,0.08),
         rgba(255,255,255,0.02)
     );
     backdrop-filter: blur(10px);
-    border-right: 1px solid rgba(255,255,255,0.06);
-}
-
-/* HEADER */
-.header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 16px 28px;
-}
-
-.header-title {
-    font-size: 22px;
-    font-weight: 600;
-    color: #f8fafc;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 16px;
+    padding: 12px 18px;
+    margin-bottom: 22px;
 }
 
 /* KPI CARDS */
@@ -103,60 +102,61 @@ section[data-testid="stSidebar"] {
     color: #e5e7eb;
     font-size: 18px;
     font-weight: 600;
-    margin: 20px 0 12px;
-}
-
-/* LIST CARD */
-.list-card {
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 14px;
-    padding: 18px;
+    margin: 22px 0 12px;
 }
 </style>
 """, unsafe_allow_html=True)
 
-# --------------------------------------------------
-# SIDEBAR
-# --------------------------------------------------
-with st.sidebar:
-    st.image("frontend/assets/logo.png", width=160)
-    st.markdown("")
+# HEADER NAVIGATION
+# st.markdown("<div class='header-nav'>", unsafe_allow_html=True)
 
-    st.radio(
-        "Navigation",
-        ["Dashboard", "Tenders", "Analytics", "Reports", "Settings"],
-        index=0,
-        key="nav"
-    )
-
-    st.markdown("---")
-    st.caption("Filters")
-
-    st.date_input("Date Range")
-    st.multiselect("Tender Type", ["Open", "Limited", "Global"])
-    st.multiselect("Status", ["Open", "Won", "Lost", "In Progress"])
-    st.multiselect("Customers", ["Govt", "Private", "PSU"])
-    st.multiselect("Priority", ["High", "Medium", "Low"])
-    st.multiselect("Business Line", ["Construction", "IT & Telecom", "Healthcare", "Energy"])
-
-# --------------------------------------------------
-# HEADER WITH ADMIN POPOVER
-# --------------------------------------------------
-left, right = st.columns([14,2])
+left, center, right = st.columns([3, 6, 3])
 
 with left:
-    st.markdown("<div class='header-title'>Dashboard</div>", unsafe_allow_html=True)
+    st.image("frontend/assets/logo.png", width=180)
+
+with center:
+    header_cols = st.columns([3, 0.4, 0.4, 0.4, 0.4, 0.4])
+
+    with header_cols[1]:
+        if st.button("⊞", key="h_dash", help="Dashboard"):
+            st.switch_page("app.py")
+
+    with header_cols[2]:
+        if st.button("⎘", key="h_gen", help="Tender Generation"):
+            st.switch_page("pages/tenderGeneration.py")
+
+    with header_cols[3]:
+        if st.button("◈", key="h_anl", help="Tender Analysis"):
+            st.switch_page("pages/tenderAnalyser.py")
+
+    with header_cols[4]:
+        if st.button("✦", key="h_bid", help="Bid Generation"):
+            st.switch_page("pages/bidGeneration.py")
+
+    with header_cols[5]:
+        if st.button("⬈", key="h_risk", help="Risk Analysis"):
+            st.switch_page("pages/riskAnalysis.py")
 
 with right:
-    with st.popover("👤 Admin"):
-        if st.button("👤 Profile"):
-            st.session_state.page = "Profile"
-        if st.button("⚙️ Settings"):
-            st.session_state.page = "Settings"
-        if st.button("🚪 Logout"):
-            st.session_state.clear()
-            st.experimental_rerun()
+    r1, r2 = st.columns([1, 1])
+
+    with r1:
+        st.button("🔔", help="Notifications")
+
+    with r2:
+        with st.popover("⚙", help="Account"):
+            if st.button("👤 Profile"):
+                st.session_state.page = "Profile"
+                st.experimental_rerun()
+            if st.button("⚙ Settings"):
+                st.session_state.page = "Settings"
+                st.experimental_rerun()
+            if st.button("⎋ Logout"):
+                st.session_state.clear()
+                st.experimental_rerun()
+
+st.markdown("</div>", unsafe_allow_html=True)
 
 # --------------------------------------------------
 # PAGE ROUTING
@@ -194,6 +194,34 @@ kpi(c3, "Capture Ratio", "0.45")
 kpi(c4, "Registered Opportunities", "185")
 
 # --------------------------------------------------
+# FILTERS (MOVED BELOW KPIs)
+# --------------------------------------------------
+st.markdown("<div class='section-title'>Filters</div>", unsafe_allow_html=True)
+
+f1, f2, f3, f4, f5, f6 = st.columns(6)
+
+with f1:
+    st.date_input("Date Range")
+
+with f2:
+    st.multiselect("Tender Type", ["Open", "Limited", "Global"])
+
+with f3:
+    st.multiselect("Status", ["Open", "Won", "Lost", "In Progress"])
+
+with f4:
+    st.multiselect("Customers", ["Govt", "Private", "PSU"])
+
+with f5:
+    st.multiselect("Priority", ["High", "Medium", "Low"])
+
+with f6:
+    st.multiselect(
+        "Business Line",
+        ["Construction", "IT & Telecom", "Healthcare", "Energy"]
+    )
+
+# --------------------------------------------------
 # BID ACTIVITY
 # --------------------------------------------------
 st.markdown("<div class='section-title'>Bid Activity (All Time)</div>", unsafe_allow_html=True)
@@ -214,23 +242,21 @@ fig.update_layout(
 
 st.plotly_chart(fig, use_container_width=True)
 
-# BOTTOM SECTION
-col1, col2 = st.columns([1, 1])
+# --------------------------------------------------
+# INSIGHTS
+# --------------------------------------------------
+col1, col2 = st.columns(2)
 
-# ---------------- LEFT: DONUT CARD ----------------
 with col1:
-    st.markdown(""" <hr> """, unsafe_allow_html=True)
-    st.markdown("#### Tenders by Category")
-
+    st.markdown("<div class='section-title'>Tenders by Category</div>", unsafe_allow_html=True)
     pie = px.pie(
         names=["Construction", "IT & Telecom", "Healthcare", "Energy"],
         values=[40, 27, 18, 15],
         hole=0.6
     )
-
     pie.update_layout(
-        height=320,                          # 🔑 controls size
-        margin=dict(t=20, b=20, l=20, r=20), # 🔑 removes weird spacing
+        height=320,
+        margin=dict(t=20, b=20, l=20, r=20),
         legend=dict(
             orientation="h",
             yanchor="top",
@@ -241,14 +267,9 @@ with col1:
         paper_bgcolor="rgba(0,0,0,0)",
         font_color="white"
     )
-
     st.plotly_chart(pie, use_container_width=True)
-    st.markdown("</div>", unsafe_allow_html=True)
 
-
-# ---------------- RIGHT: TOP 5 LIST CARD ----------------
 with col2:
-    st.markdown(""" <hr> """, unsafe_allow_html=True)
     components.html(
         """
         <div style="
@@ -267,19 +288,14 @@ with col2:
             font-family: Inter, sans-serif;
         ">
             <h4 style="margin-bottom: 16px;">Top 5 Highest Bids</h4>
-
             <div style="line-height: 2.2; font-size: 15px;">
                 <b>1.</b> Metro Rail Project — ₹12.0 Cr<br>
-                <hr>
                 <b>2.</b> Hospital Development — ₹9.5 Cr<br>
-                <hr>
                 <b>3.</b> Telecom Infrastructure — ₹7.8 Cr<br>
-                <hr>
                 <b>4.</b> Renewable Energy Plant — ₹6.5 Cr<br>
-                <hr>
                 <b>5.</b> Highway Expansion — ₹5.0 Cr
             </div>
         </div>
         """,
-        height=360
+        height=300
     )

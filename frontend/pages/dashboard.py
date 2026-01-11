@@ -5,6 +5,29 @@ import plotly.express as px
 import streamlit.components.v1 as components
 import os
 
+# AUTH & ONBOARDING GUARD
+if not st.session_state.get("authenticated"):
+    st.switch_page("pages/loginPage.py")
+    st.stop()
+
+if not st.session_state.get("onboarding_complete"):
+    step = st.session_state.get("onboarding_step", 1)
+    st.switch_page(f"pages/informationCollection_{step}.py")
+    st.stop()
+
+user = st.session_state["user"]
+
+# SUPABASE
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+
+if not SUPABASE_URL or not SUPABASE_KEY:
+    st.error("Supabase environment variables not loaded")
+    st.stop()
+
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+
 # PAGE CONFIG
 st.set_page_config(
     page_title="Tenderflow",
@@ -84,11 +107,9 @@ html, body, [class*="css"] {
 </style>
 """, unsafe_allow_html=True)
 
-# --------------------------------------------------
-# HEADER NAVIGATION
-# --------------------------------------------------
-st.markdown("<div class='header-nav'>", unsafe_allow_html=True)
+# st.markdown(""" <hr> """, unsafe_allow_html=True)
 
+# HEADER NAVIGATION
 left, center, right = st.columns([3, 6, 3])
 
 with left:
@@ -137,9 +158,7 @@ with right:
 
 st.markdown("</div>", unsafe_allow_html=True)
 
-# --------------------------------------------------
 # PAGE ROUTING
-# --------------------------------------------------
 if st.session_state.page == "Profile":
     st.markdown("<div class='section-title'>Edit Profile</div>", unsafe_allow_html=True)
     st.text_input("Name")
@@ -153,28 +172,9 @@ if st.session_state.page == "Settings":
     st.toggle("Dark Mode")
     st.stop()
 
-# --------------------------------------------------
-# KPI SECTION
-# --------------------------------------------------
-c1, c2, c3, c4 = st.columns(4)
+st.markdown(""" <hr> """, unsafe_allow_html=True)
 
-def kpi(col, title, value):
-    with col:
-        st.markdown(f"""
-        <div class="kpi-card">
-            <div class="kpi-title">{title}</div>
-            <div class="kpi-value">{value}</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-kpi(c1, "Project Value Won", "₹2.45 Cr")
-kpi(c2, "Win / Loss Ratio", "0.65")
-kpi(c3, "Capture Ratio", "0.45")
-kpi(c4, "Registered Opportunities", "185")
-
-# --------------------------------------------------
-# FILTERS (MOVED BELOW KPIs)
-# --------------------------------------------------
+# FILTERS 
 st.markdown("<div class='section-title'>Filters</div>", unsafe_allow_html=True)
 
 f1, f2, f3, f4, f5, f6 = st.columns(6)
@@ -200,9 +200,25 @@ with f6:
         ["Construction", "IT & Telecom", "Healthcare", "Energy"]
     )
 
-# --------------------------------------------------
+
+# KPI SECTION
+c1, c2, c3, c4 = st.columns(4)
+
+def kpi(col, title, value):
+    with col:
+        st.markdown(f"""
+        <div class="kpi-card">
+            <div class="kpi-title">{title}</div>
+            <div class="kpi-value">{value}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+kpi(c1, "Project Value Won", "₹2.45 Cr")
+kpi(c2, "Win / Loss Ratio", "0.65")
+kpi(c3, "Capture Ratio", "0.45")
+kpi(c4, "Registered Opportunities", "185")
+
 # BID ACTIVITY
-# --------------------------------------------------
 st.markdown("<div class='section-title'>Bid Activity (All Time)</div>", unsafe_allow_html=True)
 
 df = pd.DataFrame({
@@ -221,9 +237,7 @@ fig.update_layout(
 
 st.plotly_chart(fig, use_container_width=True)
 
-# --------------------------------------------------
 # INSIGHTS
-# --------------------------------------------------
 col1, col2 = st.columns(2)
 
 with col1:

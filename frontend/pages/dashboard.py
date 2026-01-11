@@ -5,29 +5,6 @@ import plotly.express as px
 import streamlit.components.v1 as components
 import os
 
-# AUTH & ONBOARDING GUARD
-if not st.session_state.get("authenticated"):
-    st.switch_page("pages/loginPage.py")
-    st.stop()
-
-if not st.session_state.get("onboarding_complete"):
-    step = st.session_state.get("onboarding_step", 1)
-    st.switch_page(f"pages/informationCollection_{step}.py")
-    st.stop()
-
-user = st.session_state["user"]
-
-# SUPABASE
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-
-if not SUPABASE_URL or not SUPABASE_KEY:
-    st.error("Supabase environment variables not loaded")
-    st.stop()
-
-supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-
-
 # PAGE CONFIG
 st.set_page_config(
     page_title="Tenderflow",
@@ -107,8 +84,10 @@ html, body, [class*="css"] {
 </style>
 """, unsafe_allow_html=True)
 
+# --------------------------------------------------
 # HEADER NAVIGATION
-# st.markdown("<div class='header-nav'>", unsafe_allow_html=True)
+# --------------------------------------------------
+st.markdown("<div class='header-nav'>", unsafe_allow_html=True)
 
 left, center, right = st.columns([3, 6, 3])
 
@@ -163,8 +142,8 @@ st.markdown("</div>", unsafe_allow_html=True)
 # --------------------------------------------------
 if st.session_state.page == "Profile":
     st.markdown("<div class='section-title'>Edit Profile</div>", unsafe_allow_html=True)
-    st.text_input("Name",width=300)
-    st.text_input("Email",width=300)
+    st.text_input("Name")
+    st.text_input("Email")
     st.button("Save Changes")
     st.stop()
 

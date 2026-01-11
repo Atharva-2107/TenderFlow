@@ -163,8 +163,8 @@ st.markdown("</div>", unsafe_allow_html=True)
 # --------------------------------------------------
 if st.session_state.page == "Profile":
     st.markdown("<div class='section-title'>Edit Profile</div>", unsafe_allow_html=True)
-    st.text_input("Name")
-    st.text_input("Email")
+    st.text_input("Name",width=300)
+    st.text_input("Email",width=300)
     st.button("Save Changes")
     st.stop()
 

@@ -1,17 +1,18 @@
-#from requests import session
 import streamlit as st
 import os
 import base64
 from datetime import date
 from pathlib import Path
 from supabase import create_client
-import supabase
 import re
+import time
 
+# --- 1. SESSION & AUTH GUARD ---
 if not st.session_state.get("authenticated"):
     st.switch_page("pages/loginPage.py")
     st.stop()
 
+# If onboarding already marked as complete, go to dashboard
 if st.session_state.get("onboarding_complete"):
     st.switch_page("pages/dashboard.py")
     st.stop()
@@ -29,26 +30,15 @@ user = st.session_state.get("user")
 if not sb_session or not user:
     st.switch_page("pages/loginPage.py")
     st.stop()
+
 user_id = user.id
 
+# Initialize Supabase client
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+# Authenticate the client with the user's session token
 supabase.postgrest.auth(sb_session.access_token)
 
-if "user" not in st.session_state:
-    # Not logged in at all
-    st.switch_page("pages/loginPage.py")
-    st.stop()
-
-# If onboarding already done → dashboard
-if "user" not in st.session_state or st.session_state["user"] is None:
-    st.error("Session expired. Please log in again.")
-    st.switch_page("pages/loginPage.py")
-    st.stop()
-
-user = st.session_state["user"]
-user_id = user.id
-
-# UTILS
+# --- 2. UTILS ---
 def get_base64_of_bin_file(path):
     try:
         if os.path.exists(path):
@@ -58,7 +48,7 @@ def get_base64_of_bin_file(path):
         return None
     return None
 
-#cSs
+# --- 3. STYLING (Portal Theme) ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
@@ -72,21 +62,18 @@ st.markdown("""
         font-family: 'Inter', sans-serif;
     }
 
-    /* Centered Content Container */
     .block-container {
         padding-top: 2rem !important;
         max-width: 1100px !important;
         margin: auto;
     }
     
-    /* Centered Align Header section */
     .centered-header {
             text-align: center;
             width: 100%;
             margin-top: 20px;
     }
 
-    /* Typography */
     h1 {
         color: white !important;
         font-weight: 800 !important;
@@ -105,12 +92,11 @@ st.markdown("""
         font-family: 'Inter', sans-serif;
         font-size: 0.8rem !important;
         font-weight: 600 !important;
-        color: #a855f7 !important; /* Portal Purple */
+        color: #a855f7 !important;
         text-transform: uppercase;
         letter-spacing: 1px;
     }
 
-    /* Inputs: Portal Style */
     .stTextInput input, .stSelectbox [data-baseweb="select"], .stTextArea textarea, .stDateInput input {
         background-color: #161925 !important;
         color: #FFFFFF !important;
@@ -119,7 +105,6 @@ st.markdown("""
         padding: 12px 16px !important;
     }
 
-    /* BUTTONS */
     div.stButton > button {
         background-color: #7c3aed !important;
         color: #ffffff !important;
@@ -134,17 +119,14 @@ st.markdown("""
     div.stButton > button:hover {
         background-color: #6d28d9 !important;
         border-color: #7c3aed !important;
-        /* color: white !important; */
     }
 
-    /* Hide Streamlit elements */
-    header {visibility: hidden;}
     footer {visibility: hidden;}
     
     </style>
     """, unsafe_allow_html=True)
 
-# LOGO 
+# LOGO LOADING
 current_file_path = Path(__file__).resolve()
 possible_paths = [
     current_file_path.parent / "assets" / "logo.png",
@@ -166,7 +148,7 @@ if logo_base64:
 else:
     st.markdown("<h2 style='color:#a855f7; margin-bottom:20px;'>TenderFlow</h2>", unsafe_allow_html=True)
 
-# header
+# HEADER
 st.markdown("""
         <div class="centered-header">
             <h1>Basic Information</h1>
@@ -174,7 +156,7 @@ st.markdown("""
         </div>
         """, unsafe_allow_html=True)
 
-# FORM inputs
+# --- 4. FORM INPUTS ---
 c1, c2 = st.columns(2, gap="large")
 
 with c1:
@@ -185,18 +167,19 @@ with c1:
 with c2:
     email = st.text_input("Work Email", placeholder="name@company.com")
     phone = st.text_input("Phone Number",max_chars=13, placeholder="+91XXXXXXXXXX")
-    designation = st.text_input("Your Designation", placeholder="e.g. Director",max_chars=25)
+    designation = st.selectbox("Your Designation", ["Founder/Co-Founder", "CEO", "CTO", "CFO", "Manager", "Other"])
 
 st.markdown("<div style='margin-top:20px'></div>", unsafe_allow_html=True)
 reg_address = st.text_area("Registration Address", height=100, max_chars=300)
 
 same_as_reg = st.checkbox("Office address same as registration")
+office_address = ""
 if not same_as_reg:
     office_address = st.text_area("Office Address", height=100)
 
 auth_name = st.text_input("Authorized Signatory Name", placeholder="Full legal name")
 
-#validation 
+# --- 5. VALIDATION UTILS ---
 EMAIL_REGEX = r"^[\w\.-]+@[\w\.-]+\.\w+$"
 PHONE_REGEX = r"^\+91[6-9]\d{9}$"
 
@@ -206,45 +189,46 @@ def is_valid_email(email):
 def is_valid_phone(phone):
     return re.match(PHONE_REGEX, phone)
 
-# ACTION JACKSON BEEBEE BEEE..
+# --- 6. ACTION HANDLER ---
 st.markdown("<div style='margin-top:20px'></div>", unsafe_allow_html=True)
 b1, b2, b3 = st.columns([2, 1, 2])
 
 with b2:
     if st.button(" Next -> "):
-
-        # Validations
+        # Field Validations
         if not company_name.strip():
-            st.error("company Name required!")
+            st.error("Company Name required!")
             st.stop()
-
         if len(company_name) < 3:
-            st.error("Company name must be atleast 3 chars")
+            st.error("Company name must be at least 3 chars")
             st.stop()
-
         if not email or not is_valid_email(email):
             st.error("Please enter a valid email id.")
             st.stop()
-
         if phone and not is_valid_phone(phone):
             st.error("Phone number must be in format +91XXXXXXXXXX")
             st.stop()
-
-        if not reg_address and not office_address.strip():
+        if not reg_address and not (same_as_reg or office_address.strip()):
             st.error("Office Address required.")
             st.stop()
-
         if not auth_name.strip():
             st.error("Authorized Signatory name is required.")
             st.stop()
 
-        if len(auth_name) < 3:
-            st.error("Authorized Signatory name must have atleast 3 chars.")
-            st.stop()
+        # 1. GET COMPANY ID
+        company_id = st.session_state.get("company_id")
+        
+        # Fallback if session state was lost
+        if not company_id:
+            prof_check = supabase.table("profiles").select("company_id").eq("id", user_id).maybe_single().execute()
+            if prof_check.data:
+                company_id = prof_check.data.get("company_id")
+                st.session_state["company_id"] = company_id
 
-        # Prepare payload
+        # Prepare Payload for Company Information
         profile_data = {
-            "id": user_id,  # auth.users.id
+            "id": user_id,
+            "company_id": company_id,
             "company_name": company_name,
             "org_type": org_type,
             "incorp_date": str(incorp_date),
@@ -258,15 +242,27 @@ with b2:
         }
 
         try:
-            # UPSERT (SAFE)
-            supabase.table("profiles") \
-                .upsert(profile_data, on_conflict="id") \
-                .execute()
+            # 2. SAVE COMPANY INFORMATION
+            # Link this data to the company_id so other roles can find it
+            supabase.table("company_information").upsert(profile_data, on_conflict="id").execute()
 
-            # Update session
+            # 3. UPDATE USER PROFILE STATUS (MANDATORY UPDATE)
+            # We explicitly update the profile to ensure the login page sees the progress
+            update_res = supabase.table("profiles").update({
+                "onboarding_step": 2,
+                "onboarding_complete": False # Explicitly false until the final step
+            }).eq("id", user_id).execute()
+
+            # Verify the update actually worked
+            if not update_res.data:
+                st.error("Database update failed. Ensure the 'profiles' table has 'onboarding_step' and 'onboarding_complete' columns.")
+                st.stop()
+
+            # Update session state to match DB
             st.session_state["onboarding_step"] = 2
+            st.session_state["onboarding_complete"] = False
 
-            # Redirect
+            # Redirect to next step
             st.switch_page("pages/informationCollection_2.py")
             st.stop()
 

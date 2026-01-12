@@ -5,10 +5,10 @@ from pathlib import Path
 from dotenv import load_dotenv
 from supabase import create_client
 import re
+import time
 
 # PAGE CONFIG
 st.set_page_config(page_title="TenderFlow | Compliance", layout="wide")
-st.toast("Basic Information recorded.")
 
 if not st.session_state.get("authenticated"):
     st.switch_page("pages/loginPage.py")
@@ -37,6 +37,7 @@ if not sb_session or not user:
 user_id = user.id
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
+# Session Refresh Logic
 try:
     refreshed = supabase.auth.refresh_session(sb_session.refresh_token)
     st.session_state["sb_session"] = refreshed.session
@@ -52,7 +53,7 @@ except Exception:
     
 supabase.postgrest.auth(sb_session.access_token)
 
-MAX_FILE_SIZE = 5 * 1024 * 1024  # (5MB MACXX)
+MAX_FILE_SIZE = 5 * 1024 * 1024  # (5MB MAX)
 
 def upload_file(file, filename):
     if not file:
@@ -64,19 +65,17 @@ def upload_file(file, filename):
 
     path = f"{user_id}/{filename}"
 
-    supabase.storage.from_("compliance_docs").upload(
-        path,
-        file.getvalue(),
-        {"content-type": file.type}
-    )
+    try:
+        supabase.storage.from_("compliance_docs").upload(
+            path,
+            file.getvalue(),
+            {"content-type": file.type, "upsert": "true"}
+        )
+        return path
+    except Exception as e:
+        # If file already exists, we return the path anyway
+        return path
 
-    return path
-
-# Already onboarded → dashboard
-if st.session_state.get("onboarding_complete") is True:
-    st.switch_page("pages/dashboard.py")
-    st.stop()
-       
 # UTILS: 
 def get_base64_of_bin_file(path):
     try:
@@ -94,7 +93,7 @@ IFSC_REGEX = r"^[A-Z]{4}0[A-Z0-9]{6}$"
 def is_valid(regex, value):
     return re.match(regex, value)
 
-#PREMIUM DARK CSS
+# PREMIUM DARK CSS
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
@@ -144,7 +143,6 @@ st.markdown("""
         letter-spacing: 1px;
     }
 
-    /* Inputs & Uploaders */
     .stTextInput input, .stFileUploader section {
         background-color: #161925 !important;
         color: #FFFFFF !important;
@@ -152,7 +150,6 @@ st.markdown("""
         border-radius: 8px !important;
     }
 
-    /* BUTTONS */
     div.stButton {
         display: flex;
         justify-content: center;
@@ -162,10 +159,10 @@ st.markdown("""
         background-color: #7c3aed !important;
         color: #ffffff !important;
         border-radius: 8px !important;
-        padding: 10px 80px !important;
+        padding: 10px 40px !important;
         font-weight: 600 !important;
         border: 1.5px solid #8b5cf6 !important;
-        margin-top: 40px;
+        margin-top: 20px;
     }
 
     div.stButton > button:hover {
@@ -179,8 +176,15 @@ st.markdown("""
 
 # LOGO 
 current_file_path = Path(__file__).resolve()
-logo_path = current_file_path.parent / "assets" / "logo.png"
-logo_base64 = get_base64_of_bin_file(logo_path)
+possible_paths = [
+    current_file_path.parent / "assets" / "logo.png",
+    current_file_path.parent.parent / "assets" / "logo.png"
+]
+logo_base64 = None
+for p in possible_paths:
+    if p.exists():
+        logo_base64 = get_base64_of_bin_file(p)
+        break
 
 if logo_base64:
     st.markdown(f"""
@@ -212,95 +216,77 @@ with c2:
     msme_cert = st.file_uploader("MSME Certificate", type=['pdf', 'jpg', 'png'])
     dpiit_cert = st.file_uploader("DPIIT Certificate", type=['pdf', 'jpg', 'png'])
 
-# ACTION
-_, back_col, _, next_col, _ = st.columns([1,2,1,2,1])
+# NAVIGATION
+st.markdown("<div style='margin-top:20px'></div>", unsafe_allow_html=True)
+b_col1, b_col2, b_col3 = st.columns([1, 1, 1])
 
-with back_col:
+with b_col1:
     if st.button(" <- Back "):
-        st.switch_page("pages/informationCollection.py")
+        st.switch_page("pages/informationCollection_1.py")
 
-with next_col:
+with b_col3:
     if st.button(" Next -> "):
-            
-            #critical checks 
-            if not gst_num or not is_valid(GST_REGEX, gst_num):
-                st.error("Enater valid GST number.")
-                st.stop()
+        # Validation Checks
+        if not gst_num or not is_valid(GST_REGEX, gst_num):
+            st.error("Enter a valid GST number.")
+            st.stop()
+        if not pan_card or not is_valid(PAN_REGEX, pan_card):
+            st.error("Enter a valid PAN number.")
+            st.stop()
+        if not bank_acc.isdigit() or not (9 <= len(bank_acc) <= 18):
+            st.error("Bank Account Number must be 9-18 digits.")
+            st.stop()
+        if not ifsc or not is_valid(IFSC_REGEX, ifsc):
+            st.error("Enter a valid IFSC code.")
+            st.stop()
+        if not firm_cert:
+            st.error("Firm Registration Certificate is required.")
+            st.stop()
+        if not poa_auth:
+            st.error("Power of Attorney / Authorization is mandatory.")
+            st.stop()
 
-            if not pan_card or not is_valid(PAN_REGEX, pan_card):
-                st.error("Enter a valid Pan number.")
-                st.stop()
+        # 1. GET COMPANY ID
+        company_id = st.session_state.get("company_id")
+        if not company_id:
+            prof_check = supabase.table("profiles").select("company_id").eq("id", user_id).maybe_single().execute()
+            company_id = prof_check.data.get("company_id") if prof_check.data else None
+            st.session_state["company_id"] = company_id
 
-            if not bank_acc.isdigit() or not (9 <= len(bank_acc) <= 18):
-                st.error("Bank acc number must be 9 - 18 digits.")
-                st.stop()
+        # 2. UPLOAD FILES
+        with st.spinner("Uploading documents..."):
+            firm_cert_path = upload_file(firm_cert, f"firm_certificate_{user_id}")
+            poa_path = upload_file(poa_auth, f"poa_authorization_{user_id}")
+            msme_path = upload_file(msme_cert, f"msme_certificate_{user_id}")
+            dpiit_path = upload_file(dpiit_cert, f"dpiit_certificate_{user_id}")
 
-            if not ifsc or not is_valid(IFSC_REGEX, ifsc):
-                st.error("enter valid IFSC code")
-                st.stop()
-
-            if not firm_cert:
-                st.error("firm registration cert. Required")
-                st.stop()
-
-            if not poa_auth:
-                st.error("poa (Power of Attorney / Authorization is mandatory) cert. Required")
-                st.stop()
-
-            # SAFETY CHECK
-            if not sb_session or not sb_session.access_token:
-                st.error("Session expired. Please log in again.")
-                st.switch_page("pages/loginPage.py")
-                st.stop()
-
-            # UNIQUE FILE NAME
-            firm_cert_path = upload_file(
-                firm_cert,
-                f"firm_certificate_{user_id}"
-            )
-            poa_path = upload_file(
-                poa_auth,
-                f"poa_authorization_{user_id}"
-            )
-            msme_path = upload_file(
-                msme_cert,
-                f"msme_certificate_{user_id}"
-            )
-            dpiit_path = upload_file(
-                dpiit_cert,
-                f"dpiit_certificate_{user_id}"
-            )
-
-            #  DATA PAYLOAD 
-            data = {
-                "user_id": user_id,  
-                "gst_number": gst_num,
-                "bank_account_number": bank_acc,
-                "ifsc_code": ifsc,
-                "pan_number": pan_card,
-                "firm_certificate_url": firm_cert_path,
-                "poa_certificate_url": poa_path,
-                "msme_certificate_url": msme_path,
-                "dpiit_certificate_url": dpiit_path,
+        # 3. PREPARE PAYLOAD
+        compliance_data = {
+            "user_id": user_id,
+            "company_id": company_id, # LINKING DATA TO COMPANY
+            "gst_number": gst_num,
+            "bank_account_number": bank_acc,
+            "ifsc_code": ifsc,
+            "pan_number": pan_card,
+            "firm_certificate_url": firm_cert_path,
+            "poa_certificate_url": poa_path,
+            "msme_certificate_url": msme_path,
+            "dpiit_certificate_url": dpiit_path,
         }
 
-    try: 
-            # UPSERT 
-            supabase.table("business_compliance") \
-                .upsert(data, on_conflict="user_id") \
-                .execute()
+        try:
+            # 4. SAVE TO DATABASE
+            supabase.table("business_compliance").upsert(compliance_data, on_conflict="user_id").execute()
 
-            # ADVANCE ONBOARDING STEP 
-            supabase.table("profiles") \
-                .update({"onboarding_step": 3}) \
-                .eq("id", user_id) \
-                .execute()
-
+            # 5. ADVANCE STEPS
+            supabase.table("profiles").update({"onboarding_step": 3}).eq("id", user_id).execute()
+            supabase.table("company_information").update({"onboarding_step": 3}).eq("id", user_id).execute()
+            
             st.session_state["onboarding_step"] = 3
 
-            # REDIRECT
+            # 6. REDIRECT
             st.switch_page("pages/informationCollection_3.py")
             st.stop()
 
-    except Exception as e:
+        except Exception as e:
             st.error(f"Error saving compliance data: {e}")

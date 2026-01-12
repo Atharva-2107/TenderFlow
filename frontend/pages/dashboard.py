@@ -4,6 +4,8 @@ import numpy as np
 import plotly.express as px
 import streamlit.components.v1 as components
 import os
+from dotenv import load_dotenv
+from supabase import create_client
 
 # AUTH & ONBOARDING GUARD
 if not st.session_state.get("authenticated"):

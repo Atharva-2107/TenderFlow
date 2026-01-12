@@ -1,7 +1,10 @@
 import streamlit as st
 import os
 import base64
+import random
+import string
 from datetime import datetime
+import time
 from pathlib import Path
 from dotenv import load_dotenv
 from supabase import create_client
@@ -39,7 +42,10 @@ def get_base64_of_bin_file(path):
             return base64.b64encode(f.read()).decode()
     return None
 
-#CSS
+def generate_invite_code():
+    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+
+# CSS (UNTOUCHED UI)
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
@@ -87,8 +93,7 @@ div[data-testid="stFormSubmitButton"] {
 # LAYOUT
 col_branding, col_signup = st.columns([1.2, 1])
 
-
-# LEFT BRANDING
+# LEFT BRANDING (UNTOUCHED UI)
 with col_branding:
     st.markdown("<div style='height:30vh'></div>", unsafe_allow_html=True)
     st.markdown("""
@@ -106,7 +111,7 @@ with col_branding:
 # RIGHT SIGNUP
 with col_signup:
     st.markdown("<div style='height:2vh'></div>", unsafe_allow_html=True)
-    _, box, _ = st.columns([0.2, 0.6, 0.2])
+    _, box, _ = st.columns([0.15, 0.7, 0.15]) # Adjusted slightly for extra fields
 
     with box:
         logo_path = Path(__file__).resolve().parents[1] / "assets" / "logo.png"
@@ -115,10 +120,10 @@ with col_signup:
         if logo:
             st.markdown(f"""
                 <div style="text-align:center;margin-bottom:14px;">
-                    <img src="data:image/png;base64,{logo}" width="280">
+                    <img src="data:image/png;base64,{logo}" width="240">
                 </div>
-                <div style="text-align:center;margin-bottom:35px;">
-                    <p style="color:#6366f1;font-size:12px;letter-spacing:4px;font-weight:700;">
+                <div style="text-align:center;margin-bottom:25px;">
+                    <p style="color:#6366f1;font-size:11px;letter-spacing:4px;font-weight:700;">
                         CREATE ACCOUNT
                     </p>
                 </div>
@@ -129,7 +134,20 @@ with col_signup:
             email = st.text_input("Work Email")
             password = st.text_input("Password", type="password")
             confirm_password = st.text_input("Confirm Password", type="password")
+            
+            # --- RBAC & MULTI-TENANCY FIELDS ---
+            role = st.selectbox("Designation", ["Bid Manager", "Risk Reviewer", "Executive", "Procurement Officer"])
+            
+            team_choice = st.radio("Team Setup", ["Create New Team", "Join Existing Team"], horizontal=True)
+            
+            if team_choice == "Create New Team":
+                company_name = st.text_input("Company Name")
+                invite_code_input = ""
+            else:
+                company_name = ""
+                invite_code_input = st.text_input("Invite Code", placeholder="Ask your manager for the code")
 
+            st.markdown("<br>", unsafe_allow_html=True)
             c1, c2, c3 = st.columns([1, 1, 1])
             with c2:
                 submit = st.form_submit_button("Create Account", type="primary")
@@ -141,16 +159,50 @@ with col_signup:
                 st.error("Passwords do not match")
             elif len(password) < 6:
                 st.error("Password must be at least 6 characters")
+            elif team_choice == "Create New Team" and not company_name:
+                st.error("Company Name is required to create a team")
+            elif team_choice == "Join Existing Team" and not invite_code_input:
+                st.error("Invite Code is required to join a team")
             else:
                 try:
-            # 1. Sign up the user
+                    # 1. Sign up the user in Supabase Auth
                     res = supabase.auth.sign_up({
                         "email": email.strip(),
                         "password": password
                     })
-            
+                    
                     if res.user:
-                        # 2. IMMEDIATELY sign in to get a session
+                        user_id = res.user.id
+                        company_id = None
+                        final_invite_code = ""
+
+                        # 2. HANDLE COMPANY LOGIC
+                        if team_choice == "Create New Team":
+                            final_invite_code = generate_invite_code()
+                            comp_res = supabase.table("companies").insert({
+                                "name": company_name,
+                                "invite_code": final_invite_code
+                            }).execute()
+                            if comp_res.data:
+                                company_id = comp_res.data[0]['id']
+                        else:
+                            # Join existing
+                            comp_check = supabase.table("companies").select("id").eq("invite_code", invite_code_input.strip()).execute()
+                            if comp_check.data:
+                                company_id = comp_check.data[0]['id']
+                            else:
+                                st.error("Invalid Invite Code. Please verify with your team.")
+                                st.stop()
+
+                        # 3. CREATE USER PROFILE (RBAC)
+                        supabase.table("profiles").insert({
+                            "id": user_id,
+                            "email": email.strip(),
+                            "role": role,
+                            "company_id": company_id
+                        }).execute()
+
+                        # 4. Sign in to get session
                         login_res = supabase.auth.sign_in_with_password({
                             "email": email.strip(),
                             "password": password
@@ -159,11 +211,13 @@ with col_signup:
                         if login_res.session:
                             st.session_state["sb_session"] = login_res.session
                             st.session_state["user"] = login_res.user
+                            st.session_state["user_role"] = role
+                            st.session_state["company_id"] = company_id
                             st.session_state["authenticated"] = True
 
-                            # onboarding starts
-                            st.session_state["onboarding_step"] = 1
-                            st.session_state["onboarding_complete"] = False
+                            if team_choice == "Create New Team":
+                                st.success(f"Team Created! Your Invite Code is: {final_invite_code}")
+                                time.sleep(2) # type: ignore
 
                             st.switch_page("pages/informationCollection_1.py")  
                         else:
@@ -171,13 +225,12 @@ with col_signup:
                 except Exception as e:
                     st.error(f"Sign up failed: {e}")
 
-
-        # NAVIGATION
+        # NAVIGATION (UNTOUCHED UI)
         st.markdown("""
         <div style="text-align:center; margin-top:4px;">
         Already have an account?
         <a href="?go_login=true"
-           style="font-size:17px;color:#6366f1;font-weight:500;text-decoration:none;">
+            style="font-size:17px;color:#6366f1;font-weight:500;text-decoration:none;">
         Login
         </a>
         </div>
@@ -185,32 +238,3 @@ with col_signup:
 
         if st.query_params.get("go_login") == "true":
             st.switch_page("pages/loginPage.py")
-
-        # -------------------------
-        # GOOGLE SIGN UP
-        # -------------------------
-        # oauth = supabase.auth.sign_in_with_oauth({
-        #     "provider": "google",
-        #     "options": {
-        #         "redirect_to": "http://localhost:8501"
-        #     }
-        # })
-
-        # st.markdown(f"""
-        # <a href="{oauth.url}" style="text-decoration:none;">
-        #     <div style="
-        #         width:260px;
-        #         padding:14px;
-        #         border-radius:50px;
-        #         background:#111827;
-        #         color:white;
-        #         border:1px solid #2d313e;
-        #         font-size:16px;
-        #         margin:10px auto 30px;
-        #         display:flex;
-        #         justify-content:center;
-        #         align-items:center;">
-        #         Continue with Google
-        #     </div>
-        # </a>
-        # """, unsafe_allow_html=True)

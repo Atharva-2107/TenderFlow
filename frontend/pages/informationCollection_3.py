@@ -5,10 +5,11 @@ from pathlib import Path
 from dotenv import load_dotenv
 from supabase import create_client
 import re
+import time
+from datetime import date
 
 # PAGE CONFIG
 st.set_page_config(page_title="TenderFlow | Financial Capacity", layout="wide")
-st.toast("Legal & Tax Compliance details recorded.")
 
 if not st.session_state.get("authenticated"):
     st.switch_page("pages/loginPage.py")
@@ -37,6 +38,7 @@ if not sb_session or not user:
 user_id = user.id
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
+# Session Refresh Logic
 try:
     refreshed = supabase.auth.refresh_session(sb_session.refresh_token)
     st.session_state["sb_session"] = refreshed.session
@@ -64,13 +66,16 @@ def upload_file(file, filename):
 
     path = f"{user_id}/{filename}"
 
-    supabase.storage.from_("compliance_docs").upload(
-        path,
-        file.getvalue(),
-        {"content-type": file.type}
-    )
-
-    return path
+    try:
+        supabase.storage.from_("compliance_docs").upload(
+            path,
+            file.getvalue(),
+            {"content-type": file.type, "upsert": "true"}
+        )
+        return path
+    except Exception:
+        # If file exists, return existing path
+        return path
 
 # UTILS
 def get_base64_of_bin_file(path):
@@ -82,12 +87,11 @@ def get_base64_of_bin_file(path):
         return None
     return None
 
-
+# STYLING
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
 
-    /* NUCLEAR ANCHOR FIX */
     button[title="View header anchor"], .stHtmlHeader a, [data-testid="stHeaderActionElements"] {
         display: none !important;
     }
@@ -134,16 +138,13 @@ st.markdown("""
         letter-spacing: 1px;
     }
 
-    /* Inputs & File Uploader Styling */
-    .stTextInput input, .stFileUploader section {
+    .stTextInput input, .stFileUploader section, .stTextArea textarea {
         background-color: #161925 !important;
         color: #FFFFFF !important;
         border: 1px solid #2d313e !important;
         border-radius: 8px !important;
-        padding: 12px 16px !important;
     }
 
-    /* BUTTONS */
     div.stButton {
         display: flex;
         justify-content: center;
@@ -153,10 +154,10 @@ st.markdown("""
         background-color: #7c3aed !important;
         color: #ffffff !important;
         border-radius: 8px !important;
-        padding: 10px 80px !important;
+        padding: 10px 40px !important;
         font-weight: 600 !important;
         border: 1.5px solid #8b5cf6 !important;
-        margin-top: 40px;
+        margin-top: 20px;
     }
 
     div.stButton > button:hover {
@@ -165,14 +166,20 @@ st.markdown("""
     }
 
     footer {visibility: hidden;}
-    
     </style>
     """, unsafe_allow_html=True)
 
 # LOGO
 current_file_path = Path(__file__).resolve()
-logo_path = current_file_path.parent / "assets" / "logo.png"
-logo_base64 = get_base64_of_bin_file(logo_path)
+possible_paths = [
+    current_file_path.parent / "assets" / "logo.png",
+    current_file_path.parent.parent / "assets" / "logo.png"
+]
+logo_base64 = None
+for p in possible_paths:
+    if p.exists():
+        logo_base64 = get_base64_of_bin_file(p)
+        break
 
 if logo_base64:
     st.markdown(f"""
@@ -204,79 +211,71 @@ with c2:
     st.markdown("<div style='margin-top: 25px;'></div>", unsafe_allow_html=True)
     ca_cert = st.file_uploader("Upload CA Certificate", type=['pdf'])
 
+# NAVIGATION
 st.markdown("<div style='margin-top:20px'></div>", unsafe_allow_html=True)
+b_col1, b_col2, b_col3 = st.columns([1, 1, 1])
 
-b1, b2, b3, b4, b5 = st.columns([1,2,1,2,1])
-
-with b2:
+with b_col1:
     if st.button(" <- Back "):
-        # Switch back to the first info page
         st.switch_page("pages/informationCollection_2.py")
-with b4:
+
+with b_col3:
     if st.button(" Next -> "):
-            # SAFETY CHECK 
-            if not sb_session or not sb_session.access_token:
-                st.error("Session expired. Please log in again.")
-                st.switch_page("pages/loginPage.py")
-                st.stop()
+        # Validations
+        if not avg_turnover.strip():
+            st.error("Average Annual Turnover is required.")
+            st.stop()
+        if not re.search(r"\d", avg_turnover):
+            st.error("Turnover must contain numeric value.")
+            st.stop()
+        if not fy_wise.strip():
+            st.error("FY-wise turnover details are required.")
+            st.stop()
+        if len(fy_wise.splitlines()) < 2:
+            st.error("Provide turnover for at least 2 financial years.")
+            st.stop()
+        if not balance_sheet:
+            st.error("Audited Balance Sheet is mandatory.")
+            st.stop()
+        if not ca_cert:
+            st.error("CA Certificate is mandatory.")
+            st.stop()
 
-            if not avg_turnover.strip():
-                st.error("Average Annual Turnover is required.")
-                st.stop()
+        # 1. GET COMPANY ID
+        company_id = st.session_state.get("company_id")
+        if not company_id:
+            prof_check = supabase.table("profiles").select("company_id").eq("id", user_id).maybe_single().execute()
+            company_id = prof_check.data.get("company_id") if prof_check.data else None
+            st.session_state["company_id"] = company_id
 
-            # Allow numbers + words (Lakhs / Cr)
-            if not re.search(r"\d", avg_turnover):
-                st.error("Turnover must contain numeric value.")
-                st.stop()
+        # 2. UPLOAD FILES
+        with st.spinner("Uploading financial documents..."):
+            balance_sheet_path = upload_file(balance_sheet, f"balance_sheet_{user_id}.pdf")
+            ca_cert_path = upload_file(ca_cert, f"ca_certificate_{user_id}.pdf")
 
-            if not fy_wise.strip():
-                st.error("FY-wise turnover details are required.")
-                st.stop()
+        # 3. PREPARE PAYLOAD
+        financial_data = {
+            "user_id": user_id,   
+            "company_id": company_id, # LINKING DATA TO COMPANY
+            "avg_annual_turnover": avg_turnover,
+            "fy_wise_turnover": fy_wise,
+            "balance_sheet_url": balance_sheet_path,
+            "ca_certificate_url": ca_cert_path,
+        }
 
-            if len(fy_wise.splitlines()) < 2:
-                st.error("Provide turnover for at least 2 financial years.")
-                st.stop()
+        try:
+            # 4. SAVE TO DATABASE
+            supabase.table("financials").upsert(financial_data, on_conflict="user_id").execute()
 
-            if not balance_sheet:
-                st.error("Audited Balance Sheet is mandatory.")
-                st.stop()
+            # 5. ADVANCE STEPS
+            supabase.table("profiles").update({"onboarding_step": 4}).eq("id", user_id).execute()
+            supabase.table("company_information").update({"onboarding_step": 4}).eq("id", user_id).execute()
+            
+            st.session_state["onboarding_step"] = 4
 
-            if not ca_cert:
-                st.error("CA Certificate is mandatory.")
-                st.stop()
+            # 6. REDIRECT
+            st.switch_page("pages/informationCollection_4.py")
+            st.stop()
 
-            # UNIQUE FILE NAMES (
-            balance_sheet_path = upload_file(
-                balance_sheet,
-                f"balance_sheet_{user_id}.pdf"
-            )
-            ca_cert_path = upload_file(
-                ca_cert,
-                f"ca_certificate_{user_id}.pdf"
-            )
-
-            # DATA PAYLOAD 
-            data = {
-                "user_id": user_id,   
-                "avg_annual_turnover": avg_turnover,
-                "fy_wise_turnover": fy_wise,
-                "balance_sheet_url": balance_sheet_path,
-                "ca_certificate_url": ca_cert_path,
-            }
-
-            try:
-                supabase.table("financials") \
-                    .upsert(data, on_conflict="user_id") \
-                    .execute()
-
-                supabase.table("profiles") \
-                    .update({"onboarding_step": 4}) \
-                    .eq("id", user_id) \
-                    .execute()
-
-                st.session_state["onboarding_step"] = 4
-                st.switch_page("pages/informationCollection_4.py")
-                st.stop()
-
-            except Exception as e:
-                st.error(f"Error saving financial data: {e}")
+        except Exception as e:
+            st.error(f"Error saving financial data: {e}")

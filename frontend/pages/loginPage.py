@@ -2,11 +2,10 @@ import streamlit as st
 import os
 import base64
 import datetime
+import time
 from pathlib import Path
 from dotenv import load_dotenv
 from supabase import create_client
-#from utils.auth_guard import auth_and_onboarding_guard
-
 
 # PAGE CONFIG
 st.set_page_config(page_title="TenderFlow AI | Login", layout="wide")
@@ -15,6 +14,7 @@ st.set_page_config(page_title="TenderFlow AI | Login", layout="wide")
 if st.session_state.get("authenticated"):
     st.switch_page("pages/dashboard.py")
     st.stop()
+
 # LOAD .ENV 
 def load_env():
     current = Path(__file__).resolve()
@@ -37,6 +37,7 @@ if not SUPABASE_URL or not SUPABASE_KEY:
     st.stop()
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+
 # UTILS
 def get_base64_of_bin_file(path):
     if os.path.exists(path):
@@ -170,42 +171,87 @@ with col_login:
                         "password": password
                         })
                     if res.session:
+                        # 1. SET BASIC SESSION
                         st.session_state["sb_session"] = res.session
                         st.session_state["user"] = res.user
                         st.session_state["authenticated"] = True
 
-                        profile = (
-                            supabase.table("profiles")
-                            .select("onboarding_complete, onboarding_step")
-                            .eq("id", res.user.id)
-                            .maybe_single()
-                            .execute()
-                        )   
+                        # 2. FETCH PROFILE DATA
+                        prof_query = supabase.table("profiles").select("role, company_id, onboarding_complete, onboarding_step").eq("id", res.user.id).execute()
+                        
+                        user_data = prof_query.data[0] if prof_query.data else {}
+                        
+                        user_role = user_data.get('role', "Team Member")
+                        company_id = user_data.get('company_id')
+                        is_complete = bool(user_data.get('onboarding_complete', False))
+                        current_step = int(user_data.get('onboarding_step', 1))
+                        
+                        st.session_state["user_role"] = user_role
+                        st.session_state["company_id"] = company_id
+                        st.session_state["onboarding_complete"] = is_complete
 
-                        profile_data = profile.data or {}
-
-                        onboarding_complete = bool(profile_data.get("onboarding_complete", False))
-                        onboarding_step = int(profile_data.get("onboarding_step", 1))
-
-                        # store in session
-                        st.session_state["onboarding_complete"] = onboarding_complete
-                        st.session_state["onboarding_step"] = onboarding_step
-
-                        if onboarding_complete:
+                        # 3. PRIORITY CHECK: IS PROFILE DONE?
+                        if is_complete:
+                            st.success("Login Successful. Redirecting...")
+                            time.sleep(0.5)
                             st.switch_page("pages/dashboard.py")
-                        else:
-                            st.switch_page(f"pages/informationCollection_{onboarding_step}.py")
+                            st.stop()
 
-                        st.stop()
+                        # 4. SECONDARY CHECK: IS COMPANY DONE? (For Joiners)
+                        company_onboarded = False
+                        if company_id:
+                            try:
+                                # We check if ANY info exists for this company_id.
+                                # RLS policy must allow 'select' on company_information for authenticated users in the same company.
+                                comp_query = supabase.table("company_information").select("id", count="exact").eq("company_id", company_id).execute()
+                                if comp_query.data: 
+                                    company_onboarded = True
+                            except:
+                                pass
+
+                        if company_onboarded:
+                            # IMPORTANT FIX: If company is onboarded, updating the user's profile to skip this check next time
+                            try:
+                                supabase.table("profiles").update({"onboarding_complete": True, "onboarding_step": 999}).eq("id", res.user.id).execute()
+                                st.session_state["onboarding_complete"] = True
+                            except:
+                                pass # proceed anyway
+                                
+                            st.success("Company Verified. Redirecting...")
+                            time.sleep(0.5)
+                            st.switch_page("pages/dashboard.py")
+                            st.stop()
+
+                        # 5. IF WE ARE HERE, ONBOARDING IS TRULY INCOMPLETE
+                        # Define Admin/Creator roles that MUST fill the form
+                        admin_roles = ["Executive", "Bid Manager", "Admin"]
+                        
+                        if user_role in admin_roles:
+                            st.warning(f"Setup incomplete. Resuming Step {current_step}...")
+                            time.sleep(1)
+                            if current_step > 1:
+                                st.switch_page(f"pages/informationCollection_{current_step}.py")
+                            else:
+                                st.switch_page("pages/informationCollection_1.py")
+                        else:
+                            # Team members (Risk Reviewers, etc.) cannot fill the form.
+                            # They should go to dashboard even if "company_information" is missing (read-only view)
+                            # to avoid getting stuck in a loop.
+                            st.info("ℹ️ Waiting for Admin Setup. Entering View-Only Mode...")
+                            time.sleep(2)
+                            st.switch_page("pages/dashboard.py")
+
                     else:
                         st.error("Invalid email or password")
 
                 except Exception as e:
-                    st.error(f"Login failed: {e}")
+                    st.error(f"Login failed: {str(e)}")
+        
+        # NAVIGATION LINK
         st.markdown("""
             <div style="text-align:center; margin-top:4px;">
             Don't have an account?
-            <a href="?go_signUp=true"
+            <a href="?go_signUp=true" target="_self"
             style="
             font-size:17px;
             color:#6366f1;
@@ -218,39 +264,11 @@ with col_login:
             </div>
         """, unsafe_allow_html=True)
 
+        # REDIRECTION LOGIC
+        # We check query params, clear them, and switch page
         if st.query_params.get("go_signUp") == "true":
-            st.switch_page("pages/signPage.py")
-
-        # -------------------------
-        # GOOGLE LOGIN
-        # -------------------------
-        # st.markdown("<div style='margin-top:25px'></div>", unsafe_allow_html=True)
-
-        # oauth = supabase.auth.sign_in_with_oauth({
-        #     "provider": "google",
-        #     "options": {
-        #         "redirect_to": "http://localhost:8501"
-        #     }
-        # })
-
-        # st.markdown(f"""
-        # <a href="{oauth.url}" style="text-decoration:none;">
-        #     <div style="
-        #         width:260px;
-        #         padding:14px;
-        #         border-radius:50px;
-        #         background:#111827;
-        #         color:white;
-        #         border:1px solid #2d313e;
-        #         font-size:16px;
-        #         margin:5px auto 30px;
-        #         display:flex;
-        #         justify-content:center;
-        #         align-items:center;">
-        #         Continue with Google
-        #     </div>
-        # </a>
-        # """, unsafe_allow_html=True)
+            st.query_params.clear()  # Clear params to prevent loops
+            st.switch_page("pages/signupPage.py")
 
         st.markdown("""
             <p style='text-align:center;color:#2d313e;font-size:10px;margin-top:50px'>

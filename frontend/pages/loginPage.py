@@ -190,9 +190,13 @@ with col_login:
                         st.session_state["company_id"] = company_id
                         st.session_state["onboarding_complete"] = is_complete
 
+                        # --- DEBUGGING (Remove after fixing) ---
+                        # st.error(f"DEBUG: Role={user_role}, CompID={company_id}, Complete={is_complete}")
+                        # -------------------------------------
+
                         # 3. PRIORITY CHECK: IS PROFILE DONE?
                         if is_complete:
-                            st.success("Login Successful. Redirecting...")
+                            st.success("Login Successful.")
                             time.sleep(0.5)
                             st.switch_page("pages/dashboard.py")
                             st.stop()
@@ -201,8 +205,6 @@ with col_login:
                         company_onboarded = False
                         if company_id:
                             try:
-                                # We check if ANY info exists for this company_id.
-                                # RLS policy must allow 'select' on company_information for authenticated users in the same company.
                                 comp_query = supabase.table("company_information").select("id", count="exact").eq("company_id", company_id).execute()
                                 if comp_query.data: 
                                     company_onboarded = True
@@ -210,20 +212,19 @@ with col_login:
                                 pass
 
                         if company_onboarded:
-                            # IMPORTANT FIX: If company is onboarded, updating the user's profile to skip this check next time
+                            # Auto-update profile so next login is faster
                             try:
                                 supabase.table("profiles").update({"onboarding_complete": True, "onboarding_step": 999}).eq("id", res.user.id).execute()
-                                st.session_state["onboarding_complete"] = True
-                            except:
-                                pass # proceed anyway
-                                
-                            st.success("Company Verified. Redirecting...")
+                            except: pass
+                            
+                            st.session_state["onboarding_complete"] = True
+                            st.success("Company Verified.")
                             time.sleep(0.5)
                             st.switch_page("pages/dashboard.py")
                             st.stop()
 
-                        # 5. IF WE ARE HERE, ONBOARDING IS TRULY INCOMPLETE
-                        # Define Admin/Creator roles that MUST fill the form
+                        # 5. IF WE ARE HERE, ONBOARDING IS INCOMPLETE
+                        # Decide based on Role
                         admin_roles = ["Executive", "Bid Manager", "Admin"]
                         
                         if user_role in admin_roles:
@@ -234,11 +235,11 @@ with col_login:
                             else:
                                 st.switch_page("pages/informationCollection_1.py")
                         else:
-                            # Team members (Risk Reviewers, etc.) cannot fill the form.
-                            # They should go to dashboard even if "company_information" is missing (read-only view)
-                            # to avoid getting stuck in a loop.
-                            st.info("ℹ️ Waiting for Admin Setup. Entering View-Only Mode...")
-                            time.sleep(2)
+                            # *** FIX IS HERE ***
+                            # Force completion flag for Team Members so Dashboard doesn't kick them out
+                            st.session_state["onboarding_complete"] = True 
+                            st.info(f"Welcome {user_role}. Redirecting to Dashboard (View Only)...")
+                            time.sleep(1.5)
                             st.switch_page("pages/dashboard.py")
 
                     else:
@@ -265,9 +266,8 @@ with col_login:
         """, unsafe_allow_html=True)
 
         # REDIRECTION LOGIC
-        # We check query params, clear them, and switch page
         if st.query_params.get("go_signUp") == "true":
-            st.query_params.clear()  # Clear params to prevent loops
+            st.query_params.clear()
             st.switch_page("pages/signupPage.py")
 
         st.markdown("""

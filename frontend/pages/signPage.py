@@ -186,7 +186,7 @@ with col_signup:
                             if comp_res.data:
                                 company_id = comp_res.data[0]['id']
                         else:
-                            # Join existing
+                            # Join existing logic
                             comp_check = supabase.table("companies").select("id").eq("invite_code", invite_code_input.strip()).execute()
                             if comp_check.data:
                                 company_id = comp_check.data[0]['id']
@@ -195,11 +195,16 @@ with col_signup:
                                 st.stop()
 
                         # 3. CREATE USER PROFILE (RBAC)
+                        # Important: If joining an existing team, we set onboarding_complete=True so they skip setup
+                        is_joining = (team_choice == "Join Existing Team")
+                        
                         supabase.table("profiles").insert({
                             "id": user_id,
                             "email": email.strip(),
                             "role": role,
-                            "company_id": company_id
+                            "company_id": company_id,
+                            "onboarding_complete": is_joining,  # Automatically mark complete if joining
+                            "onboarding_step": 999 if is_joining else 1
                         }).execute()
 
                         # 4. Sign in to get session
@@ -215,11 +220,18 @@ with col_signup:
                             st.session_state["company_id"] = company_id
                             st.session_state["authenticated"] = True
 
+                            # 5. REDIRECTION LOGIC
                             if team_choice == "Create New Team":
                                 st.success(f"Team Created! Your Invite Code is: {final_invite_code}")
-                                time.sleep(2) # type: ignore
-
-                            st.switch_page("pages/informationCollection_1.py")  
+                                time.sleep(2)
+                                st.session_state["onboarding_complete"] = False
+                                st.switch_page("pages/informationCollection_1.py")
+                            else:
+                                # Joined existing team -> Skip to Dashboard
+                                st.success("Joined Team Successfully! Redirecting...")
+                                time.sleep(1)
+                                st.session_state["onboarding_complete"] = True
+                                st.switch_page("pages/dashboard.py")
                         else:
                             st.info("Account created. Please verify your email and log in.")
                 except Exception as e:

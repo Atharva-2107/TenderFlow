@@ -177,6 +177,8 @@ from langchain_core.documents import Document
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import math
 import nest_asyncio
+import fitz  # PyMuPDF - 15-21x faster than PyPDF
+import gc
 
 # Prevent event loop errors in async contexts
 nest_asyncio.apply()
@@ -202,6 +204,203 @@ embeddings = FastEmbedEmbeddings(model_name="BAAI/bge-small-en-v1.5")
 # Configuration
 INDEX_DIR = "indices"
 os.makedirs(INDEX_DIR, exist_ok=True)
+
+def parse_pdf_fast_quality(file_path: str) -> list:
+    """
+    HIGH-SPEED QUALITY PDF PARSING using PyMuPDF (fitz).
+    - 15-21x faster than PyPDF
+    - Superior text extraction with layout awareness
+    - Parallel page processing for maximum speed
+    - Returns list of LangChain Document objects
+    """
+    docs = []
+    
+    try:
+        # Open PDF with PyMuPDF
+        pdf_document = fitz.open(file_path)
+        total_pages = len(pdf_document)
+        print(f"[FAST-QUALITY] Parsing {total_pages} pages with PyMuPDF...")
+        
+        # Process pages in parallel for maximum speed
+        def extract_page(page_num):
+            page = pdf_document[page_num]
+            # Extract text with layout preservation
+            text = page.get_text("text", sort=True)  # sort=True preserves reading order
+            return Document(
+                page_content=text,
+                metadata={
+                    "source": file_path,
+                    "page": page_num + 1,
+                    "parser": "pymupdf_fast_quality"
+                }
+            )
+        
+        # Use ThreadPoolExecutor for parallel page extraction
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            futures = {executor.submit(extract_page, i): i for i in range(total_pages)}
+            for future in as_completed(futures):
+                page_num = futures[future]
+                try:
+                    doc = future.result()
+                    if doc.page_content.strip():  # Only add non-empty pages
+                        docs.append(doc)
+                except Exception as e:
+                    print(f"[FAST-QUALITY] Page {page_num} extraction error: {e}")
+        
+        # Sort docs by page number to maintain order
+        docs.sort(key=lambda x: x.metadata.get("page", 0))
+        
+        pdf_document.close()
+        print(f"[FAST-QUALITY] Successfully extracted {len(docs)} documents")
+        
+    except Exception as e:
+        print(f"[FAST-QUALITY] Error parsing PDF: {e}")
+        # Fallback to PyPDFLoader if PyMuPDF fails
+        print("[FAST-QUALITY] Falling back to PyPDFLoader...")
+        loader = PyPDFLoader(file_path)
+        docs = loader.load()
+    
+    return docs
+
+def parse_pdf_hybrid_quality(file_path: str) -> list:
+    """
+    HYBRID HIGH-QUALITY PARSING: Combines PyMuPDF speed with LlamaParse quality.
+    
+    Strategy:
+    1. Use PyMuPDF for instant text extraction (fast)
+    2. Detect pages with low text content (likely scanned/image pages)
+    3. Only send image-heavy pages to LlamaParse for OCR
+    4. Merge results for best of both worlds
+    
+    This gives:
+    - Text-based PDFs: Super fast (PyMuPDF only)
+    - Scanned/image PDFs: Quality OCR only where needed (minimal LlamaParse calls)
+    """
+    import time
+    start_time = time.time()
+    
+    all_docs = []
+    pages_needing_ocr = []
+    
+    try:
+        # Step 1: Fast extraction with PyMuPDF
+        pdf_document = fitz.open(file_path)
+        total_pages = len(pdf_document)
+        print(f"[HYBRID] Phase 1: Fast extraction of {total_pages} pages with PyMuPDF...")
+        
+        MIN_TEXT_THRESHOLD = 50  # Minimum characters to consider page as "text-based"
+        
+        for page_num in range(total_pages):
+            page = pdf_document[page_num]
+            text = page.get_text("text", sort=True)
+            
+            # Check if page has images
+            image_list = page.get_images(full=True)
+            has_images = len(image_list) > 0
+            
+            # Determine if page needs OCR
+            text_length = len(text.strip())
+            
+            if text_length >= MIN_TEXT_THRESHOLD:
+                # Good text extraction - use PyMuPDF result
+                all_docs.append(Document(
+                    page_content=text,
+                    metadata={
+                        "source": file_path,
+                        "page": page_num + 1,
+                        "parser": "pymupdf_hybrid",
+                        "text_chars": text_length
+                    }
+                ))
+            elif has_images or text_length < MIN_TEXT_THRESHOLD:
+                # Low text + has images = likely scanned page, needs OCR
+                pages_needing_ocr.append(page_num)
+                # Add placeholder for now
+                all_docs.append(Document(
+                    page_content=f"[OCR_PENDING_PAGE_{page_num + 1}]",
+                    metadata={
+                        "source": file_path,
+                        "page": page_num + 1,
+                        "parser": "pending_llamaparse",
+                        "text_chars": text_length
+                    }
+                ))
+        
+        pdf_document.close()
+        
+        phase1_time = time.time() - start_time
+        print(f"[HYBRID] Phase 1 complete in {phase1_time:.2f}s - {len(all_docs) - len(pages_needing_ocr)} text pages, {len(pages_needing_ocr)} need OCR")
+        
+        # Step 2: Send only problematic pages to LlamaParse (if any)
+        if pages_needing_ocr:
+            print(f"[HYBRID] Phase 2: Sending {len(pages_needing_ocr)} image-heavy pages to LlamaParse...")
+            
+            try:
+                # Extract only the pages that need OCR into a temporary PDF
+                from pypdf import PdfReader, PdfWriter
+                reader = PdfReader(file_path)
+                writer = PdfWriter()
+                
+                for page_num in pages_needing_ocr:
+                    writer.add_page(reader.pages[page_num])
+                
+                # Save temporary PDF with only OCR-needed pages
+                ocr_temp_path = f"temp_ocr_{os.path.basename(file_path)}"
+                with open(ocr_temp_path, "wb") as f:
+                    writer.write(f)
+                
+                # Process with LlamaParse
+                parser = LlamaParse(result_type="markdown")
+                ocr_docs = parser.load_data(ocr_temp_path)
+                
+                # Map OCR results back to original page numbers
+                for i, ocr_doc in enumerate(ocr_docs):
+                    if i < len(pages_needing_ocr):
+                        original_page = pages_needing_ocr[i]
+                        # Find and replace placeholder in all_docs
+                        for j, doc in enumerate(all_docs):
+                            if doc.metadata.get("page") == original_page + 1 and "pending" in doc.metadata.get("parser", ""):
+                                all_docs[j] = Document(
+                                    page_content=ocr_doc.text,
+                                    metadata={
+                                        "source": file_path,
+                                        "page": original_page + 1,
+                                        "parser": "llamaparse_ocr"
+                                    }
+                                )
+                                break
+                
+                # Cleanup temp file
+                if os.path.exists(ocr_temp_path):
+                    os.remove(ocr_temp_path)
+                    
+                print(f"[HYBRID] Phase 2 complete - OCR processed {len(ocr_docs)} pages")
+                
+            except Exception as e:
+                print(f"[HYBRID] LlamaParse OCR failed: {e}")
+                print("[HYBRID] Using PyMuPDF text for all pages (some may have limited text)")
+                # Remove placeholder markers
+                for i, doc in enumerate(all_docs):
+                    if "[OCR_PENDING" in doc.page_content:
+                        all_docs[i] = Document(
+                            page_content="[Image-based page - text extraction limited]",
+                            metadata=doc.metadata
+                        )
+        
+        # Sort by page number
+        all_docs.sort(key=lambda x: x.metadata.get("page", 0))
+        
+        total_time = time.time() - start_time
+        print(f"[HYBRID] Complete in {total_time:.2f}s - {len(all_docs)} total documents")
+        
+        return all_docs
+        
+    except Exception as e:
+        print(f"[HYBRID] Error: {e}")
+        print("[HYBRID] Falling back to full LlamaParse...")
+        parser = LlamaParse(result_type="markdown")
+        llama_docs = parser.load_data(file_path)
+        return [Document(page_content=d.text, metadata=d.metadata or {}) for d in llama_docs]
 
 # Generate Prompt Templates - Enhanced for Legal Grade Output
 SECTION_PROMPTS = {
@@ -463,95 +662,83 @@ async def upload_tender(
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
         
         if parsing_mode == "High-Quality":
-            # PARALLEL PARSING FOR LARGE FILES
-            print(f"[HIGH-QUALITY] Parsing {file.filename} with LlamaParse (Vision) in parallel...")
+            # HYBRID HIGH-QUALITY PARSING
+            # Combines PyMuPDF speed with LlamaParse quality for scanned pages
+            import time
+            start_time = time.time()
             
-            # First, get page count using PyPDF to determine batches
-            from pypdf import PdfReader, PdfWriter
-            reader = PdfReader(temp_path)
-            total_pages = len(reader.pages)
-            print(f"Total pages: {total_pages}")
+            print(f"[HIGH-QUALITY HYBRID] Parsing {file.filename}...")
+            print("[HIGH-QUALITY HYBRID] Phase 1: Fast extraction with PyMuPDF")
+            print("[HIGH-QUALITY HYBRID] Phase 2: OCR for image-heavy pages with LlamaParse")
             
-            BATCH_SIZE = 5  # Process 5 pages at a time
-            num_batches = math.ceil(total_pages / BATCH_SIZE)
+            # Use the hybrid parser
+            docs = parse_pdf_hybrid_quality(temp_path)
             
-            # Create temporary batch files
-            batch_files = []
-            for batch_idx in range(num_batches):
-                start_page = batch_idx * BATCH_SIZE
-                end_page = min((batch_idx + 1) * BATCH_SIZE, total_pages)
-                
-                writer = PdfWriter()
-                for page_num in range(start_page, end_page):
-                    writer.add_page(reader.pages[page_num])
-                
-                batch_path = f"temp_batch_{batch_idx}_{file.filename}"
-                with open(batch_path, "wb") as batch_file:
-                    writer.write(batch_file)
-                batch_files.append((batch_idx, batch_path))
+            parse_time = time.time() - start_time
+            print(f"[HIGH-QUALITY HYBRID] Parsing complete in {parse_time:.2f}s ({len(docs)} pages)")
             
-            # Parallel parsing function
-            def parse_batch(batch_info):
-                batch_idx, batch_path = batch_info
-                try:
-                    parser = LlamaParse(result_type="markdown")
-                    batch_docs = parser.load_data(batch_path)
-                    result = [Document(
-                        page_content=d.text, 
-                        metadata={**(d.metadata or {}), "batch": batch_idx}
-                    ) for d in batch_docs]
-                    os.remove(batch_path)  # Cleanup batch file
-                    return result
-                except Exception as e:
-                    print(f"Batch {batch_idx} failed: {e}")
-                    os.remove(batch_path)
-                    return []
+            # Split and index
+            split_docs = text_splitter.split_documents(docs)
+            total_chunks = len(split_docs)
+            print(f"[HIGH-QUALITY HYBRID] Creating vector store with {total_chunks} chunks...")
             
-            # Execute parallel parsing with ThreadPoolExecutor
-            all_docs = []
+            # BATCHED INDEXING to prevent memory exhaustion
+            EMBED_BATCH_SIZE = 50
             vectorstore = None
             
-            with ThreadPoolExecutor(max_workers=3) as executor:
-                futures = {executor.submit(parse_batch, bf): bf[0] for bf in batch_files}
+            for i in range(0, total_chunks, EMBED_BATCH_SIZE):
+                batch = split_docs[i:i + EMBED_BATCH_SIZE]
+                print(f"[HIGH-QUALITY HYBRID] Indexing chunks {i+1}-{min(i+EMBED_BATCH_SIZE, total_chunks)}/{total_chunks}...")
                 
-                for future in as_completed(futures):
-                    batch_idx = futures[future]
-                    try:
-                        batch_docs = future.result()
-                        all_docs.extend(batch_docs)
-                        print(f"[BATCH {batch_idx + 1}/{num_batches}] Parsed {len(batch_docs)} documents")
-                        
-                        # PARTIAL INDEXING: Save index after each batch
-                        if batch_docs:
-                            split_docs = text_splitter.split_documents(batch_docs)
-                            if vectorstore is None:
-                                vectorstore = FAISS.from_documents(split_docs, embeddings)
-                            else:
-                                batch_vs = FAISS.from_documents(split_docs, embeddings)
-                                vectorstore.merge_from(batch_vs)
-                            
-                            # Save intermediate index
-                            vectorstore.save_local(index_path)
-                            print(f"[PARTIAL INDEX] Saved after batch {batch_idx + 1}")
-                            
-                    except Exception as e:
-                        print(f"Batch {batch_idx} processing error: {e}")
+                if vectorstore is None:
+                    vectorstore = FAISS.from_documents(batch, embeddings)
+                else:
+                    batch_vs = FAISS.from_documents(batch, embeddings)
+                    vectorstore.merge_from(batch_vs)
+                    del batch_vs
+                
+                gc.collect()
             
-            docs = all_docs
+            vectorstore.save_local(index_path)
+            total_time = time.time() - start_time
+            print(f"[HIGH-QUALITY HYBRID COMPLETE] Index saved with {total_chunks} chunks in {total_time:.2f}s")
             
         else:
-            # 2b. Parse PDF with PyPDFLoader (Local, Fast)
-            print(f"Parsing {file.filename} locally...")
-            loader = PyPDFLoader(temp_path)
-            docs = loader.load()
+            # FAST-QUALITY MODE: Parse PDF with PyMuPDF (15-21x faster than PyPDF)
+            import time
+            start_time = time.time()
+            
+            print(f"[FAST-QUALITY MODE] Parsing {file.filename} with PyMuPDF...")
+            docs = parse_pdf_fast_quality(temp_path)
+            
+            parse_time = time.time() - start_time
+            print(f"[FAST-QUALITY MODE] Parsing complete in {parse_time:.2f}s ({len(docs)} pages)")
             
             # 3. Split
             split_docs = text_splitter.split_documents(docs)
+            total_chunks = len(split_docs)
             
-            # 4. Index & Save
-            print("Creating Vector Store...")
-            vectorstore = FAISS.from_documents(split_docs, embeddings)
+            # 4. BATCHED Index & Save to prevent memory exhaustion
+            print(f"[FAST-QUALITY MODE] Creating Vector Store with {total_chunks} chunks...")
+            EMBED_BATCH_SIZE = 50
+            vectorstore = None
+            
+            for i in range(0, total_chunks, EMBED_BATCH_SIZE):
+                batch = split_docs[i:i + EMBED_BATCH_SIZE]
+                print(f"[FAST-QUALITY MODE] Indexing chunks {i+1}-{min(i+EMBED_BATCH_SIZE, total_chunks)}/{total_chunks}...")
+                
+                if vectorstore is None:
+                    vectorstore = FAISS.from_documents(batch, embeddings)
+                else:
+                    batch_vs = FAISS.from_documents(batch, embeddings)
+                    vectorstore.merge_from(batch_vs)
+                    del batch_vs
+                
+                gc.collect()
+            
             vectorstore.save_local(index_path)
+            total_time = time.time() - start_time
+            print(f"[FAST-QUALITY MODE COMPLETE] Index saved with {total_chunks} chunks in {total_time:.2f}s")
         
         # Cleanup
         if os.path.exists(temp_path):
@@ -573,11 +760,13 @@ async def generate_section(
     filename: str = Form(...),
     section_type: str = Form(...),
     tone: str = Form("Formal"),
-    compliance_mode: bool = Form(True)
+    compliance_mode: bool = Form(True),
+    company_context: str = Form("")
 ):
     """
     Generates content for a specific section using the pre-built index.
     Enhanced with Deep Research (k=15) and Senior Legal Counsel grounding.
+    Now includes company-specific context for personalized tender responses.
     """
     index_path = get_index_path(filename)
     
@@ -600,11 +789,66 @@ async def generate_section(
         docs = retriever.invoke(query)
         context_text = "\n\n---\n\n".join([d.page_content for d in docs])
         
-        # 4. Generate with LLM - SENIOR BID ARCHITECT PROMPT
+        # 4. Build BIDDER PROFILE with SMART CONTEXT & PRIVACY PROTECTION
+        # DEBUG: Log received company context
+        print(f"[BACKEND DEBUG] Received company_context: '{company_context}'")
+        print(f"[BACKEND DEBUG] company_context length: {len(company_context) if company_context else 0}")
+        
+        # PRIVACY PROTECTION: Mask sensitive information
+        import re
+        masked_context = company_context
+        if company_context:
+            # Mask bank account numbers (show only last 4 digits)
+            masked_context = re.sub(
+                r'Bank Account Number:\s*(\d+)',
+                lambda m: f"Bank Account Number: XXXX-XXXX-{m.group(1)[-4:]}",
+                masked_context
+            )
+            # Mask PAN numbers (show only last 4 characters)
+            masked_context = re.sub(
+                r'PAN Number:\s*([A-Z0-9]+)',
+                lambda m: f"PAN Number: XXXXX{m.group(1)[-4:]}",
+                masked_context
+            )
+            # Mask IFSC codes partially
+            masked_context = re.sub(
+                r'IFSC Code:\s*([A-Z0-9]+)',
+                lambda m: f"IFSC Code: {m.group(1)[:4]}XXXXX",
+                masked_context
+            )
+        
+        # SECTION-SPECIFIC RELEVANCE RULES
+        section_relevance = {
+            "Eligibility Response": ["Company Name", "Turnover", "GST Number"],
+            "Technical Proposal": ["Company Name", "Registered Address"],
+            "Financial Statements": ["Company Name", "Turnover", "GST Number"],
+            "Declarations & Forms": ["Company Name", "Authorized Signatory", "Designation", "GST Number", "PAN Number"]
+        }
+        
+        relevant_fields = section_relevance.get(section_type, ["Company Name"])
+        
+        bidder_profile_section = ""
+        if masked_context and masked_context.strip():
+            bidder_profile_section = f"""
+        BIDDER COMPANY PROFILE (Reference Only - Use SPARINGLY):
+        {masked_context}
+        
+        SMART USAGE RULES FOR COMPANY DATA:
+        1. SECTION-SPECIFIC RELEVANCE: For '{section_type}', only the following are typically needed: {', '.join(relevant_fields)}
+        2. DO NOT repeat company details in every paragraph - mention ONCE in the appropriate context
+        3. Use company name in headers/titles where a signatory is needed
+        4. Use financial figures ONLY in eligibility/financial capacity sections
+        5. Use GST/PAN ONLY in declaration sections requiring statutory compliance
+        6. If a detail is marked with XXXX (masked), write: "[As per submitted documents]"
+        7. NEVER include sensitive banking details in the response body
+        8. If a required detail is not provided, use: "[BIDDER TO COMPLETE]"
+        """
+        
+        # 5. Generate with LLM - SENIOR BID ARCHITECT PROMPT
         system_instruction = f"""
         You are a SENIOR BID ARCHITECT specializing in government tender responses, procurement law, and enterprise proposals.
         Task: Draft the '{section_type}' section for a formal bid response document.
-        
+        {bidder_profile_section}
         CRITICAL CITATION RULES:
         - Extract and cite ACTUAL clause/article/section numbers from the tender text.
         - Use proper legal citation format: [Article X, Clause Y.Z] or [Section X.Y.Z] or [Clause X.Y]

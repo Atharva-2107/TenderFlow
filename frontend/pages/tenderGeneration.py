@@ -6,6 +6,13 @@ import requests
 import markdown2
 from xhtml2pdf import pisa
 from io import BytesIO
+from utils.auth import can_access
+
+
+if not can_access("tender_generation"):
+    st.error("You are not authorized to access this page.")
+    st.stop()
+
 
 import os
 from supabase import create_client, Client

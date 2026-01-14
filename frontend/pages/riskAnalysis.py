@@ -4,6 +4,12 @@ import plotly.graph_objects as go
 import random
 import sys
 from pathlib import Path
+from utils.auth import can_access
+
+
+if not can_access("risk_analysis"):
+    st.error("You are not authorized to access this page.")
+    st.stop()
 
 # Add project root to Python path
 ROOT_DIR = Path(__file__).resolve().parents[2]

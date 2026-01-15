@@ -168,29 +168,82 @@ st.set_page_config(
 # Custom CSS
 st.markdown("""
     <style>
-    .main {
-        padding: 0rem 1rem;
-        overflow-x: hidden;
-    }
+    /* Main container padding fix */
     .section-header {
         font-size: 1.5rem;
         font-weight: bold;
-        color: #64748B;
-        margin-bottom: 1rem;
-        padding-bottom: 0.5rem;
+        color: #e2e8f0; /* Lighter color for dark mode */
+        margin-bottom: 2rem; /* More space below */
+        padding-bottom: 0.8rem;
         border-bottom: 3px solid #3b82f6;
+        margin-top: 2rem; /* Ensure space from top bar */
     }
-    /* Fixing Overflow issues */
-    div[data-testid="stVerticalBlock"] > div {
-        width: 100%;
-        max-width: 100%;
-        box-sizing: border-box;
-        overflow-x: hidden;
+    
+    /* Top Bar Styling */
+    .top-bar {
+        background-color: #1e293b;
+        padding: 20px 25px;
+        border-radius: 8px;
+        margin-bottom: 30px;
+        border: 1px solid #334155;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-top: 0px; /* Fixed overlap issue */
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
     }
-    /* Main workspace column constraints */
-    div[data-testid="column"] {
-        overflow: hidden;
+    .top-bar-title {
+        color: white;
+        font-size: 1.4rem;
+        font-weight: bold;
+        line-height: 1.2;
     }
+    .top-bar-info {
+        color: #94a3b8;
+        font-size: 0.9rem;
+    }
+    .status-badge {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 4px;
+        font-size: 0.8rem;
+        font-weight: bold;
+        width: fit-content;
+    }
+    .status-ready {
+        background-color: #065f46;
+        color: #34d399;
+    }
+
+    /* Control Panel Styling - Clean Look */
+    .control-section {
+        margin-bottom: 15px;
+        padding: 5px 0px; /* Removed box padding */
+        background-color: transparent; /* Removed dark box */
+        border: none;
+    }
+    .control-label {
+        font-weight: 700;
+        font-size: 0.95rem;
+        margin-bottom: 8px;
+        color: #f1f5f9; /* Bright white text */
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    
+    /* Streamlit UI Tweaks */
+    div[data-testid="stVerticalBlock"] {
+        gap: 0.5rem;
+    }
+    
+    /* Ensure content within columns doesn't force scrollbars */
+    section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] {
+        overflow: visible;
+    }
+    
     /* Legal preview containment */
     .legal-preview {
         max-width: 100% !important;
@@ -209,6 +262,14 @@ st.markdown("""
     }
     .legal-preview-editable:focus {
         outline: 2px solid #3b82f6;
+    }
+    
+    /* Streamlit UI Cleanups */
+    div[data-testid="stExpanderr"] {
+        border-radius: 8px;
+    }
+    h3 {
+        padding-top: 10px;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -338,17 +399,17 @@ with left_panel:
             ):
                 st.session_state.current_section = section_name
 
-            # Status directly tied to THIS button
+            # Status text with proper spacing
             st.markdown(
                 f"""
                 <div style="
                     text-align: center;
-                    margin-top: -10px;
-                    margin-bottom: 30px;
-                    font-size: 15px;
+                    margin-top: 2px;
+                    margin-bottom: 15px;
+                    font-size: 13px;
                     font-weight: 600;
-                    line-height: 1.2;
                     color: {status_color};
+                    letter-spacing: 0.5px;
                 ">
                     {status_text}
                 </div>
@@ -651,48 +712,42 @@ with main_workspace:
         with col_edit:
             is_editing = st.checkbox("✍️ Edit", key=f"edit_mode_{current}", help="Edit directly in the legal preview")
         
-        # Initialize edited content key if not exists
-        if f"edited_html_{current}" not in st.session_state:
-            st.session_state[f"edited_html_{current}"] = ""
-        
-        # Legal document preview with A4 simulation and table styling (ALWAYS shown)
-        # When editing is enabled, the preview becomes editable (contenteditable)
-        preview_content = section_data['content'] or default_text
-        
-        # Convert markdown to HTML for display
-        html_content = markdown2.markdown(
-            preview_content,
-            extras=["tables", "fenced-code-blocks", "header-ids"]
-        )
-        
-        # Determine editability
-        editable_attr = 'contenteditable="true"' if is_editing else ''
-        editable_class = 'legal-preview-editable' if is_editing else ''
-        edit_notice = '<div style="background: #3b82f6; color: white; padding: 8px 15px; margin-bottom: 10px; border-radius: 4px; font-family: sans-serif; font-size: 10pt;">✏️ <strong>Edit Mode Active</strong> - Click anywhere to edit. Changes save automatically when you click outside.</div>' if is_editing else ''
-        
-        # JavaScript for capturing edits
-        edit_script = """
-        <script>
-        (function() {
-            const preview = document.querySelector('.legal-preview[contenteditable="true"]');
-            if (preview) {
-                preview.addEventListener('blur', function() {
-                    // Store the edited HTML in a hidden input for Streamlit to access
-                    const hiddenInput = document.getElementById('edited_content_store');
-                    if (hiddenInput) {
-                        hiddenInput.value = preview.innerHTML;
-                    }
-                });
-                preview.addEventListener('input', function() {
-                    // Mark as dirty
-                    preview.dataset.dirty = 'true';
-                });
-            }
-        })();
-        </script>
-        """ if is_editing else ""
-        
-        st.markdown(f"""
+        if f"edited_content_{current}" not in st.session_state:
+            st.session_state[f"edited_content_{current}"] = section_data['content'] or default_text
+
+        # Toggle structure
+        if is_editing:
+            # EDIT MODE
+            new_content = st.text_area(
+                "Edit Content",
+                value=st.session_state[f"edited_content_{current}"],
+                height=600,
+                label_visibility="collapsed",
+                key=f"editor_{current}"
+            )
+            st.session_state[f"edited_content_{current}"] = new_content
+            
+            # Save Button
+            if st.button("💾 Save Changes", type="primary", key=f"save_{current}"):
+                st.session_state.sections[current]['content'] = new_content
+                st.session_state[f"content_{current}"] = new_content
+                st.session_state[f"edit_mode_{current}"] = False # Exit edit mode
+                st.success("Changes saved!")
+                st.rerun()
+
+        else:
+            # PREVIEW MODE
+            # Use current content (committed)
+            display_content = st.session_state.sections[current]['content'] or default_text
+            
+            # Convert markdown to HTML for display
+            # Removed 'fenced-code-blocks' to correct "code snippet" issue
+            html_content = markdown2.markdown(
+                display_content,
+                extras=["tables", "header-ids"]
+            )
+            
+            st.markdown(f"""
             <style>
                 .legal-preview table {{
                     width: 100%;
@@ -730,10 +785,9 @@ with main_workspace:
                     color: #2c3e50;
                 }}
             </style>
-            {edit_notice}
-            <div class="legal-preview {editable_class}" {editable_attr} style="
+            <div class="legal-preview" style="
                 background-color: white;
-                padding: 30px; 
+                padding: 40px; 
                 box-sizing: border-box;
                 width: 100%;
                 max-width: 100%;
@@ -741,19 +795,15 @@ with main_workspace:
                 box-shadow: 0 4px 20px rgba(0,0,0,0.15);
                 font-family: 'Times New Roman', Times, serif;
                 font-size: 12pt;
-                line-height: 1.8;
+                line-height: 1.6;
                 color: #1a1a1a;
-                max-height: 800px;
-                overflow-y: auto;
-                overflow-x: hidden;
+                min-height: 800px;
                 text-align: justify;
-                border: 1px solid {'#3b82f6' if is_editing else '#ccc'};
+                border: 1px solid #ccc;
             ">
                 {html_content}
             </div>
-            <input type="hidden" id="edited_content_store" value="" />
-            {edit_script}
-        """, unsafe_allow_html=True)
+            """, unsafe_allow_html=True)
         
         # Show save button when editing
         with col_save:
@@ -858,23 +908,20 @@ with right_panel:
     
     # Bulk actions
     st.markdown("### 🚀 Bulk Actions")
+    st.markdown('<div style="margin-bottom: 15px;"></div>', unsafe_allow_html=True) 
     
     st.button("⚡ Generate All Sections", use_container_width=True, type="primary", on_click=handle_bulk_generation)
+    st.markdown('<div style="margin-bottom: 10px;"></div>', unsafe_allow_html=True)
     
     if st.button("💾 Save Progress", use_container_width=True):
         st.success("Progress saved locally!")
-    
-    # Export Complete Logic (Duplicate removed from here as it's now in main area)
-    # full_text = handle_export_complete_docx()
-    # full_pdf = create_legal_pdf(full_text)
-    # st.download_button(...)
     
     st.markdown('</div>', unsafe_allow_html=True)
 
 # Footer info
 st.markdown("---")
 st.markdown("""
-    <div style='text-align: center; color: #6b7280; font-size: 0.85rem;'>
+    <div style='text-align: center; color: #6b7280; font-size: 0.85rem; padding-bottom: 30px;'>
         <strong>Tender Generation System</strong> | Last saved: {time} | Auto-save enabled
     </div>
 """.format(time=datetime.now().strftime('%H:%M:%S')), unsafe_allow_html=True)

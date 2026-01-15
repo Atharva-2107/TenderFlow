@@ -231,7 +231,9 @@ with b_col3:
         if not fy_wise.strip():
             st.error("FY-wise turnover details are required.")
             st.stop()
-        if len(fy_wise.splitlines()) < 2:
+        # Split by comma or newline to handle both formats
+        fy_entries = [x for x in re.split(r'[,\n]', fy_wise) if x.strip()]
+        if len(fy_entries) < 2:
             st.error("Provide turnover for at least 2 financial years.")
             st.stop()
         if not balance_sheet:

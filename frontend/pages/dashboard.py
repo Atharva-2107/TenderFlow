@@ -149,7 +149,7 @@ html, body, [class*="css"] {
 left, center, right = st.columns([3, 6, 3])
 
 with left:
-    st.image("frontend/assets/logo.png", width=180)
+    st.image("assets/logo.png", width=180)
 
 with center:
     header_cols = st.columns([3, 0.4, 0.4, 0.4, 0.4, 0.4])

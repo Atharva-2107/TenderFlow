@@ -7,6 +7,7 @@ import os
 from dotenv import load_dotenv
 from supabase import create_client
 from utils.auth import can_access
+from utils.queries import get_tenders, get_bids
 
 
 # ROLE_PERMISSIONS = {
@@ -147,6 +148,10 @@ html, body, [class*="css"] {
 
 # st.markdown(""" <hr> """, unsafe_allow_html=True)
 
+#Data loading
+tenders = get_tenders()
+bids = get_bids()
+
 # HEADER NAVIGATION
 left, center, right = st.columns([3, 6, 3])
 
@@ -264,82 +269,161 @@ def kpi(col, title, value):
         </div>
         """, unsafe_allow_html=True)
 
-kpi(c1, "Project Value Won", "₹2.45 Cr")
-kpi(c2, "Win / Loss Ratio", "0.65")
-kpi(c3, "Capture Ratio", "0.45")
-kpi(c4, "Registered Opportunities", "185")
+#KPI dynamic
+total_bids = len(bids)
+won_bids = sum(1 for b in bids if b.get("won") is True)
+
+total_value_won = sum(
+    b.get("final_bid_amount", 0)
+    for b in bids
+    if b.get("won") is True
+)
+
+win_ratio = round(won_bids / max(total_bids, 1), 2)
+capture_ratio = round(won_bids / max(len(tenders), 1), 2)
+
+kpi(c1, "Project Value Won", f"₹{total_value_won/1e7:.2f} Cr")
+kpi(c2, "Win / Loss Ratio", win_ratio)
+kpi(c3, "Capture Ratio", capture_ratio)
+kpi(c4, "Registered Opportunities", len(tenders))
 
 # BID ACTIVITY
 st.markdown("<div class='section-title'>Bid Activity (All Time)</div>", unsafe_allow_html=True)
 
-df = pd.DataFrame({
-    "Month": ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"],
-    "Bids Submitted": np.random.randint(80,160,12),
-    "Bids Won": np.random.randint(40,120,12)
-})
+# =========================
+# BID ACTIVITY (PHASE 1 - SAFE)
+# =========================
 
-fig = px.line(df, x="Month", y=["Bids Submitted","Bids Won"], markers=True)
-fig.update_layout(
-    paper_bgcolor="rgba(0,0,0,0)",
-    plot_bgcolor="rgba(0,0,0,0)",
-    font_color="white",
-    legend_title_text=""
-)
+st.markdown("<div class='section-title'>Bid Activity (All Time)</div>", unsafe_allow_html=True)
 
-st.plotly_chart(fig, use_container_width=True)
+df = pd.DataFrame(bids)
+
+if df.empty:
+    st.info("No bid activity available")
+else:
+    # Ensure required column exists
+    if "created_at" not in df.columns:
+        st.warning("Bid data missing 'created_at' field")
+    else:
+        df["created_at"] = pd.to_datetime(df["created_at"])
+        df["Month"] = df["created_at"].dt.strftime("%b %Y")
+
+        activity_df = (
+            df.groupby("Month")
+            .agg(
+                Bids_Submitted=("id", "count"),
+                Bids_Won=("won", "sum")
+            )
+            .reset_index()
+        )
+
+        fig = px.line(
+            activity_df,
+            x="Month",
+            y=["Bids_Submitted", "Bids_Won"],
+            markers=True
+        )
+
+        fig.update_layout(
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            font_color="white",
+            legend_title_text=""
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
+
 
 # INSIGHTS
 col1, col2 = st.columns(2)
 
 with col1:
     st.markdown("<div class='section-title'>Tenders by Category</div>", unsafe_allow_html=True)
-    pie = px.pie(
-        names=["Construction", "IT & Telecom", "Healthcare", "Energy"],
-        values=[40, 27, 18, 15],
-        hole=0.6
-    )
-    pie.update_layout(
-        height=320,
-        margin=dict(t=20, b=20, l=20, r=20),
-        legend=dict(
-            orientation="h",
-            yanchor="top",
-            y=-0.15,
-            xanchor="center",
-            x=0.5
-        ),
-        paper_bgcolor="rgba(0,0,0,0)",
-        font_color="white"
-    )
-    st.plotly_chart(pie, use_container_width=True)
+    st.info("Category insights will be enabled once structured fields are finalized.")
+    # st.markdown("<div class='section-title'>Tenders by Category</div>", unsafe_allow_html=True)
+    # pie = px.pie(
+    #     st.info("Category insights will be enabled once structured fields are finalized.")
+    #     # names=["Construction", "IT & Telecom", "Healthcare", "Energy"],
+    #     # values=[40, 27, 18, 15],
+    #     # hole=0.6
+    # )
+    # pie.update_layout(
+    #     height=320,
+    #     margin=dict(t=20, b=20, l=20, r=20),
+    #     legend=dict(
+    #         orientation="h",
+    #         yanchor="top",
+    #         y=-0.15,
+    #         xanchor="center",
+    #         x=0.5
+    #     ),
+    #     paper_bgcolor="rgba(0,0,0,0)",
+    #     font_color="white"
+    # )
+    # st.plotly_chart(pie, use_container_width=True)
 
 with col2:
-    components.html(
-        """
-        <div style="
-            background: linear-gradient(
-                135deg,
-                rgba(255,255,255,0.08),
-                rgba(255,255,255,0.02)
-            );
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255,255,255,0.12);
-            border-radius: 16px;
-            padding: 22px;
-            max-width: 520px;
-            margin: auto;
-            color: white;
-            font-family: Inter, sans-serif;
-        ">
-            <h4 style="margin-bottom: 16px;">Top 5 Highest Bids</h4>
-            <div style="line-height: 2.2; font-size: 15px;">
-                <b>1.</b> Metro Rail Project — ₹12.0 Cr<br>
-                <b>2.</b> Hospital Development — ₹9.5 Cr<br>
-                <b>3.</b> Telecom Infrastructure — ₹7.8 Cr<br>
-                <b>4.</b> Renewable Energy Plant — ₹6.5 Cr<br>
-                <b>5.</b> Highway Expansion — ₹5.0 Cr
-            </div>
+    top_bids = sorted(
+    [b for b in bids if b.get("final_bid_amount")],
+    key=lambda x: x["final_bid_amount"],
+    reverse=True
+)[:5]
+
+html_rows = ""
+for i, bid in enumerate(top_bids, 1):
+    html_rows += f"<b>{i}.</b> Tender ID {bid['tender_id']} — ₹{bid['final_bid_amount']/1e7:.2f} Cr<br>"
+
+components.html(
+    f"""
+    <div style="
+        background: linear-gradient(
+            135deg,
+            rgba(255,255,255,0.08),
+            rgba(255,255,255,0.02)
+        );
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255,255,255,0.12);
+        border-radius: 16px;
+        padding: 22px;
+        max-width: 520px;
+        margin: auto;
+        color: white;
+        font-family: Inter, sans-serif;
+    ">
+        <h4 style="margin-bottom: 16px;">Top 5 Highest Bids</h4>
+        <div style="line-height: 2.2; font-size: 15px;">
+            {html_rows if html_rows else "No bids available"}
         </div>
-        """,
-        height=300
-    )
+    </div>
+    """,
+    height=300
+)
+    # components.html(
+    #     """
+    #     <div style="
+    #         background: linear-gradient(
+    #             135deg,
+    #             rgba(255,255,255,0.08),
+    #             rgba(255,255,255,0.02)
+    #         );
+    #         backdrop-filter: blur(10px);
+    #         border: 1px solid rgba(255,255,255,0.12);
+    #         border-radius: 16px;
+    #         padding: 22px;
+    #         max-width: 520px;
+    #         margin: auto;
+    #         color: white;
+    #         font-family: Inter, sans-serif;
+    #     ">
+    #         <h4 style="margin-bottom: 16px;">Top 5 Highest Bids</h4>
+    #         <div style="line-height: 2.2; font-size: 15px;">
+    #             <b>1.</b> Metro Rail Project — ₹12.0 Cr<br>
+    #             <b>2.</b> Hospital Development — ₹9.5 Cr<br>
+    #             <b>3.</b> Telecom Infrastructure — ₹7.8 Cr<br>
+    #             <b>4.</b> Renewable Energy Plant — ₹6.5 Cr<br>
+    #             <b>5.</b> Highway Expansion — ₹5.0 Cr
+    #         </div>
+    #     </div>
+    #     """,
+    #     height=300
+    # )

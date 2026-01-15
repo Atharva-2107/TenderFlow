@@ -33,52 +33,128 @@ key = os.environ.get("SUPABASE_KEY")
 if url and key:
     supabase: Client = create_client(url, key)
 
-def get_company_context(user_id: str) -> str:
+def get_company_context(user_id: str, section_type: str = None) -> str:
     """
     Fetches comprehensive company information for the given user_id.
+    Matches the actual database schema from information collection pages.
+    
+    Args:
+        user_id: The user's UUID
+        section_type: Optional section type to filter relevant fields
+    
+    Returns:
+        Formatted string with company context, sensitive data hashed
     """
+    import hashlib
+    
     if not user_id:
+        print(f"[DEBUG] get_company_context: No user_id provided")
         return ""
     
-    # We need the user's session token for RLS, but here we might use the service role 
-    # OR better, rely on the global supabase client if we have RLS policies allowing read.
-    # Actually, in the frontend, we usually use st.session_state['sb_session'] client interactions.
-    # But for simplicity and robustness in this quick fix, let's try the direct client query 
-    # assuming the user has rights or we're using a client that can read.
-    # NOTE: In previous steps we saw this used 'supabase.table'.
+    # CRITICAL: Use authenticated Supabase client with user's session
+    sb_session = st.session_state.get("sb_session")
+    if not sb_session:
+        print(f"[DEBUG] get_company_context: No sb_session found")
+        return ""
+    
+    # Create authenticated client
+    auth_supabase = create_client(url, key)
+    auth_supabase.postgrest.auth(sb_session.access_token)
     
     context_parts = []
+    
+    def hash_sensitive(value: str, show_last: int = 4) -> str:
+        """Hash sensitive data, showing only last N characters"""
+        if not value or value == 'N/A':
+            return 'N/A'
+        if len(value) <= show_last:
+            return '*' * len(value)
+        return '*' * (len(value) - show_last) + value[-show_last:]
+    
     try:
-        # 1. Company Information
-        response = supabase.table("company_information").select("*").eq("id", user_id).maybe_single().execute()
-        if response and hasattr(response, 'data') and response.data:
-            data = response.data
-            context_parts.append(f"Company Name: {data.get('company_name', 'N/A')}")
-            context_parts.append(f"Registration Number: {data.get('registration_number', 'N/A')}")
-            context_parts.append(f"Registered Address: {data.get('registered_address', 'N/A')}")
-            context_parts.append(f"Website: {data.get('website_url', 'N/A')}")
+        # 1. Company Information (from informationCollection_1.py)
+        # Table: company_information, primary key: id = user_id
+        print(f"[DEBUG] Fetching company_information for user_id: {user_id}")
+        response = auth_supabase.table("company_information").select("*").eq("id", user_id).maybe_single().execute()
+        print(f"[DEBUG] company_information response: {response.data if response else 'None'}")
         
-        # 2. Business Compliance (GST, PAN)
-        response = supabase.table("business_compliance").select("*").eq("user_id", user_id).maybe_single().execute()
-        if response and hasattr(response, 'data') and response.data:
+        if response and response.data:
             data = response.data
-            context_parts.append(f"GST Number: {data.get('gst_number', 'N/A')}")
-            context_parts.append(f"PAN Number: {data.get('pan_number', 'N/A')}")
+            # Core company info (always include)
+            if data.get('company_name'):
+                context_parts.append(f"Company Name: {data.get('company_name')}")
+            if data.get('org_type'):
+                context_parts.append(f"Organization Type: {data.get('org_type')}")
+            if data.get('reg_address'):
+                context_parts.append(f"Registered Address: {data.get('reg_address')}")
+            if data.get('office_address'):
+                context_parts.append(f"Office Address: {data.get('office_address')}")
+            if data.get('authorized_signatory'):
+                context_parts.append(f"Authorized Signatory: {data.get('authorized_signatory')}")
+            if data.get('designation'):
+                context_parts.append(f"Signatory Designation: {data.get('designation')}")
+            if data.get('email'):
+                context_parts.append(f"Contact Email: {data.get('email')}")
+            if data.get('phone_number'):
+                context_parts.append(f"Contact Phone: {data.get('phone_number')}")
         
-        # 3. Financials (Turnover, Banking)
-        response = supabase.table("financials").select("*").eq("user_id", user_id).maybe_single().execute()
-        if response and hasattr(response, 'data') and response.data:
+        # 2. Business Compliance (from informationCollection_2.py)
+        # Table: business_compliance, foreign key: user_id
+        print(f"[DEBUG] Fetching business_compliance for user_id: {user_id}")
+        response = auth_supabase.table("business_compliance").select("*").eq("user_id", user_id).maybe_single().execute()
+        print(f"[DEBUG] business_compliance response: {response.data if response else 'None'}")
+        
+        if response and response.data:
             data = response.data
-            context_parts.append(f"Annual Turnover: {data.get('annual_turnover', 'N/A')}")
-            context_parts.append(f"Bank Account Number: {data.get('bank_account_number', 'N/A')}")
-            context_parts.append(f"IFSC Code: {data.get('ifsc_code', 'N/A')}")
-            context_parts.append(f"Bank Name: {data.get('bank_name', 'N/A')}")
+            # GST - show partially (important for compliance sections)
+            if data.get('gst_number'):
+                gst = data.get('gst_number')
+                context_parts.append(f"GST Number: {gst[:2]}****{gst[-4:] if len(gst) > 6 else gst}")
+            # PAN - hash more heavily (sensitive)
+            if data.get('pan_number'):
+                context_parts.append(f"PAN Number: {hash_sensitive(data.get('pan_number'), 4)}")
+            # Bank details - heavily hashed
+            if data.get('bank_account_number'):
+                context_parts.append(f"Bank Account: {hash_sensitive(data.get('bank_account_number'), 4)}")
+            if data.get('ifsc_code'):
+                ifsc = data.get('ifsc_code')
+                context_parts.append(f"IFSC Code: {ifsc[:4]}******" if len(ifsc) > 4 else ifsc)
+        
+        # 3. Financials (from informationCollection_3.py)
+        # Table: financials, foreign key: user_id
+        print(f"[DEBUG] Fetching financials for user_id: {user_id}")
+        response = auth_supabase.table("financials").select("*").eq("user_id", user_id).maybe_single().execute()
+        print(f"[DEBUG] financials response: {response.data if response else 'None'}")
+        
+        if response and response.data:
+            data = response.data
+            if data.get('avg_annual_turnover'):
+                context_parts.append(f"Average Annual Turnover: {data.get('avg_annual_turnover')}")
+            if data.get('fy_wise_turnover'):
+                context_parts.append(f"FY-wise Turnover: {data.get('fy_wise_turnover')}")
+        
+        # 4. Experience Records (from informationCollection_4.py)
+        # Table: experience_records, foreign key: user_id (multiple records possible)
+        print(f"[DEBUG] Fetching experience_records for user_id: {user_id}")
+        response = auth_supabase.table("experience_records").select("project_name, client_name, client_type, work_category, contract_value, completion_status").eq("user_id", user_id).execute()
+        print(f"[DEBUG] experience_records response: {response.data if response else 'None'}")
+        
+        if response and response.data and len(response.data) > 0:
+            exp_summary = []
+            for exp in response.data[:5]:  # Limit to 5 most recent
+                exp_str = f"{exp.get('project_name', 'N/A')} ({exp.get('client_type', '')}, {exp.get('contract_value', 'N/A')})"
+                exp_summary.append(exp_str)
+            if exp_summary:
+                context_parts.append(f"Past Projects: {'; '.join(exp_summary)}")
 
     except Exception as e:
         print(f"[DEBUG] Error fetching company context: {e}")
+        import traceback
+        print(f"[DEBUG] Traceback: {traceback.format_exc()}")
         return ""
     
     result = "; ".join(context_parts) if context_parts else ""
+    print(f"[DEBUG] Final company context ({len(result)} chars): {result[:200]}...")
     return result
 
 # Page configuration
@@ -94,21 +170,46 @@ st.markdown("""
     <style>
     .main {
         padding: 0rem 1rem;
+        overflow-x: hidden;
     }
-        /* Rest of the CSS remains... */
-        .section-header {
-            font-size: 1.5rem;
-            font-weight: bold;
-            color: #64748B;
-            margin-bottom: 1rem;
-            padding-bottom: 0.5rem;
-            border-bottom: 3px solid #3b82f6;
-        }
-        /* Fixing Overflow issues */
-        div[data-testid="stVerticalBlock"] > div {
-            width: 100%;
-            box-sizing: border-box;
-        }
+    .section-header {
+        font-size: 1.5rem;
+        font-weight: bold;
+        color: #64748B;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 3px solid #3b82f6;
+    }
+    /* Fixing Overflow issues */
+    div[data-testid="stVerticalBlock"] > div {
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+        overflow-x: hidden;
+    }
+    /* Main workspace column constraints */
+    div[data-testid="column"] {
+        overflow: hidden;
+    }
+    /* Legal preview containment */
+    .legal-preview {
+        max-width: 100% !important;
+        overflow-x: auto !important;
+        word-wrap: break-word !important;
+    }
+    .legal-preview table {
+        max-width: 100% !important;
+        overflow-x: auto !important;
+        display: block;
+    }
+    /* Editable preview styling */
+    .legal-preview-editable {
+        outline: 2px dashed #3b82f6;
+        cursor: text;
+    }
+    .legal-preview-editable:focus {
+        outline: 2px solid #3b82f6;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -546,111 +647,120 @@ with main_workspace:
         default_text = "Click 'Generate all Sections' to draft this proposal section using AI."
         
         # Edit Toggle placed prominently
-        col_space, col_edit = st.columns([0.85, 0.15])
+        col_space, col_edit, col_save = st.columns([0.75, 0.12, 0.13])
         with col_edit:
-            is_editing = st.checkbox("✍️ Edit", key=f"edit_mode_{current}", help="Toggle between Legal Preview and Markdown Editor")
+            is_editing = st.checkbox("✍️ Edit", key=f"edit_mode_{current}", help="Edit directly in the legal preview")
         
-        if is_editing:
-            if HAS_VISUAL_EDITOR:
-                st.markdown("### 📝 Content Editor (Visual)")
-                # Convert Markdown -> HTML for the editor
-                html_input = markdown2.markdown(section_data['content'] or default_text)
-                
-                # Visual Editor
-                # Configure toolbar to be simple but useful
-                content_html = st_quill(
-                    value=html_input,
-                    html=True,
-                    key=f"quill_{current}",
-                    placeholder="Write your content here...",
-                    toolbar=[
-                        ['bold', 'italic', 'underline', 'strike'],
-                        [{'header': 1}, {'header': 2}],
-                        [{'list': 'ordered'}, {'list': 'bullet'}],
-                        ['clean']
-                    ]
-                )
-                
-                # Convert HTML -> Markdown for storage
-                if content_html:
-                    # markdownify converts HTML back to Markdown
-                    new_md = markdownify.markdownify(content_html, heading_style="ATX")
-                    st.session_state.sections[current]['content'] = new_md
-                    
-            else:
-                st.markdown("### 📝 Content Editor (Raw)")
-                st.markdown("Use this editor to refine the content. Markdown syntax is supported for formatting.")
-                
-                # Editor fallback
-                edited_content = st.text_area(
-                    "Content Editor",
-                    value=section_data['content'] or default_text,
-                    height=800,
-                    label_visibility="collapsed",
-                    key=f"content_{current}",
-                    help="Edit the generated Markdown content."
-                )
-                # Update session state on change
-                st.session_state.sections[current]['content'] = edited_content
-            
-        else:
-            # Legal document preview with A4 simulation and table styling
-            st.markdown("""
-                <style>
-                    .legal-preview table {
-                        width: 100%;
-                        border: 1px solid black;
-                        border-collapse: collapse;
-                        margin: 15px 0;
+        # Initialize edited content key if not exists
+        if f"edited_html_{current}" not in st.session_state:
+            st.session_state[f"edited_html_{current}"] = ""
+        
+        # Legal document preview with A4 simulation and table styling (ALWAYS shown)
+        # When editing is enabled, the preview becomes editable (contenteditable)
+        preview_content = section_data['content'] or default_text
+        
+        # Convert markdown to HTML for display
+        html_content = markdown2.markdown(
+            preview_content,
+            extras=["tables", "fenced-code-blocks", "header-ids"]
+        )
+        
+        # Determine editability
+        editable_attr = 'contenteditable="true"' if is_editing else ''
+        editable_class = 'legal-preview-editable' if is_editing else ''
+        edit_notice = '<div style="background: #3b82f6; color: white; padding: 8px 15px; margin-bottom: 10px; border-radius: 4px; font-family: sans-serif; font-size: 10pt;">✏️ <strong>Edit Mode Active</strong> - Click anywhere to edit. Changes save automatically when you click outside.</div>' if is_editing else ''
+        
+        # JavaScript for capturing edits
+        edit_script = """
+        <script>
+        (function() {
+            const preview = document.querySelector('.legal-preview[contenteditable="true"]');
+            if (preview) {
+                preview.addEventListener('blur', function() {
+                    // Store the edited HTML in a hidden input for Streamlit to access
+                    const hiddenInput = document.getElementById('edited_content_store');
+                    if (hiddenInput) {
+                        hiddenInput.value = preview.innerHTML;
                     }
-                    .legal-preview th {
-                        background-color: #2c3e50;
-                        color: white;
-                        font-weight: bold;
-                        padding: 10px;
-                        border: 1px solid black;
-                        text-align: left;
-                    }
-                    .legal-preview td {
-                        padding: 8px;
-                        border: 1px solid black;
-                        vertical-align: top;
-                    }
-                    .legal-preview h3 {
-                        font-weight: bold;
-                        margin-top: 20px;
-                        border-bottom: 2px solid #333;
-                        padding-bottom: 5px;
-                    }
-                    .legal-preview h4 {
-                        font-weight: bold;
-                        margin-top: 15px;
-                        color: #2c3e50;
-                    }
-                </style>
-                <div class="legal-preview" style="
-                    background-color: white;
-                    padding: 30px; 
-                    box-sizing: border-box;
+                });
+                preview.addEventListener('input', function() {
+                    // Mark as dirty
+                    preview.dataset.dirty = 'true';
+                });
+            }
+        })();
+        </script>
+        """ if is_editing else ""
+        
+        st.markdown(f"""
+            <style>
+                .legal-preview table {{
                     width: 100%;
-                    border-radius: 4px;
-                    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-                    font-family: 'Times New Roman', Times, serif;
-                    font-size: 12pt;
-                    line-height: 1.8;
-                    color: #1a1a1a;
-                    max-height: 800px;
-                    overflow-y: auto;
-                    text-align: justify;
-                    border: 1px solid #ccc;
-                ">
-            """, unsafe_allow_html=True)
-            
-            # Render the markdown content
-            preview_content = section_data['content'] or default_text
-            st.markdown(preview_content)
-            
-            st.markdown("</div>", unsafe_allow_html=True)
+                    max-width: 100%;
+                    border: 1px solid black;
+                    border-collapse: collapse;
+                    margin: 15px 0;
+                    display: table;
+                    table-layout: fixed;
+                }}
+                .legal-preview th {{
+                    background-color: #2c3e50;
+                    color: white;
+                    font-weight: bold;
+                    padding: 10px;
+                    border: 1px solid black;
+                    text-align: left;
+                    word-wrap: break-word;
+                }}
+                .legal-preview td {{
+                    padding: 8px;
+                    border: 1px solid black;
+                    vertical-align: top;
+                    word-wrap: break-word;
+                }}
+                .legal-preview h3 {{
+                    font-weight: bold;
+                    margin-top: 20px;
+                    border-bottom: 2px solid #333;
+                    padding-bottom: 5px;
+                }}
+                .legal-preview h4 {{
+                    font-weight: bold;
+                    margin-top: 15px;
+                    color: #2c3e50;
+                }}
+            </style>
+            {edit_notice}
+            <div class="legal-preview {editable_class}" {editable_attr} style="
+                background-color: white;
+                padding: 30px; 
+                box-sizing: border-box;
+                width: 100%;
+                max-width: 100%;
+                border-radius: 4px;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+                font-family: 'Times New Roman', Times, serif;
+                font-size: 12pt;
+                line-height: 1.8;
+                color: #1a1a1a;
+                max-height: 800px;
+                overflow-y: auto;
+                overflow-x: hidden;
+                text-align: justify;
+                border: 1px solid {'#3b82f6' if is_editing else '#ccc'};
+            ">
+                {html_content}
+            </div>
+            <input type="hidden" id="edited_content_store" value="" />
+            {edit_script}
+        """, unsafe_allow_html=True)
+        
+        # Show save button when editing
+        with col_save:
+            if is_editing:
+                if st.button("💾 Save", key=f"save_edit_{current}", help="Save your edits"):
+                    st.success("Changes saved!")
+                    st.rerun()
         
         # Action buttons
         col1, col2, col3, col4 = st.columns(4)

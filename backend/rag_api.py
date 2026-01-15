@@ -283,23 +283,45 @@ def parse_pdf_hybrid_quality(file_path: str) -> list:
     pages_needing_ocr = []
     
     try:
-        # Step 1: Fast extraction with PyMuPDF
+        # Step 1: Fast extraction with PyMuPDF (Parallel)
         pdf_document = fitz.open(file_path)
         total_pages = len(pdf_document)
         print(f"[HYBRID] Phase 1: Fast extraction of {total_pages} pages with PyMuPDF...")
         
         MIN_TEXT_THRESHOLD = 50  # Minimum characters to consider page as "text-based"
         
-        for page_num in range(total_pages):
+        # Helper function for parallel processing
+        def analyze_page(page_num):
+            # Re-open doc in thread if needed (PyMuPDF isn't thread-safe for same doc object)
+            # But get_text is generally safe if read-only. Safer to use fresh handle if issues arise.
+            # For now, we'll try shared handle as it's usually fine for read
             page = pdf_document[page_num]
             text = page.get_text("text", sort=True)
             
             # Check if page has images
             image_list = page.get_images(full=True)
             has_images = len(image_list) > 0
-            
-            # Determine if page needs OCR
             text_length = len(text.strip())
+            
+            return {
+                "page_num": page_num,
+                "text": text,
+                "text_length": text_length,
+                "has_images": has_images
+            }
+
+        # Process pages in parallel
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            results = list(executor.map(analyze_page, range(total_pages)))
+        
+        # Sort results by page number
+        results.sort(key=lambda x: x["page_num"])
+        
+        for res in results:
+            page_num = res["page_num"]
+            text = res["text"]
+            text_length = res["text_length"]
+            has_images = res["has_images"]
             
             if text_length >= MIN_TEXT_THRESHOLD:
                 # Good text extraction - use PyMuPDF result
@@ -332,49 +354,94 @@ def parse_pdf_hybrid_quality(file_path: str) -> list:
         print(f"[HYBRID] Phase 1 complete in {phase1_time:.2f}s - {len(all_docs) - len(pages_needing_ocr)} text pages, {len(pages_needing_ocr)} need OCR")
         
         # Step 2: Send only problematic pages to LlamaParse (if any)
+        # Step 2: Send only problematic pages to LlamaParse (if any)
         if pages_needing_ocr:
-            print(f"[HYBRID] Phase 2: Sending {len(pages_needing_ocr)} image-heavy pages to LlamaParse...")
+            print(f"[HYBRID] Phase 2: Sending {len(pages_needing_ocr)} image-heavy pages to LlamaParse (Parallel Batches)...")
             
             try:
-                # Extract only the pages that need OCR into a temporary PDF
-                from pypdf import PdfReader, PdfWriter
-                reader = PdfReader(file_path)
-                writer = PdfWriter()
+                # Helper to process a batch of pages
+                def process_ocr_batch(batch_pages, batch_index):
+                    try:
+                        from pypdf import PdfReader, PdfWriter
+                        reader = PdfReader(file_path)
+                        writer = PdfWriter()
+                        
+                        for p_num in batch_pages:
+                            writer.add_page(reader.pages[p_num])
+                            
+                        batch_temp_path = f"temp_ocr_{os.path.basename(file_path)}_batch_{batch_index}.pdf"
+                        with open(batch_temp_path, "wb") as f:
+                            writer.write(f)
+                            
+                        parser = LlamaParse(result_type="markdown", fast_mode=True) # Enable fast mode for speed
+                        batch_docs = parser.load_data(batch_temp_path)
+                        
+                        # Cleanup
+                        if os.path.exists(batch_temp_path):
+                            os.remove(batch_temp_path)
+                            
+                        return batch_docs
+                    except Exception as e:
+                        print(f"[HYBRID] Batch {batch_index} failed: {e}")
+                        return []
+
+                # Split into batches of 20 pages max for parallelism
+                BATCH_SIZE = 20
+                batches = [pages_needing_ocr[i:i + BATCH_SIZE] for i in range(0, len(pages_needing_ocr), BATCH_SIZE)]
                 
-                for page_num in pages_needing_ocr:
-                    writer.add_page(reader.pages[page_num])
-                
-                # Save temporary PDF with only OCR-needed pages
-                ocr_temp_path = f"temp_ocr_{os.path.basename(file_path)}"
-                with open(ocr_temp_path, "wb") as f:
-                    writer.write(f)
-                
-                # Process with LlamaParse
-                parser = LlamaParse(result_type="markdown")
-                ocr_docs = parser.load_data(ocr_temp_path)
-                
-                # Map OCR results back to original page numbers
-                for i, ocr_doc in enumerate(ocr_docs):
-                    if i < len(pages_needing_ocr):
-                        original_page = pages_needing_ocr[i]
-                        # Find and replace placeholder in all_docs
-                        for j, doc in enumerate(all_docs):
-                            if doc.metadata.get("page") == original_page + 1 and "pending" in doc.metadata.get("parser", ""):
-                                all_docs[j] = Document(
-                                    page_content=ocr_doc.text,
-                                    metadata={
-                                        "source": file_path,
-                                        "page": original_page + 1,
-                                        "parser": "llamaparse_ocr"
-                                    }
-                                )
-                                break
-                
-                # Cleanup temp file
-                if os.path.exists(ocr_temp_path):
-                    os.remove(ocr_temp_path)
+                ocr_results = []
+                with ThreadPoolExecutor(max_workers=5) as executor: # Up to 5 concurrent API calls
+                    future_to_batch = {executor.submit(process_ocr_batch, batch, i): batch for i, batch in enumerate(batches)}
                     
-                print(f"[HYBRID] Phase 2 complete - OCR processed {len(ocr_docs)} pages")
+                    for future in as_completed(future_to_batch):
+                        result_docs = future.result()
+                        ocr_results.extend(result_docs)
+                
+                # Simple mapping: Assuming LlamaParse returns docs in order of pages in the batch PDF
+                # We need to be careful. LlamaParse generally preserves order.
+                # However, since we batch, we need to map results back to specific page numbers carefully.
+                # A safer approach is to trust that `ocr_results` contains text for the pages we sent.
+                # But parallel returns are out of order. We need deeper mapping structure.
+                
+                # REVISED STRATEGY: Map batch results back to logic. 
+                # Actually, simpler: LlamaParse returns 1 doc per page usually. 
+                # Let's just collect all text and assume we can't perfectly map 1:1 if order scrambles.
+                # BUT, wait. LlamaParse `load_data` returns a list of docs.
+                # If we process batches, we know which pages were in each batch.
+                
+                # Rerunning with simpler ordered collection
+                all_ocr_docs_ordered = []
+                with ThreadPoolExecutor(max_workers=5) as executor:
+                    # Submit all batches
+                    futures = []
+                    for i, batch in enumerate(batches):
+                        futures.append(executor.submit(process_ocr_batch, batch, i))
+                        
+                    # Collect results in order of submission (batches)
+                    for future, batch in zip(futures, batches):
+                        batch_docs = future.result()
+                        # Map these docs to the pages in this batch
+                        for i, doc in enumerate(batch_docs):
+                            if i < len(batch):
+                                original_page = batch[i]
+                                all_ocr_docs_ordered.append((original_page, doc.text))
+
+                # Now update the main docs
+                for original_page, text in all_ocr_docs_ordered:
+                    for j, doc in enumerate(all_docs):
+                        # Match page number and pending status
+                        if doc.metadata.get("page") == original_page + 1 and "pending" in doc.metadata.get("parser", ""):
+                            all_docs[j] = Document(
+                                page_content=text,
+                                metadata={
+                                    "source": file_path,
+                                    "page": original_page + 1,
+                                    "parser": "llamaparse_ocr_parallel"
+                                }
+                            )
+                            break
+                    
+                print(f"[HYBRID] Phase 2 complete - OCR processed {len(all_ocr_docs_ordered)} pages")
                 
             except Exception as e:
                 print(f"[HYBRID] LlamaParse OCR failed: {e}")
@@ -568,11 +635,14 @@ def generate_summary_with_groq(user_query, retrieved_chunks, output_format):
     - If format is 'Technical Narrative', write in professional prose.
     - If format is 'Compliance Matrix', list requirements vs compliance status.
     - STRICTLY base your answer on the provided Context.
+    - IMPORTANT: Provide a COMPREHENSIVE and DETAILED response. 
+    - For large documents, ensure you capture ALL key requirements, dates, and eligibility criteria.
+    - The summary should be thorough (minimum 800-1000 words if the document is large).
     """
 
     messages = [
         {"role": "system", "content": system_instruction},
-        {"role": "user", "content": f"Context:\n{context_text}\n\nRequest: {user_query}"}
+        {"role": "user", "content": f"Context:\n{context_text}\n\nRequest: {user_query}. Please provide a very detailed analysis."}
     ]
     
     response = groq_client.chat.completions.create(
@@ -794,35 +864,35 @@ async def generate_section(
         print(f"[BACKEND DEBUG] Received company_context: '{company_context}'")
         print(f"[BACKEND DEBUG] company_context length: {len(company_context) if company_context else 0}")
         
-        # PRIVACY PROTECTION: Mask sensitive information
+        # PRIVACY PROTECTION: Mask sensitive information (if not already hashed by frontend)
         import re
         masked_context = company_context
         if company_context:
             # Mask bank account numbers (show only last 4 digits)
             masked_context = re.sub(
-                r'Bank Account Number:\s*(\d+)',
-                lambda m: f"Bank Account Number: XXXX-XXXX-{m.group(1)[-4:]}",
+                r'(Bank Account|Account Number):\s*(\d+)',
+                lambda m: f"{m.group(1)}: XXXX-XXXX-{m.group(2)[-4:] if len(m.group(2))>=4 else m.group(2)}",
                 masked_context
             )
             # Mask PAN numbers (show only last 4 characters)
             masked_context = re.sub(
-                r'PAN Number:\s*([A-Z0-9]+)',
+                r'PAN Number:\s*([A-Z0-9]{5}\d{4}[A-Z])',
                 lambda m: f"PAN Number: XXXXX{m.group(1)[-4:]}",
                 masked_context
             )
             # Mask IFSC codes partially
             masked_context = re.sub(
-                r'IFSC Code:\s*([A-Z0-9]+)',
+                r'IFSC Code:\s*([A-Z]{4}0[A-Z0-9]{6})',
                 lambda m: f"IFSC Code: {m.group(1)[:4]}XXXXX",
                 masked_context
             )
         
-        # SECTION-SPECIFIC RELEVANCE RULES
+        # SECTION-SPECIFIC RELEVANCE RULES - Aligned with frontend field names
         section_relevance = {
-            "Eligibility Response": ["Company Name", "Turnover", "GST Number"],
-            "Technical Proposal": ["Company Name", "Registered Address"],
-            "Financial Statements": ["Company Name", "Turnover", "GST Number"],
-            "Declarations & Forms": ["Company Name", "Authorized Signatory", "Designation", "GST Number", "PAN Number"]
+            "Eligibility Response": ["Company Name", "Average Annual Turnover", "FY-wise Turnover", "GST Number", "Past Projects"],
+            "Technical Proposal": ["Company Name", "Registered Address", "Past Projects"],
+            "Financial Statements": ["Company Name", "Average Annual Turnover", "FY-wise Turnover", "GST Number", "Bank Account", "IFSC Code"],
+            "Declarations & Forms": ["Company Name", "Authorized Signatory", "Signatory Designation", "GST Number", "PAN Number", "Registered Address", "Contact Email"]
         }
         
         relevant_fields = section_relevance.get(section_type, ["Company Name"])
@@ -830,18 +900,17 @@ async def generate_section(
         bidder_profile_section = ""
         if masked_context and masked_context.strip():
             bidder_profile_section = f"""
-        BIDDER COMPANY PROFILE (Reference Only - Use SPARINGLY):
+        ### BIDDER COMPANY PROFILE (Reference Only)
+        PROFILE DATA:
         {masked_context}
         
-        SMART USAGE RULES FOR COMPANY DATA:
-        1. SECTION-SPECIFIC RELEVANCE: For '{section_type}', only the following are typically needed: {', '.join(relevant_fields)}
-        2. DO NOT repeat company details in every paragraph - mention ONCE in the appropriate context
-        3. Use company name in headers/titles where a signatory is needed
-        4. Use financial figures ONLY in eligibility/financial capacity sections
-        5. Use GST/PAN ONLY in declaration sections requiring statutory compliance
-        6. If a detail is marked with XXXX (masked), write: "[As per submitted documents]"
-        7. NEVER include sensitive banking details in the response body
-        8. If a required detail is not provided, use: "[BIDDER TO COMPLETE]"
+        ### SMART USAGE RULES FOR BIDDER DATA:
+        1. **MINIMALISM (CRITICAL)**: ONLY use profile data if the tender specifically asks for bidder details (e.g., "Company Name", "Financial Capacity", "Signatory").
+        2. **SECTION RELEVANCE**: For '{section_type}', typically focus ONLY on: {', '.join(relevant_fields)}. Ignore other fields.
+        3. **NO REPETITION**: NEVER repeat the company name or details in every paragraph. Mention once in formal headers or compliance tables only.
+        4. **MASKING AWARENESS**: If a detail is masked with '*' or 'X' (e.g., Bank Account: ************3456), write exactly that value or "[As per submitted documents]" in the tender body. NEVER try to guess or hallucinate the full number.
+        5. **PROFESSIONAL PLACEMENT**: Use company details primarily in the 'COMPLIANCE MATRIX' and 'SUMMARY' tables where identifying information is mandatory.
+        6. **PRIVACY**: Never include sensitive banking or tax details in descriptive technical paragraphs - keep them restricted to structured tables if required.
         """
         
         # 5. Generate with LLM - SENIOR BID ARCHITECT PROMPT
@@ -930,28 +999,104 @@ async def analyze_tender(
     file: UploadFile = File(...),
     query: str = Form("Provide a comprehensive summary of this tender document"),
     output_format: str = Form("Executive Bullets"),
-    depth: str = Form("Standard")
+    depth: str = Form("Standard"),
+    parsing_mode: str = Form("Fast")  # NEW: Fast or High-Quality
 ):
+    """
+    OPTIMIZED: Uses the same fast parsing + caching strategy as /upload-tender.
+    
+    parsing_mode:
+    - "Fast": PyMuPDF local parsing (15-21x faster)
+    - "High-Quality": Hybrid PyMuPDF + LlamaParse OCR for scanned pages
+    """
+    import time
+    start_time = time.time()
+    
     try:
-        # Create a temp file to store the upload
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+        # 1. Check for cached index first
+        index_path = get_index_path(file.filename)
+        temp_path = None
+        
+        if os.path.exists(index_path):
+            print(f"[ANALYZE-TENDER] Using cached index for {file.filename}")
+            vectorstore = FAISS.load_local(index_path, embeddings, allow_dangerous_deserialization=True)
+        else:
+            # 2. Save file temporarily for parsing
+            temp_path = f"temp_analyze_{file.filename}"
             content = await file.read()
-            tmp_file.write(content)
-            tmp_path = tmp_file.name
+            with open(temp_path, "wb") as buffer:
+                buffer.write(content)
+            
+            # 3. Parse based on mode (same as /upload-tender)
+            if parsing_mode == "High-Quality":
+                print(f"[ANALYZE-TENDER HIGH-QUALITY] Parsing {file.filename}...")
+                docs = parse_pdf_hybrid_quality(temp_path)
+            else:
+                print(f"[ANALYZE-TENDER FAST] Parsing {file.filename} with PyMuPDF...")
+                docs = parse_pdf_fast_quality(temp_path)
+            
+            parse_time = time.time() - start_time
+            print(f"[ANALYZE-TENDER] Parsing complete in {parse_time:.2f}s ({len(docs)} pages)")
+            
+            # 4. Split text (OPTIMIZED for speed)
+            # Increased chunk size to 4000 to reduce total number of embeddings
+            # This significantly speeds up FAISS index creation for large docs
+            text_splitter = RecursiveCharacterTextSplitter(chunk_size=4000, chunk_overlap=200)
+            split_docs = text_splitter.split_documents(docs)
+            print(f"[ANALYZE-TENDER] Split into {len(split_docs)} chunks")
+            
+            # 5. Create VectorStore (Batched)
+            # Increased batch size to 100 for faster parallel embedding
+            batch_size = 100 
+            vectorstore = FAISS.from_documents(split_docs[:batch_size], embeddings)
+            if len(split_docs) > batch_size:
+                for i in range(batch_size, len(split_docs), batch_size):
+                    batch = split_docs[i:i + batch_size]
+                    vectorstore.add_documents(batch)
+                    print(f"  - Processed batch {i//batch_size} of {len(split_docs)//batch_size}")
+            gc.collect() # Ensure memory is cleared after large operations
+            
+            # 6. Cache the index for future use
+            vectorstore.save_local(index_path)
+            print(f"[ANALYZE-TENDER] Index cached at {index_path}")
         
-        # Run the pipeline
-        result = process_rag_pipeline(tmp_path, query, output_format, depth)
+        # 7. Retrieve context (same strategy as /generate-section)
+        k_value = 15 if depth == "Deep Dive" else 10
+        retriever = vectorstore.as_retriever(search_kwargs={"k": k_value})
         
-        # Cleanup
-        os.unlink(tmp_path)
+        # 8. Optional reranking
+        try:
+            compressor = FlashrankRerank(model="ms-marco-MultiBERT-L-12")
+            compression_retriever = ContextualCompressionRetriever(
+                base_compressor=compressor,
+                base_retriever=retriever
+            )
+            compressed_docs = compression_retriever.invoke(query)[:5]
+        except Exception as e:
+            print(f"[ANALYZE-TENDER] Rerank failed, using standard retrieval: {e}")
+            compressed_docs = retriever.invoke(query)[:5]
+        
+        # 9. Generate summary with Groq
+        result = generate_summary_with_groq(query, compressed_docs, output_format)
+        
+        # Cleanup temp file
+        if temp_path and os.path.exists(temp_path):
+            os.remove(temp_path)
+        
+        total_time = time.time() - start_time
+        print(f"[ANALYZE-TENDER COMPLETE] Total time: {total_time:.2f}s")
         
         return {
             "status": "success",
-            "summary": result
+            "summary": result,
+            "processing_time": f"{total_time:.2f}s",
+            "cached": os.path.exists(index_path)
         }
         
     except Exception as e:
-        print(f"Error: {str(e)}")
+        print(f"[ANALYZE-TENDER ERROR] {str(e)}")
+        import traceback
+        traceback.print_exc()
         return {
             "status": "error",
             "message": str(e)

@@ -871,9 +871,11 @@ with col_right:
             # PREVIEW MODE - Rich rendered markdown
             # Use markdown2 to generate HTML so we can embed it inside the scrolling div
             # This fixes the alignment issue where content was pushed down/outside
+            # PREVIEW MODE - Rich rendered markdown
+            # Removed fenced-code-blocks to avoid showing code snippets styled boxes
             html_content = markdown2.markdown(
                 current_content,
-                extras=["tables", "fenced-code-blocks", "header-ids"]
+                extras=["tables", "header-ids"]
             )
             
             st.markdown(f"""
@@ -916,7 +918,7 @@ with col_right:
 
 # 7. ACTION BUTTONS ROW
 st.markdown('<div class="button-row">', unsafe_allow_html=True)
-left_btn_col, middle_btn_col, right_btn_col = st.columns(3)
+left_btn_col, middle_btn_col = st.columns(2)
 
 with left_btn_col:
     if st.session_state.show_summary:
@@ -936,22 +938,6 @@ with middle_btn_col:
             mime="application/pdf",
             use_container_width=True,
             key="download_pdf"
-        )
-
-with right_btn_col:
-    if st.session_state.show_summary and st.session_state.summary_result:
-        # Get current content for copy
-        current = st.session_state.edited_summary if st.session_state.edited_summary else st.session_state.summary_result
-        
-        # Use pyperclip-style copy with download button workaround
-        st.download_button(
-            label=st.session_state.copy_status,
-            data=current,
-            file_name="summary.txt",
-            mime="text/plain",
-            use_container_width=True,
-            key="copy_as_txt",
-            help="Click to download summary as text file"
         )
 
 st.markdown('</div>', unsafe_allow_html=True)

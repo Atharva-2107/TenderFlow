@@ -236,7 +236,9 @@ def parse_pdf_fast_quality(file_path: str) -> list:
             )
         
         # Use ThreadPoolExecutor for parallel page extraction
-        with ThreadPoolExecutor(max_workers=8) as executor:
+        # OPTIMIZATION: Limit workers to prevent system freeze
+        max_workers = min(4, os.cpu_count() or 4)
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = {executor.submit(extract_page, i): i for i in range(total_pages)}
             for future in as_completed(futures):
                 page_num = futures[future]
@@ -311,7 +313,12 @@ def parse_pdf_hybrid_quality(file_path: str) -> list:
             }
 
         # Process pages in parallel
-        with ThreadPoolExecutor(max_workers=8) as executor:
+        # Process pages in parallel
+        # OPTIMIZATION: Limit workers to prevent system freeze
+        max_workers = min(4, os.cpu_count() or 4)
+        print(f"[HYBRID] Using {max_workers} workers for page analysis")
+        
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
             results = list(executor.map(analyze_page, range(total_pages)))
         
         # Sort results by page number
@@ -373,8 +380,25 @@ def parse_pdf_hybrid_quality(file_path: str) -> list:
                         with open(batch_temp_path, "wb") as f:
                             writer.write(f)
                             
-                        parser = LlamaParse(result_type="markdown", fast_mode=True) # Enable fast mode for speed
-                        batch_docs = parser.load_data(batch_temp_path)
+                        try:
+                            parser = LlamaParse(result_type="markdown", fast_mode=False) # Disable fast mode for better quality/reliability
+                            batch_docs = parser.load_data(batch_temp_path)
+                        except KeyError as e:
+                             if str(e) == "'markdown'":
+                                 print(f"[HYBRID] Batch {batch_index} LlamaParse KeyError 'markdown' - likely empty response. Falling back to PyMuPDF.")
+                                 # Fallback: Try to extract text using PyMuPDF for this batch
+                                 try:
+                                     fallback_doc = fitz.open(batch_temp_path)
+                                     fallback_text = ""
+                                     for p in fallback_doc:
+                                         fallback_text += p.get_text() + "\n"
+                                     fallback_doc.close()
+                                     batch_docs = [Document(page_content=fallback_text, metadata={"source": batch_temp_path})]
+                                 except Exception as inner_e:
+                                      print(f"[HYBRID] Batch {batch_index} fallback failed: {inner_e}")
+                                      batch_docs = []
+                             else:
+                                 raise e
                         
                         # Cleanup
                         if os.path.exists(batch_temp_path):
@@ -390,7 +414,11 @@ def parse_pdf_hybrid_quality(file_path: str) -> list:
                 batches = [pages_needing_ocr[i:i + BATCH_SIZE] for i in range(0, len(pages_needing_ocr), BATCH_SIZE)]
                 
                 ocr_results = []
-                with ThreadPoolExecutor(max_workers=5) as executor: # Up to 5 concurrent API calls
+                ocr_results = []
+                # OPTIMIZATION: Limit concurrent OCR usage to prevent API/System overload
+                max_ocr_workers = min(3, os.cpu_count() or 3)
+                
+                with ThreadPoolExecutor(max_workers=max_ocr_workers) as executor: # Reduced concurrent API calls
                     future_to_batch = {executor.submit(process_ocr_batch, batch, i): batch for i, batch in enumerate(batches)}
                     
                     for future in as_completed(future_to_batch):
@@ -411,7 +439,10 @@ def parse_pdf_hybrid_quality(file_path: str) -> list:
                 
                 # Rerunning with simpler ordered collection
                 all_ocr_docs_ordered = []
-                with ThreadPoolExecutor(max_workers=5) as executor:
+                # Rerunning with simpler ordered collection
+                all_ocr_docs_ordered = []
+                # OPTIMIZATION: Consistent worker count
+                with ThreadPoolExecutor(max_workers=max_ocr_workers) as executor:
                     # Submit all batches
                     futures = []
                     for i, batch in enumerate(batches):
@@ -752,8 +783,9 @@ async def upload_tender(
             total_chunks = len(split_docs)
             print(f"[HIGH-QUALITY HYBRID] Creating vector store with {total_chunks} chunks...")
             
-            # BATCHED INDEXING to prevent memory exhaustion
-            EMBED_BATCH_SIZE = 50
+            # BATCHED INDEXING to prevent memory exhaustion AND optimize speed
+            # OPTIMIZATION: Use add_documents instead of merge_from for O(N) performance vs O(N^2)
+            EMBED_BATCH_SIZE = 100 # Increased batch size
             vectorstore = None
             
             for i in range(0, total_chunks, EMBED_BATCH_SIZE):
@@ -763,11 +795,11 @@ async def upload_tender(
                 if vectorstore is None:
                     vectorstore = FAISS.from_documents(batch, embeddings)
                 else:
-                    batch_vs = FAISS.from_documents(batch, embeddings)
-                    vectorstore.merge_from(batch_vs)
-                    del batch_vs
+                    vectorstore.add_documents(batch)
                 
-                gc.collect()
+                # Aggressive GC to prevent freeze
+                if i % (EMBED_BATCH_SIZE * 2) == 0:
+                    gc.collect()
             
             vectorstore.save_local(index_path)
             total_time = time.time() - start_time
@@ -790,7 +822,8 @@ async def upload_tender(
             
             # 4. BATCHED Index & Save to prevent memory exhaustion
             print(f"[FAST-QUALITY MODE] Creating Vector Store with {total_chunks} chunks...")
-            EMBED_BATCH_SIZE = 50
+            # OPTIMIZATION: Use add_documents instead of merge_from
+            EMBED_BATCH_SIZE = 100 
             vectorstore = None
             
             for i in range(0, total_chunks, EMBED_BATCH_SIZE):
@@ -800,9 +833,10 @@ async def upload_tender(
                 if vectorstore is None:
                     vectorstore = FAISS.from_documents(batch, embeddings)
                 else:
-                    batch_vs = FAISS.from_documents(batch, embeddings)
-                    vectorstore.merge_from(batch_vs)
-                    del batch_vs
+                    vectorstore.add_documents(batch)
+                
+                if i % (EMBED_BATCH_SIZE * 2) == 0:
+                    gc.collect()
                 
                 gc.collect()
             
@@ -1038,11 +1072,31 @@ async def analyze_tender(
             parse_time = time.time() - start_time
             print(f"[ANALYZE-TENDER] Parsing complete in {parse_time:.2f}s ({len(docs)} pages)")
             
-            # 4. Split text (OPTIMIZED for speed)
-            # Increased chunk size to 4000 to reduce total number of embeddings
-            # This significantly speeds up FAISS index creation for large docs
-            text_splitter = RecursiveCharacterTextSplitter(chunk_size=4000, chunk_overlap=200)
-            split_docs = text_splitter.split_documents(docs)
+            # OPTIMIZATION: Chunk size 2000 (~400-500 tokens) is the sweet spot for speed/quality
+            # Parallelize splitting to utilize multi-core CPU
+            chunk_size = 2000
+            text_splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=200)
+            
+            # Helper for parallel splitting
+            def split_doc_batch(batch_docs):
+                splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=200)
+                return splitter.split_documents(batch_docs)
+            
+            # Split docs into batches for workers
+            import itertools
+            split_workers = min(4, os.cpu_count() or 4)
+            # Create sub-lists of documents
+            doc_batches = [docs[i::split_workers] for i in range(split_workers)]
+            doc_batches = [b for b in doc_batches if b] # Remove empty
+            
+            print(f"[ANALYZE-TENDER] Splitting {len(docs)} pages using {len(doc_batches)} threads...")
+            split_docs = []
+            
+            with ThreadPoolExecutor(max_workers=split_workers) as executor:
+                results = executor.map(split_doc_batch, doc_batches)
+                for res in results:
+                    split_docs.extend(res)
+                    
             print(f"[ANALYZE-TENDER] Split into {len(split_docs)} chunks")
             
             # 5. Create VectorStore (Batched)
@@ -1052,8 +1106,12 @@ async def analyze_tender(
             if len(split_docs) > batch_size:
                 for i in range(batch_size, len(split_docs), batch_size):
                     batch = split_docs[i:i + batch_size]
+                    # OPTIMIZATION: Use add_documents instead of add_documents loop
                     vectorstore.add_documents(batch)
                     print(f"  - Processed batch {i//batch_size} of {len(split_docs)//batch_size}")
+                    
+                    if i % (batch_size * 2) == 0:
+                        gc.collect()
             gc.collect() # Ensure memory is cleared after large operations
             
             # 6. Cache the index for future use

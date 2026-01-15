@@ -389,7 +389,7 @@ components.html(
         margin: auto;
         color: white;
         font-family: Inter, sans-serif;
-    ">
+    ">  
         <h4 style="margin-bottom: 16px;">Top 5 Highest Bids</h4>
         <div style="line-height: 2.2; font-size: 15px;">
             {html_rows if html_rows else "No bids available"}
@@ -398,6 +398,62 @@ components.html(
     """,
     height=300
 )
+
+# ======================================================
+# 📰 REGULATORY & BID DOCUMENTATION UPDATES (ADDED)
+# ======================================================
+
+st.markdown("<div class='section-title'>📰 Regulatory & Bid Documentation Updates</div>", unsafe_allow_html=True)
+
+try:
+    response = supabase.table("tender_documents") \
+        .select("source, tender_no, document_type, structured_data, pdf_url, fetched_at") \
+        .order("fetched_at", desc=True) \
+        .limit(8) \
+        .execute()
+
+    updates = response.data or []
+
+except Exception:
+    updates = []
+
+if not updates:
+    st.info("No recent regulatory or bid documentation updates available.")
+else:
+    for doc in updates:
+        st.markdown("""
+        <div style="
+            background: linear-gradient(
+                135deg,
+                rgba(255,255,255,0.08),
+                rgba(255,255,255,0.02)
+            );
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 14px;
+            padding: 16px 18px;
+            margin-bottom: 12px;
+        ">
+        """, unsafe_allow_html=True)
+
+        colA, colB = st.columns([4, 1])
+
+        with colA:
+            st.markdown(f"**{doc['document_type']}**  \nSource: {doc['source']}")
+            if doc.get("tender_no"):
+                st.markdown(f"Tender No: `{doc['tender_no']}`")
+
+            deadline = (doc.get("structured_data") or {}).get("submission_deadline")
+            if deadline:
+                st.markdown(f"🕒 Submission Deadline: **{deadline}**")
+
+            st.caption(f"Updated: {doc['fetched_at'][:19].replace('T',' ')}")
+
+        with colB:
+            if doc.get("pdf_url"):
+                st.markdown(f"[📄 View PDF]({doc['pdf_url']})")
+
+        # st.markdown("</div>", unsafe_allow_html=True)
     # components.html(
     #     """
     #     <div style="

@@ -83,6 +83,8 @@ st.markdown("""
 html, body, [class*="css"] {
     font-family: 'Inter', sans-serif;
 }
+            
+
 
 .stApp {
     background: radial-gradient(circle at 20% 30%, #1a1c4b 0%, #0f111a 100%);
@@ -149,7 +151,7 @@ html, body, [class*="css"] {
 left, center, right = st.columns([3, 6, 3])
 
 with left:
-    st.image("assets/logo.png", width=180)
+    st.image("frontend/assets/logo.png", width=180)
 
 with center:
     header_cols = st.columns([3, 0.4, 0.4, 0.4, 0.4, 0.4])

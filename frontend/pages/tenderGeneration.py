@@ -32,6 +32,38 @@ url = os.environ.get("SUPABASE_URL")
 key = os.environ.get("SUPABASE_KEY")
 if url and key:
     supabase: Client = create_client(url, key)
+    
+    # Session Retrieval
+    try:
+        session = supabase.auth.get_session()
+        st.session_state.sb_session = session
+        user_id = session.user.id if session else None
+    except Exception as e:
+        print(f"Session Error: {e}")
+        user_id = None
+else:
+    user_id = None
+
+def save_tender_to_db(user_id, project_name, content, section_type):
+    """
+    Saves a generated tender section to Supabase.
+    """
+    if not user_id:
+        return False
+    
+    try:
+        data = {
+            "user_id": user_id,
+            "project_name": project_name,
+            "content": content,
+            "section_type": section_type,
+            "created_at": datetime.now().isoformat()
+        }
+        supabase.table("generated_tenders").insert(data).execute()
+        return True
+    except Exception as e:
+        print(f"DB Save Error: {e}")
+        return False
 
 def get_company_context(user_id: str, section_type: str = None) -> str:
     """
@@ -935,8 +967,31 @@ with right_panel:
     st.button("⚡ Generate All Sections", use_container_width=True, type="primary", on_click=handle_bulk_generation)
     st.markdown('<div style="margin-bottom: 10px;"></div>', unsafe_allow_html=True)
     
-    # if st.button("💾 Save Progress", use_container_width=True):
-    #     st.success("Progress saved locally!")
+    # Save to Supabase DB Controls
+    project_name_input = st.text_input("Project Name", value="New Tender", help="Name for this tender project")
+    
+    if st.button("💾 Save to Cloud DB", use_container_width=True, help="Save all generated sections to Supabase"):
+        if not user_id:
+            st.warning("⚠️ You must be logged in to save to the cloud.")
+        else:
+            saved_count = 0
+            with st.spinner("Saving to database..."):
+                for sec_name, sec_data in st.session_state.sections.items():
+                    content_to_save = sec_data.get('content', '')
+                    if content_to_save:
+                        success = save_tender_to_db(
+                            user_id=user_id,
+                            project_name=project_name_input,
+                            content=content_to_save,
+                            section_type=sec_name
+                        )
+                        if success:
+                            saved_count += 1
+            
+            if saved_count > 0:
+                st.success(f"✅ Successfully saved {saved_count} sections to cloud!")
+            else:
+                st.warning("No content to save (generate sections first).")
     
     st.markdown('</div>', unsafe_allow_html=True)
 

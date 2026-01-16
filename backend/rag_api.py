@@ -1,163 +1,3 @@
-# from fastapi import FastAPI, File, UploadFile, Form
-# from fastapi.middleware.cors import CORSMiddleware
-# import os
-# import tempfile
-# from dotenv import load_dotenv
-# from flashrank import Ranker
-# from groq import Groq
-# from llama_parse import LlamaParse
-# from langchain_text_splitters import RecursiveCharacterTextSplitter
-# from langchain_community.embeddings import FastEmbedEmbeddings
-# from langchain_community.vectorstores import FAISS
-# from langchain_classic.retrievers import ContextualCompressionRetriever
-# from langchain_classic.retrievers.document_compressors import FlashrankRerank
-# from langchain_core.documents import Document
-
-# load_dotenv()
-
-# app = FastAPI()
-
-# # Enable CORS for Streamlit frontend
-# app.add_middleware(
-#     CORSMiddleware,
-#     allow_origins=["*"],
-#     allow_credentials=True,
-#     allow_methods=["*"],
-#     allow_headers=["*"],
-# )
-
-# groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-
-# def generate_summary_with_groq(user_query, retrieved_chunks, output_format):
-#     """Generate response based on output format"""
-#     context_text = "\n\n".join([doc.page_content for doc in retrieved_chunks])
-    
-#     # Adjust prompt based on format
-#     format_instructions = {
-#         "Executive Bullets": "Provide a concise bullet-point summary with key findings.",
-#         "Technical Narrative": "Provide a detailed technical narrative with comprehensive analysis.",
-#         "Compliance Matrix": "Create a structured compliance checklist with requirements and statuses."
-#     }
-    
-#     system_prompt = f"""
-#     You are a Senior Technical Tender Analyst. Your job is to extract precise information 
-#     from the provided tender documents to answer the user's question.
-    
-#     Output Format: {format_instructions.get(output_format, format_instructions["Executive Bullets"])}
-    
-#     Rules:
-#     - Answer ONLY based on the provided Context.
-#     - If the answer is not in the context, say "Data not found in the provided documents."
-#     - Be detailed and professional.
-#     - Cite specific section names if available.
-#     """
-    
-#     user_prompt = f"""
-#     Context Data:
-#     {context_text}
-    
-#     User Question: 
-#     {user_query}
-    
-#     Provide a detailed, structured response:
-#     """
-
-#     chat_completion = groq_client.chat.completions.create(
-#         messages=[
-#             {"role": "system", "content": system_prompt},
-#             {"role": "user", "content": user_prompt}
-#         ],
-#         model="llama-3.3-70b-versatile",
-#         temperature=0.3,
-#     )
-    
-#     return chat_completion.choices[0].message.content
-
-# def process_rag_pipeline(pdf_path, query, output_format, depth):
-#     """Main RAG pipeline"""
-#     print(f"\n1️⃣ Parsing PDF...")
-#     parser = LlamaParse(api_key=os.getenv("LLAMA_CLOUD_API_KEY"), result_type="markdown")
-#     llama_docs = parser.load_data(pdf_path)
-    
-#     langchain_docs = [
-#         Document(page_content=d.text, metadata=d.metadata or {}) 
-#         for d in llama_docs
-#     ]
-    
-#     print(f"\n2️⃣ Chunking text...")
-#     chunk_size = 2000 if depth == "Deep Dive" else 1000
-#     text_splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=200)
-#     docs = text_splitter.split_documents(langchain_docs)
-    
-#     print(f"\n3️⃣ Creating vector store...")
-#     embeddings = FastEmbedEmbeddings(model_name="BAAI/bge-small-en-v1.5")
-#     vectorstore = FAISS.from_documents(docs, embeddings)
-    
-#     k_value = 30 if depth == "Deep Dive" else 20
-#     base_retriever = vectorstore.as_retriever(search_kwargs={"k": k_value})
-    
-#     print(f"\n4️⃣ Reranking...")
-#     compressor = FlashrankRerank(model="ms-marco-MultiBERT-L-12")
-#     compression_retriever = ContextualCompressionRetriever(
-#         base_compressor=compressor, 
-#         base_retriever=base_retriever
-#     )
-    
-#     print(f"\n🔎 Searching for: '{query}'")
-#     compressed_docs = compression_retriever.invoke(query)[:5]
-    
-#     print(f"\n🧠 Generating answer...")
-#     final_answer = generate_summary_with_groq(query, compressed_docs, output_format)
-    
-#     return final_answer
-
-# @app.post("/analyze-tender")
-# async def analyze_tender(
-#     file: UploadFile = File(...),
-#     query: str = Form("Provide a comprehensive summary of this tender document"),
-#     output_format: str = Form("Executive Bullets"),
-#     depth: str = Form("Standard")
-# ):
-#     """
-#     Endpoint to analyze uploaded tender PDF
-#     """
-#     try:
-#         # Save uploaded file temporarily
-#         with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
-#             content = await file.read()
-#             tmp_file.write(content)
-#             tmp_path = tmp_file.name
-        
-#         # Process with RAG pipeline
-#         result = process_rag_pipeline(tmp_path, query, output_format, depth)
-        
-#         # Cleanup
-#         os.unlink(tmp_path)
-        
-#         return {
-#             "status": "success",
-#             "summary": result,
-#             "query": query,
-#             "format": output_format
-#         }
-        
-#     except Exception as e:
-#         return {
-#             "status": "error",
-#             "message": str(e)
-#         }
-
-# @app.get("/")
-# def home():
-#     return {"message": "TenderFlow RAG API is Running!"}
-
-# if __name__ == "__main__":
-#     import uvicorn
-#     uvicorn.run(app, host="127.0.0.1", port=8000)
-
-
-
-
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import os
@@ -643,6 +483,59 @@ SECTION_PROMPTS = {
         
         Use **bold** for form names and signatory requirements.
         If information is missing, use placeholder: [FORM DETAILS NOT FOUND]
+    """,
+    "Annexures": """
+        List all annexures, appendices, and supporting documentation requirements from the tender.
+        
+        MANDATORY OUTPUT FORMAT:
+        
+        ### Compliance Matrix
+        Start with this table (REQUIRED):
+        | Annexure ID | Document Title | Mandatory/Optional | Format | Reference |
+        |-------------|----------------|-------------------|--------|----------|
+        
+        Then structure with formal legal numbering:
+        
+        ### 1. Technical Annexures
+        #### 1.1 Technical Specifications Documents
+        Provide exhaustive details on all technical specification documents required. Include format requirements, page limits, mandatory sections, and cross-references.
+        #### 1.2 Equipment/Material Datasheets
+        Detail all equipment and material datasheets needed, including manufacturer specifications, compliance certificates, and testing reports.
+        #### 1.3 Quality Certifications
+        List ISO certifications, quality management system certificates, and industry-specific accreditations required.
+        #### 1.4 Testing Reports and Compliance Documentation
+        Specify all third-party testing reports, lab certifications, and compliance verification documents.
+        
+        ### 2. Financial Annexures
+        #### 2.1 Bill of Quantities (BOQ)
+        Provide detailed BOQ format requirements, item categorization, unit pricing structure, and summary totals.
+        #### 2.2 Price Schedule Templates
+        Detail all price schedule formats including base prices, taxes, duties, escalation clauses, and payment milestones.
+        #### 2.3 Financial Guarantee Formats
+        Specify bank guarantee formats, performance bond templates, and advance payment guarantee requirements.
+        
+        ### 3. Legal Annexures
+        #### 3.1 Draft Contract/Agreement
+        Provide comprehensive analysis of draft contract terms, key clauses, obligations, and acceptance criteria.
+        #### 3.2 Terms and Conditions
+        Detail general and special conditions of contract, penalty clauses, and force majeure provisions.
+        #### 3.3 Dispute Resolution Clauses
+        Specify arbitration procedures, jurisdiction, and escalation mechanisms.
+        
+        ### 4. Reference Documents
+        #### 4.1 Sample Work Orders and Previous Experience Documents
+        List format requirements for work order citations, client references, and experience certificates.
+        #### 4.2 Client Testimonials and Reference Letters
+        Specify format and authentication requirements for client references.
+        #### 4.3 Organization Chart and Key Personnel CVs
+        Detail requirements for organizational structure documentation and personnel qualification formats.
+        
+        ### 5. Summary Table of Required Annexures
+        | S.No | Annexure | Description | Page Limit | Submission Format | Mandatory |
+        |------|----------|-------------|------------|-------------------|-----------|   
+        
+        Use **bold** for annexure titles and mandatory requirements.
+        If information is missing, use placeholder: [ANNEXURE DETAILS NOT FOUND]
     """
 }
 
@@ -690,7 +583,7 @@ def generate_summary_with_groq(user_query, retrieved_chunks, output_format):
         model="llama-3.3-70b-versatile",
         messages=messages,
         temperature=0.3,
-        max_tokens=6500
+        max_tokens=4500
     )
     
     return response.choices[0].message.content
@@ -892,7 +785,8 @@ async def generate_section(
         vectorstore = FAISS.load_local(index_path, embeddings, allow_dangerous_deserialization=True)
         
         # DEEP RESEARCH: Increased k to 15 for comprehensive context
-        retriever = vectorstore.as_retriever(search_kwargs={"k": 15})
+        # ENHANCED: Increased k to 30 for comprehensive context (18-20 page output)
+        retriever = vectorstore.as_retriever(search_kwargs={"k": 30})
         
         # 2. Select Query based on Section
         query = SECTION_PROMPTS.get(section_type, f"Summarize information relevant to {section_type}")
@@ -936,7 +830,8 @@ async def generate_section(
             "Eligibility Response": ["Company Name", "Average Annual Turnover", "FY-wise Turnover", "GST Number", "Past Projects"],
             "Technical Proposal": ["Company Name", "Registered Address", "Past Projects"],
             "Financial Statements": ["Company Name", "Average Annual Turnover", "FY-wise Turnover", "GST Number", "Bank Account", "IFSC Code"],
-            "Declarations & Forms": ["Company Name", "Authorized Signatory", "Signatory Designation", "GST Number", "PAN Number", "Registered Address", "Contact Email"]
+            "Declarations & Forms": ["Company Name", "Authorized Signatory", "Signatory Designation", "GST Number", "PAN Number", "Registered Address", "Contact Email"],
+            "Annexures": ["Company Name", "Past Projects", "Registered Address"]
         }
         
         relevant_fields = section_relevance.get(section_type, ["Company Name"])
@@ -1014,6 +909,19 @@ async def generate_section(
         - Be unambiguous and defensible
         
         COMPLIANCE MODE: {'STRICT - Every requirement must have explicit compliance statement' if compliance_mode else 'FLEXIBLE - General compliance overview'}
+        
+        CRITICAL LENGTH REQUIREMENTS (MANDATORY):
+        - Generate EXTREMELY DETAILED and COMPREHENSIVE content.
+        - Target output: 5000-8000 words per section (approximately 3-4 pages per section).
+        - The complete tender document across all 5 sections should total 18-20 pages.
+        - DO NOT summarize or be brief. EXPAND on every point with full explanations.
+        - Include detailed sub-clauses, explanatory notes, and implementation details.
+        - For each requirement, provide: (a) requirement statement, (b) compliance approach, (c) evidence/documentation reference, (d) implementation timeline.
+        - Quote specific tender clauses verbatim where available.
+        - Add detailed methodology descriptions, step-by-step procedures, and comprehensive explanations.
+        - Never leave any section sparse. If content seems short, elaborate further with relevant context.
+        - Include executive summaries, detailed breakdowns, cross-references, and dependency mappings.
+        - Add explanatory paragraphs before and after each table to provide context.
         """
         
         response = groq_client.chat.completions.create(
@@ -1023,7 +931,7 @@ async def generate_section(
                 {"role": "user", "content": f"TENDER DOCUMENT CONTENT (extracted from uploaded PDF):\n\n{context_text}\n\n---\n\nBased on the above tender content, draft the '{section_type}' section. Remember to cite actual clause/article numbers from the text, NOT generic document references."}
             ],
             temperature=0.2,  # Lower temperature for more precise legal output
-            max_tokens=4096   # Increased for comprehensive sections
+            max_tokens=8000   # Extended for 18-20 page tender sections
         )
         
         return {

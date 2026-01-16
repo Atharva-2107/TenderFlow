@@ -145,13 +145,46 @@ def risk_analysis_page():
             st.markdown(f'<img src="data:image/png;base64,{logo}" width="200" style="margin-top:5px;">', unsafe_allow_html=True)
 
     with nav_col2:
-        h_cols = st.columns(6)
-        pages = [("⊞", "app.py"), ("⎘", "pages/tenderGeneration.py"), ("◈", "pages/tenderAnalyser.py"), 
-                 ("✦", "pages/bidGeneration.py"), ("⬈", "pages/riskAnalysis.py")]
-        for i, (icon, path) in enumerate(pages):
-            with h_cols[i+1]:
-                if st.button(icon, key=f"nav_{i}"):
-                    st.switch_page(path)
+            header_cols = st.columns([3, 3, 3, 3, 3, 3])
+            with header_cols[1]:
+                if st.button("⊞", key="h_dash", help="Dashboard"):
+                    st.switch_page("app.py")
+
+            with header_cols[2]:
+                if can_access("tender_generation"):
+                    if st.button("⎘", key="h_gen", help="Tender Generation"):
+                        st.switch_page("pages/tenderGeneration.py")
+                else:
+                    st.button("⎘", key="h_gen_disabled", disabled=True, help="Access restricted")
+
+
+            with header_cols[3]:
+                if can_access("tender_analysis"):
+                    if st.button("◈", key="h_anl", help="Tender Analysis"):
+                        st.switch_page("pages/tenderAnalyser.py")
+                else:
+                    st.button("◈", key="h_anl_disabled", disabled=True)
+
+            with header_cols[4]:
+                if can_access("bid_generation"):
+                    if st.button("✦", key="h_bid", help="Bid Generation"):
+                        st.switch_page("pages/bidGeneration.py")
+                else:
+                    st.button("✦", key="h_bid_disabled", disabled=True)
+
+            with header_cols[5]:
+                if can_access("risk_analysis"):
+                    if st.button("⬈", key="h_risk", help="Risk Analysis"):
+                        st.switch_page("pages/riskAnalysis.py")
+                # else:
+                #     st.button("⬈", key="h_risk_disabled", disabled=True)
+                # h_cols = st.columns(6)
+                # pages = [("⊞", "app.py", "help= "), ("⎘", "pages/tenderGeneration.py"), ("◈", "pages/tenderAnalyser.py"), 
+                #          ("✦", "pages/bidGeneration.py"), ("⬈", "pages/riskAnalysis.py")]
+                # for i, (icon, path) in enumerate(pages):
+                #     with h_cols[i+1]:
+                #         if st.button(icon, key=f"nav_{i}"):
+                #             st.switch_page(path)
 
     st.markdown("<div> <hr> </div>", unsafe_allow_html=True)
     # 2. HERO SECTION

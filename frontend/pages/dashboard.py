@@ -156,7 +156,7 @@ bids = get_bids()
 left, center, right = st.columns([3, 6, 3])
 
 with left:
-    st.image("assets/logo.png", width=180)
+    st.image("frontend/assets/logo.png", width=180)
 
 with center:
     header_cols = st.columns([3, 0.4, 0.4, 0.4, 0.4, 0.4])
@@ -287,13 +287,7 @@ kpi(c2, "Win / Loss Ratio", win_ratio)
 kpi(c3, "Capture Ratio", capture_ratio)
 kpi(c4, "Registered Opportunities", len(tenders))
 
-# BID ACTIVITY
-st.markdown("<div class='section-title'>Bid Activity (All Time)</div>", unsafe_allow_html=True)
-
-# =========================
-# BID ACTIVITY (PHASE 1 - SAFE)
-# =========================
-
+# BID ACTIVITY 
 st.markdown("<div class='section-title'>Bid Activity (All Time)</div>", unsafe_allow_html=True)
 
 df = pd.DataFrame(bids)
@@ -398,10 +392,7 @@ components.html(
     """,
     height=300
 )
-
-# ======================================================
-# 📰 REGULATORY & BID DOCUMENTATION UPDATES (ADDED)
-# ======================================================
+#REGULATORY & BID DOCUMENTATION
 
 st.markdown("<div class='section-title'>📰 Regulatory & Bid Documentation Updates</div>", unsafe_allow_html=True)
 

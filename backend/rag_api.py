@@ -668,7 +668,17 @@ def generate_summary_with_groq(user_query, retrieved_chunks, output_format):
     - STRICTLY base your answer on the provided Context.
     - IMPORTANT: Provide a COMPREHENSIVE and DETAILED response. 
     - For large documents, ensure you capture ALL key requirements, dates, and eligibility criteria.
-    - The summary should be thorough (minimum 800-1000 words if the document is large).
+    - The summary should be thorough (target 20-25 pages of content, approx 6000-8000 words).
+    - BE EXTREMELY DETAILED AND VERBOSE. 
+    - Expand on every single point. Do not use summary bullets; use long, detailed paragraphs.
+    - Quote specific clauses verbatim where appropriate to add length and precision.
+    - Include all specific technical requirements and clause numbers found.
+    - Do not leave any section brief. If a section seems short, expand it with relevant context from the tender.
+    
+    NEGATIVE CONSTRAINTS:
+    - Do NOT include any introductory or concluding remarks (e.g., "Here is the analysis...", "Please note...").
+    - Do NOT mention the prompt instructions, rules, or guidelines you followed.
+    - Output ONLY the requested content directly.
     """
 
     messages = [
@@ -680,7 +690,7 @@ def generate_summary_with_groq(user_query, retrieved_chunks, output_format):
         model="llama-3.3-70b-versatile",
         messages=messages,
         temperature=0.3,
-        max_tokens=2048
+        max_tokens=6500
     )
     
     return response.choices[0].message.content
@@ -708,7 +718,7 @@ def process_rag_pipeline(pdf_path, query, output_format, depth):
     vectorstore = FAISS.from_documents(split_docs, embeddings)
     
     # 4. Retrieve
-    retriever = vectorstore.as_retriever(search_kwargs={"k": 10}) # Fetch broad context
+    retriever = vectorstore.as_retriever(search_kwargs={"k": 30}) # Fetch broad context
     
     # 5. Rerank (Optional but recommended)
     try:
@@ -719,10 +729,10 @@ def process_rag_pipeline(pdf_path, query, output_format, depth):
         )
         # Use the USER QUERY, not a hardcoded one
         print(f"--- Searching for: {query} ---")
-        compressed_docs = compression_retriever.invoke(query)[:5]
+        compressed_docs = compression_retriever.invoke(query)[:15]
     except Exception as e:
         print(f"Rerank failed, falling back to standard retrieval: {e}")
-        compressed_docs = retriever.invoke(query)[:5]
+        compressed_docs = retriever.invoke(query)[:15]
 
     # 6. Generate
     return generate_summary_with_groq(query, compressed_docs, output_format)

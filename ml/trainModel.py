@@ -4,9 +4,7 @@ import xgboost as xgb
 import json
 from sklearn.model_selection import train_test_split
 
-# ----------------------------
 # 1. GENERATE REALISTIC SYNTHETIC DATA
-# ----------------------------
 rows = []
 
 np.random.seed(42)

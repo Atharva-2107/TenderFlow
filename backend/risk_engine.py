@@ -1,39 +1,13 @@
+import json
+import ollama
 import pdfplumber
 import re
-import torch
 import streamlit as st
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
-from torch.nn.functional import softmax
 
-# ======================================================
-# MODEL CONFIG
-# ======================================================
-MODEL_NAME = "nlpaueb/legal-bert-base-uncased"
 LABELS = ["Financial", "Legal", "Payment", "Timeline", "Resource"]
+OLLAMA_MODEL = "llama3.1"  
 
-torch.set_num_threads(4)
-torch.backends.mkldnn.enabled = True
-
-
-# ======================================================
-# STREAMLIT RESOURCE CACHE
-# ======================================================
-@st.cache_resource(show_spinner="Loading AI Risk Engine...")
-def load_model():
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-    model = AutoModelForSequenceClassification.from_pretrained(
-        MODEL_NAME,
-        num_labels=len(LABELS)
-    )
-    model.eval()
-    return tokenizer, model
-
-
-tokenizer, model = load_model()
-
-# ======================================================
 # TEXT EXTRACTION
-# ======================================================
 def clean_extracted_text(text: str) -> str:
     text = re.sub(r"\(cid:\d+\)", " ", text)
     text = re.sub(r"\s+", " ", text)
@@ -50,9 +24,7 @@ def extract_text(uploaded_file):
     return clean_extracted_text(text)
 
 
-# ======================================================
 # CLAUSE SPLITTING
-# ======================================================
 def split_clauses(text):
     raw = re.split(r"\n(?=\d+[\.\)])", text)
     clauses = []
@@ -68,9 +40,7 @@ def split_clauses(text):
     return clauses
 
 
-# ======================================================
 # AI GATE (PERFORMANCE)
-# ======================================================
 HARD_KEYWORDS = [
     "payment", "compensation", "fees", "charges",
     "delay", "time", "completion", "schedule",
@@ -83,46 +53,81 @@ HARD_KEYWORDS = [
 
 def requires_ai_analysis(text: str) -> bool:
     t = text.lower()
-    return any(k in t for k in HARD_KEYWORDS) or len(t.split()) > 40
+    return any(k in t for k in HARD_KEYWORDS)
+    # return any(k in t for k in HARD_KEYWORDS) or len(t.split()) > 40
 
 
-# ======================================================
-# PRIMARY AI CLASSIFICATION (1 label per clause)
-# ======================================================
-def classify_clauses_batch(texts, threshold=0.12, batch_size=8):
-    results = []
+def classify_clause_ollama(text: str):
+    """
+    Returns: (category, confidence)
+    category: one of LABELS or None
+    confidence: 0.0 to 1.0
+    """
 
-    for i in range(0, len(texts), batch_size):
-        batch = texts[i:i + batch_size]
+    prompt = f"""
+You are a contract risk classifier.
 
-        inputs = tokenizer(
-            batch,
-            truncation=True,
-            padding=True,
-            max_length=256,
-            return_tensors="pt"
+Classify the following clause into ONLY ONE category from:
+Financial, Legal, Payment, Timeline, Resource
+
+Return output strictly as JSON like:
+{{
+  "category": "Financial|Legal|Payment|Timeline|Resource|None",
+  "confidence": 0.0
+}}
+
+Clause:
+\"\"\"{text}\"\"\"
+"""
+
+    try:
+        res = ollama.chat(
+            model=OLLAMA_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            options={"temperature": 0}
         )
 
-        with torch.inference_mode():
-            outputs = model(**inputs)
+        content = res["message"]["content"].strip()
 
-        probs = softmax(outputs.logits, dim=1)
+        # Extract JSON safely
+        start = content.find("{")
+        end = content.rfind("}")
+        if start == -1 or end == -1:
+            return None, 0.0
 
-        for text, row in zip(batch, probs):
-            best_idx = int(torch.argmax(row))
-            confidence = float(row[best_idx])
+        data = json.loads(content[start:end + 1])
 
-            if confidence >= threshold:
-                results.append((text, LABELS[best_idx], confidence))
-            else:
-                results.append((text, None, 0.0))
+        category = data.get("category", None)
+        confidence = float(data.get("confidence", 0.0))
+
+        if category == "None" or category not in LABELS:
+            return None, confidence
+
+        return category, confidence
+
+    except Exception:
+        return None, 0.0
+
+
+def classify_clauses_batch(texts, threshold=0.12, batch_size=8):
+    """
+    Keeps same output format as LegalBERT:
+    [(text, category, confidence), ...]
+    """
+    results = []
+
+    for text in texts:
+        category, confidence = classify_clause_ollama(text)
+
+        if category and confidence >= threshold:
+            results.append((text, category, confidence))
+        else:
+            results.append((text, None, 0.0))
 
     return results
 
 
-# ======================================================
 # RISK EXPANSION (DOMAIN-AWARE)
-# ======================================================
 def expand_related_risks(primary_category, text):
     t = text.lower()
     risks = set()
@@ -177,9 +182,7 @@ def expand_related_risks(primary_category, text):
     return list(risks)
 
 
-# ======================================================
 # SEVERITY
-# ======================================================
 def severity_from_confidence(confidence, text):
     base = confidence * 100
     t = text.lower()
@@ -202,16 +205,12 @@ def severity_from_confidence(confidence, text):
     return severity, "Low"
 
 
-# ======================================================
 # HIGHLIGHT
-# ======================================================
 def extract_risk_highlight(text, category):
     return text.strip()
 
 
-# ======================================================
 # AI IMPACT
-# ======================================================
 def generate_ai_impact(category, text):
     if category == "Financial":
         return "The clause creates monetary exposure or cost escalation risk."
@@ -226,9 +225,7 @@ def generate_ai_impact(category, text):
     return "The clause introduces contractual risk."
 
 
-# ======================================================
 # MAIN ENTRY POINT (SENTENCE-LEVEL RISKS)
-# ======================================================
 def analyze_pdf(uploaded_file):
     text = extract_text(uploaded_file)
     clauses = split_clauses(text)

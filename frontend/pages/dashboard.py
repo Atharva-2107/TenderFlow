@@ -7,7 +7,7 @@ import os
 from dotenv import load_dotenv
 from supabase import create_client
 from utils.auth import can_access
-from utils.queries import get_tenders, get_bids
+from utils.queries import get_tenders, get_bids, get_generated_tenders
 import base64
 from pathlib import Path
 
@@ -163,7 +163,8 @@ div.block-container {
 
 #Data loading
 tenders = get_tenders()
-bids = get_bids()
+# bids = get_bids() # REMOVED: User requested to ignore bid_history
+generated_tenders = get_generated_tenders()
 
 # HEADER NAVIGATION
 left, center, right = st.columns([3, 6, 3])
@@ -292,17 +293,15 @@ def kpi(col, title, value):
         """, unsafe_allow_html=True)
 
 #KPI dynamic
-total_bids = len(bids)
-won_bids = sum(1 for b in bids if b.get("won") is True)
+# ONLY GENERATED TENDERS NOW
+unique_gen_tenders = len(set(g.get("project_name") for g in generated_tenders if g.get("project_name")))
+total_bids = unique_gen_tenders
+# Generated tenders don't have 'won' status or value yet, so these are 0 for now
+won_bids = 0 
+total_value_won = 0
 
-total_value_won = sum(
-    b.get("final_bid_amount", 0)
-    for b in bids
-    if b.get("won") is True
-)
-
-win_ratio = round(won_bids / max(total_bids, 1), 2)
-capture_ratio = round(won_bids / max(len(tenders), 1), 2)
+win_ratio = 0
+capture_ratio = 0
 
 kpi(c1, "Project Value Won", f"₹{total_value_won/1e7:.2f} Cr")
 kpi(c2, "Win / Loss Ratio", win_ratio)
@@ -311,63 +310,74 @@ kpi(c4, "Registered Opportunities", len(tenders))
 
 st.markdown("<div class='section-title'>Bid Activity (All Time)</div>", unsafe_allow_html=True)
 
-df = pd.DataFrame(bids)
+# Process Generated Tenders (Treat as Bids Submitted)
+gen_df = pd.DataFrame(generated_tenders)
 
-if df.empty:
+if gen_df.empty:
     st.info("No bid activity available")
+    # Stop earlier if purely empty
 else:
-    if "created_at" not in df.columns:
-        st.warning("Bid data missing 'created_at' field")
+    if "created_at" in gen_df.columns:
+        gen_df["created_at"] = pd.to_datetime(gen_df["created_at"], errors="coerce")
+        gen_df = gen_df.dropna(subset=["created_at"])
+        
+        # UNIQUE TENDER LOGIC: Drop duplicates by project_name to count 1 tender per project
+        if "project_name" in gen_df.columns:
+            gen_df = gen_df.sort_values("created_at") # Ensure we keep latest if duplicates
+            gen_df = gen_df.drop_duplicates(subset=["project_name"], keep="last")
+
+        gen_df["won"] = 0 # Generated but not strictly "won" yet
+        combined_df = gen_df[["created_at", "won", "id"]] # Select relevant cols
     else:
-        df["created_at"] = pd.to_datetime(df["created_at"], errors="coerce")
-        df = df.dropna(subset=["created_at"])
+        combined_df = pd.DataFrame()
 
-        # ✅ If all created_at were invalid -> show info instead of empty chart
-        if df.empty:
-            st.info("No bid activity available")
-            st.stop()
+    if combined_df.empty:
+        st.info("No valid activity data available")
+        st.stop()
 
-        # won -> 0/1 conversion
-        if "won" in df.columns:
-            df["won"] = df["won"].fillna(False)
-            df["won"] = df["won"].astype(str).str.lower().map({
-                "true": 1, "false": 0, "1": 1, "0": 0
-            }).fillna(0).astype(int)
-        else:
-            df["won"] = 0
+    combined_df["Month"] = combined_df["created_at"].dt.to_period("M").dt.to_timestamp()
 
-        df["Month"] = df["created_at"].dt.to_period("M").dt.to_timestamp()
+    activity_df = (
+        combined_df.groupby("Month", as_index=False)
+        .agg(
+            Bids_Submitted=("id", "count"),
+            Bids_Won=("won", "sum")
+        )
+        .sort_values("Month")
+    )
 
-        activity_df = (
-            df.groupby("Month", as_index=False)
-            .agg(
-                Bids_Submitted=("id", "count"),
-                Bids_Won=("won", "sum")
-            )
-            .sort_values("Month")
+    # ✅ Another safety check
+    if activity_df.empty:
+        st.info("No bid activity available")
+    else:
+        # VISUAL FIX: If only 1 data point, add a preceding 0 point to show a line from 0
+        if len(activity_df) == 1:
+            first_month = activity_df.iloc[0]["Month"]
+            prev_month = first_month - pd.DateOffset(months=1)
+            zero_row = pd.DataFrame({
+                "Month": [prev_month],
+                "Bids_Submitted": [0],
+                "Bids_Won": [0]
+            })
+            activity_df = pd.concat([zero_row, activity_df], ignore_index=True)
+
+        activity_df["Month_Label"] = activity_df["Month"].dt.strftime("%b %Y")
+
+        fig = px.line(
+            activity_df,
+            x="Month_Label",
+            y=["Bids_Submitted", "Bids_Won"],
+            markers=True
         )
 
-        # ✅ Another safety check
-        if activity_df.empty:
-            st.info("No bid activity available")
-        else:
-            activity_df["Month_Label"] = activity_df["Month"].dt.strftime("%b %Y")
+        fig.update_layout(
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            font_color="white",
+            legend_title_text=""
+        )
 
-            fig = px.line(
-                activity_df,
-                x="Month_Label",
-                y=["Bids_Submitted", "Bids_Won"],
-                markers=True
-            )
-
-            fig.update_layout(
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(0,0,0,0)",
-                font_color="white",
-                legend_title_text=""
-            )
-
-            st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, use_container_width=True)
 
 
 
@@ -402,11 +412,12 @@ with col1:
 with col2:
     st.markdown("<div class='section-title'>Top 5 Highest Bids</div>", unsafe_allow_html=True)
 
-    top_bids = sorted(
-        [b for b in bids if b.get("final_bid_amount") and b.get("tender_id")],
-        key=lambda x: x["final_bid_amount"],
-        reverse=True
-    )[:5]
+    top_bids = [] 
+    # sorted(
+    #     [b for b in bids if b.get("final_bid_amount") and b.get("tender_id")],
+    #     key=lambda x: x["final_bid_amount"],
+    #     reverse=True
+    # )[:5]
 
     if not top_bids:
         st.info("No bids available")

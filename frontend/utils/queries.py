@@ -25,3 +25,13 @@ def get_bids():
         .execute()
     )
     return response.data or []
+
+
+def get_generated_tenders():
+    response = (
+        supabase
+        .table("generated_tenders")
+        .select("*")
+        .execute()
+    )
+    return response.data or []

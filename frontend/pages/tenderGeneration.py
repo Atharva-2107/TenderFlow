@@ -1,5 +1,6 @@
 import streamlit as st
 from datetime import datetime, timedelta
+import time
 # from PyPDF2 import PdfReader # Removed local processing
 import json
 import requests
@@ -34,24 +35,61 @@ if url and key:
     supabase: Client = create_client(url, key)
     
     # Session Retrieval
+    # Prioritize existing session in state (from Login page)
+    current_session = st.session_state.get("sb_session")
+    
+    # Try to refresh/get from client if no state, or just to check
     try:
-        session = supabase.auth.get_session()
-        st.session_state.sb_session = session
-        user_id = session.user.id if session else None
+        client_session = supabase.auth.get_session()
+        if client_session:
+            st.session_state.sb_session = client_session
+            current_session = client_session
     except Exception as e:
         print(f"Session Error: {e}")
+    
+    if current_session:
+        user_id = current_session.user.id
+        # Restore session to client if needed for subsequent calls
+        # supabase.auth.set_session(current_session.access_token, current_session.refresh_token)
+    else:
         user_id = None
 else:
     user_id = None
 
-def save_tender_to_db(user_id, project_name, content, section_type):
+def save_tender_to_db(user_id, project_name, content, section_type, pdf_bytes=None):
     """
     Saves a generated tender section to Supabase.
+    If pdf_bytes is provided, uploads it to storage and saves the URL.
     """
     if not user_id:
         return False
     
     try:
+        # 1. Upload PDF if provided
+        pdf_url = None
+        if pdf_bytes:
+            try:
+                # Unique filename: user_id/project_name_section_timestamp.pdf
+                # Sanitize filenames
+                safe_proj = "".join(c for c in project_name if c.isalnum() or c in (' ', '-', '_')).strip().replace(' ', '_')
+                safe_sec = "".join(c for c in section_type if c.isalnum() or c in (' ', '-', '_')).strip().replace(' ', '_')
+                timestamp = int(time.time())
+                file_path = f"{user_id}/{safe_proj}_{safe_sec}_{timestamp}.pdf"
+                
+                # Upload
+                supabase.storage.from_("generated-tenders").upload(
+                    file_path,
+                    pdf_bytes.getvalue() if hasattr(pdf_bytes, 'getvalue') else pdf_bytes,
+                    {"content-type": "application/pdf", "upsert": "true"}
+                )
+                
+                # Get Public URL
+                pdf_url = supabase.storage.from_("generated-tenders").get_public_url(file_path)
+            except Exception as e:
+                print(f"PDF Upload Error: {e}")
+                # We continue saving the DB record even if PDF upload fails, but log it.
+
+        # 2. Insert DB Record
         data = {
             "user_id": user_id,
             "project_name": project_name,
@@ -59,6 +97,10 @@ def save_tender_to_db(user_id, project_name, content, section_type):
             "section_type": section_type,
             "created_at": datetime.now().isoformat()
         }
+        
+        if pdf_url:
+            data["pdf_url"] = pdf_url
+
         supabase.table("generated_tenders").insert(data).execute()
         return True
     except Exception as e:
@@ -983,11 +1025,15 @@ with right_panel:
                 for sec_name, sec_data in st.session_state.sections.items():
                     content_to_save = sec_data.get('content', '')
                     if content_to_save:
+                        # Generate PDF on the fly
+                        pdf_bytes = create_legal_pdf(content_to_save)
+                        
                         success = save_tender_to_db(
                             user_id=current_user_id,
                             project_name=project_name_input,
                             content=content_to_save,
-                            section_type=sec_name
+                            section_type=sec_name,
+                            pdf_bytes=pdf_bytes
                         )
                         if success:
                             saved_count += 1

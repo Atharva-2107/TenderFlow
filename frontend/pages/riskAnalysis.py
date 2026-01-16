@@ -1,48 +1,55 @@
 import streamlit as st
-import pandas as pd
 import plotly.graph_objects as go
 import random
 import sys
 from pathlib import Path
-from utils.auth import can_access
 
-
-if not can_access("risk_analysis"):
-    st.error("You are not authorized to access this page.")
-    st.stop()
-
-# Add project root to Python path
+# --------------------------------------------------
+# FIX 1: Ensure project root is in sys.path FIRST
+# --------------------------------------------------
 ROOT_DIR = Path(__file__).resolve().parents[2]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
+# Correct import because utils is inside frontend
+from frontend.utils.auth import can_access
 from backend.risk_engine import analyze_pdf
 
+# --------------------------------------------------
+# ACCESS CONTROL
+# --------------------------------------------------
+if not can_access("risk_analysis"):
+    st.error("You are not authorized to access this page.")
+    st.stop()
 
+# --------------------------------------------------
+# SESSION STATE INITIALIZATION
+# --------------------------------------------------
+if "analysis_results" not in st.session_state:
+    st.session_state.analysis_results = None
+
+if "last_file_id" not in st.session_state:
+    st.session_state.last_file_id = None
+
+# --------------------------------------------------
+# MAIN PAGE
+# --------------------------------------------------
 def risk_analysis_page():
-    # --- 1. ENHANCED STYLING ---
+
+    # ------------------ STYLING ------------------
     st.markdown("""
         <style>
-
-        /* ===== PAGE BACKGROUND (ONLY CHANGE) ===== */
-        /* ===== FORCE GRADIENT BACKGROUND ===== */
         .stApp {
             background: radial-gradient(circle at 20% 30%, #1a1c4b 0%, #0f111a 100%) !important;
         }
-
-        /* This is the KEY part */
         [data-testid="stAppViewContainer"] {
             background: transparent !important;
         }
-
-        /* Optional: header bar */
         [data-testid="stHeader"] {
             background: rgba(2, 6, 23, 0.85) !important;
         }
 
-
-        /* ===== EXISTING STYLES (UNCHANGED) ===== */
-        .risk-header { font-size: 2.2rem; font-weight: 700; color: #64748B; }
+        .risk-header { font-size: 2.2rem; font-weight: 700; color: #94a3b8; }
         .risk-tag {
             padding: 4px 12px;
             border-radius: 20px;
@@ -56,148 +63,142 @@ def risk_analysis_page():
         .tag-resource { background-color: #fef3c7; color: #92400e; }
         .tag-payment { background-color: #f3e8ff; color: #6b21a8; }
         .tag-timeline { background-color: #f3e8ff; color: #6b21a8; }
-        
+
         .risk-card {
             padding: 1.5rem;
             border-radius: 12px;
             margin-bottom: 1.2rem;
             border: 1px solid #1f2937;
             background-color: #0f172a;
-            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
-            transition: transform 0.2s;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.35);
         }
-        .risk-card h4 { color: #e5e7eb; }
-        .risk-card p { color: #cbd5f5; }
-                
-        .risk-card:hover { transform: translateY(-2px); }
+
         .border-red { border-left: 6px solid #ef4444; }
         .border-amber { border-left: 6px solid #f59e0b; }
         .border-green { border-left: 6px solid #22c55e; }
-
         </style>
     """, unsafe_allow_html=True)
 
-    # --- 2. DATA SIMULATION LOGIC (REPLACES HARDCODED LISTS) ---
-    def simulate_analysis(filename):
-        """Simulates the Gemini/LlamaParse output for different documents"""
-        categories = ['Financial', 'Timeline', 'Legal', 'Payment', 'Resource']
-        clauses = [
-            ("Liquidated Damages", "Financial", "Penalty of X% per day of delay."),
-            ("Indemnity", "Legal", "Contractor liable for all indirect losses."),
-            ("Payment Terms", "Payment", "Net 60/90 day payment cycles."),
-            ("Force Majeure", "Legal", "Limited definition of excusable delays."),
-            ("Termination", "Legal", "Issuer can terminate for convenience without fee."),
-            ("Mobilization", "Timeline", "Start date within 48 hours of award."),
-            ("Retentions", "Financial", "10% retention held until 12 months post-completion."),
-            ("Price Escalation", "Financial", "No adjustments allowed for fuel/material spikes.")
-        ]
-        
-        results = []
-        for name, cat, desc in clauses:
-            severity = random.randint(20, 95)
-            status = "Critical" if severity > 75 else "Warning" if severity > 45 else "Low"
-            results.append({
-                "category": cat,
-                "clause": name,
-                "content": desc,
-                "severity": severity,
-                "status": status,
-                "impact": f"AI calculates a {severity}/100 impact score based on sector standards.",
-                "tag_class": f"tag-{cat.lower()}"
-            })
-        return results
-
-    # Initialize Session State for dynamic data
-    if 'analysis_results' not in st.session_state:
-        st.session_state.analysis_results = None
-
-    # --- 3. HEADER & UPLOAD ---
+    # ------------------ HEADER ------------------
     st.markdown('<div class="risk-header">🕵️ Contractual Risk Intelligence</div>', unsafe_allow_html=True)
-    st.write("AI-driven deep scan of Tender Documents for predatory clauses and hidden liabilities.")
+    st.write("AI-driven deep scan of Tender Documents for contractual and financial risk.")
 
-    uploaded_file = st.file_uploader("Upload Tender RFP or Contract Draft", type=['pdf'])
-    
-    if uploaded_file and st.session_state.analysis_results is None:
-        with st.status("LlamaParse & Gemini Analyzing Document...", expanded=True) as status:
-            st.write("Extracting legal text structures...")
-            import time; time.sleep(1.5)
-            st.write("Categorizing 5 Pillars of Risk...")
-            time.sleep(1)
-            st.session_state.analysis_results = analyze_pdf(uploaded_file)
-            status.update(label="Analysis Complete!", state="complete")
+    # ------------------ FILE UPLOAD ------------------
+    uploaded_file = st.file_uploader(
+        "Upload Tender RFP or Contract Draft",
+        type=["pdf"],
+        key="risk_pdf_uploader"
+    )
+
+    # ------------------ ANALYSIS TRIGGER ------------------
+    if uploaded_file:
+        file_id = (uploaded_file.name, uploaded_file.size)
+
+        if st.session_state.last_file_id != file_id:
+            with st.status("AI Risk Engine Analyzing Document...", expanded=True) as status:
+                st.write("Extracting clauses from document...")
+                st.write("Running legal risk classification model...")
+                st.session_state.analysis_results = analyze_pdf(uploaded_file)
+                st.session_state.last_file_id = file_id
+                status.update(label="Analysis Complete", state="complete")
 
     st.divider()
 
+    # ------------------ SIDEBAR CONTROLS ------------------
     if st.session_state.analysis_results:
-        # --- 4. SIDEBAR SETTINGS (CONTROLS THE DYNAMICS) ---
         with st.sidebar:
             st.header("⚙️ View Settings")
-            appetite = st.slider("Risk Sensitivity Threshold", 0, 100, 40, help="Hide risks with severity below this score.")
-            focus_cats = st.multiselect("Filter by Category", 
-                                      ['Financial', 'Timeline', 'Legal', 'Payment', 'Resource'], 
-                                      default=['Financial', 'Timeline', 'Legal', 'Payment', 'Resource'])
-            
-            # Reset Button
+
+            appetite = st.slider(
+                "Risk Sensitivity Threshold",
+                0, 100, 20,
+                help="Hide risks below this severity score."
+            )
+
+            focus_cats = st.multiselect(
+                "Filter by Category",
+                ['Financial', 'Timeline', 'Legal', 'Payment', 'Resource'],
+                default=['Financial', 'Timeline', 'Legal', 'Payment', 'Resource']
+            )
+
             if st.button("Clear Analysis"):
                 st.session_state.analysis_results = None
+                st.session_state.last_file_id = None
                 st.rerun()
 
-        # Filtering Logic
-        filtered_data = [r for r in st.session_state.analysis_results 
-                         if r['severity'] >= appetite and r['category'] in focus_cats]
+    # ------------------ RESULTS ------------------
+    if st.session_state.analysis_results:
+        filtered_data = [
+            r for r in st.session_state.analysis_results
+            if r["severity"] >= appetite and r["category"] in focus_cats
+        ]
 
-        # --- 5. DYNAMIC EXECUTIVE SUMMARY ---
-        col_chart, col_summary = st.columns([1, 1])
+        col_chart, col_summary = st.columns(2)
 
+        # ---------- Radar Chart ----------
         with col_chart:
-            # Calculate dynamic averages for Radar Chart
-            radar_cats = ['Financial', 'Timeline', 'Legal', 'Payment', 'Resource']
-            radar_vals = []
-            for c in radar_cats:
-                cat_scores = [r['severity'] for r in st.session_state.analysis_results if r['category'] == c]
-                radar_vals.append(sum(cat_scores)/len(cat_scores) if cat_scores else 0)
+            cats = ['Financial', 'Timeline', 'Legal', 'Payment', 'Resource']
+            vals = []
 
-            fig = go.Figure(data=go.Scatterpolar(
-                r=radar_vals, theta=radar_cats, fill='toself', line_color='#ef4444'
+            for c in cats:
+                scores = [r["severity"] for r in st.session_state.analysis_results if r["category"] == c]
+                vals.append(sum(scores) / len(scores) if scores else 0)
+
+            fig = go.Figure(go.Scatterpolar(
+                r=vals,
+                theta=cats,
+                fill="toself",
+                line_color="#ef4444"
             ))
-            fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
-                              showlegend=False, height=350, margin=dict(l=40, r=40, t=40, b=40))
+
+            fig.update_layout(
+                polar=dict(radialaxis=dict(range=[0, 100], visible=True)),
+                showlegend=False,
+                height=350
+            )
+
             st.plotly_chart(fig, use_container_width=True)
 
+        # ---------- Summary ----------
         with col_summary:
-            st.subheader("⚠️ Executive Flag Summary")
-            critical_count = len([r for r in filtered_data if r['status'] == "Critical"])
-            warning_count = len([r for r in filtered_data if r['status'] == "Warning"])
-            
-            st.metric("Filtered Critical Risks", critical_count, delta=f"{warning_count} Warnings", delta_color="off")
-            
-            if critical_count > 0:
-                highest_risk = max(filtered_data, key=lambda x: x['severity'])
-                st.error(f"**Highest Priority:** {highest_risk['clause']} ({highest_risk['severity']}/100)")
+            critical = [r for r in filtered_data if r["status"] == "Critical"]
+            warning = [r for r in filtered_data if r["status"] == "Warning"]
+
+            st.metric("Critical Risks", len(critical), delta=f"{len(warning)} Warnings")
+
+            if critical:
+                top = max(critical, key=lambda x: x["severity"])
+                st.error(f"Highest Risk: {top['clause']} ({top['severity']}/100)")
             else:
-                st.success("No high-severity risks found with current filters.")
+                st.success("No critical risks under current filters.")
 
         st.divider()
 
-        # --- 6. DYNAMIC CLAUSE FEED ---
-        st.subheader(f"🔍 Clause Breakdown ({len(filtered_data)} active flags)")
-        
+        # ---------- Clause Cards ----------
+        st.subheader(f"🔍 Clause Breakdown ({len(filtered_data)} flags)")
+
         if not filtered_data:
-            st.info("No clauses match your current filters. Adjust the 'Risk Sensitivity' in the sidebar.")
+            st.info("No clauses match your filters.")
         else:
             for r in filtered_data:
-                border = "border-red" if r['status'] == "Critical" else "border-amber" if r['status'] == "Warning" else "border-green"
+                border = (
+                    "border-red" if r["status"] == "Critical"
+                    else "border-amber" if r["status"] == "Warning"
+                    else "border-green"
+                )
+
                 st.markdown(f"""
                     <div class="risk-card {border}">
                         <span class="risk-tag {r['tag_class']}">{r['category']}</span>
-                        <h4 style="margin: 5px 0;">{r['clause']} <span style="font-size: 0.8rem; color: #64748b;">(Score: {r['severity']})</span></h4>
-                        <p style="font-style: italic; color: #475569; margin-bottom: 10px;">"{r['content']}"</p>
+                         <h4>{r['clause']} </h4>
+                        <p style="font-style: italic;">"{r['content']}"</p>
                         <p><strong>AI Analysis:</strong> {r['impact']}</p>
                     </div>
                 """, unsafe_allow_html=True)
+
     else:
-        # Placeholder when no file is uploaded
-        st.info("Please upload a contract or RFP document above to begin the risk analysis.")
+        st.info("Upload a contract or tender document to begin analysis.")
+
 
 if __name__ == "__main__":
     risk_analysis_page()

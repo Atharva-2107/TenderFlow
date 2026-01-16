@@ -1,13 +1,13 @@
-# import streamlit as st
-# from datetime import datetime, timedelta
-# import time
-# # from PyPDF2 import PdfReader # Removed local processing
-# import json
-# import requests
-# import markdown2
-# from xhtml2pdf import pisa
-# from io import BytesIO
-# from utils.auth import can_access
+import streamlit as st
+from datetime import datetime, timedelta
+import time
+# from PyPDF2 import PdfReader # Removed local processing
+import json
+import requests
+import markdown2
+from xhtml2pdf import pisa
+from io import BytesIO
+from utils.auth import can_access
 
 
 if not can_access("tender_generation"):

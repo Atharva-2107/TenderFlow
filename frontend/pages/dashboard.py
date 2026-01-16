@@ -179,8 +179,6 @@ with left:
             </div>
         """, unsafe_allow_html=True)
 
-    # st.image("frontend/assets/logo.png", width=180)
-
 with center:
     header_cols = st.columns([3, 0.4, 0.4, 0.4, 0.4, 0.4])
 

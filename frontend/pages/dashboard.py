@@ -169,9 +169,6 @@ bids = get_bids()
 left, center, right = st.columns([3, 6, 3])
 
 with left:
-<<<<<<< HEAD
-    st.image("frontend/assets/logo.png", width=180)
-=======
     logo_path = Path(__file__).resolve().parents[1] / "assets" / "logo.png"
     logo = get_base64_of_bin_file(logo_path)
 
@@ -181,9 +178,6 @@ with left:
                 <img src="data:image/png;base64,{logo}" width="180">
             </div>
         """, unsafe_allow_html=True)
-
-    # st.image("frontend/assets/logo.png", width=180)
->>>>>>> eb0ec7c2429500a083fd2c45bb93e9be639b42c9
 
 with center:
     header_cols = st.columns([3, 0.4, 0.4, 0.4, 0.4, 0.4])

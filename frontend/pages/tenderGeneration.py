@@ -971,7 +971,11 @@ with right_panel:
     project_name_input = st.text_input("Project Name", value="New Tender", help="Name for this tender project")
     
     if st.button("💾 Save to Cloud DB", use_container_width=True, help="Save all generated sections to Supabase"):
-        if not user_id:
+        # Robust user check using session_state
+        current_user = st.session_state.get("user")
+        current_user_id = getattr(current_user, 'id', None) or (current_user.get('id') if isinstance(current_user, dict) else None)
+        
+        if not current_user_id:
             st.warning("⚠️ You must be logged in to save to the cloud.")
         else:
             saved_count = 0
@@ -980,7 +984,7 @@ with right_panel:
                     content_to_save = sec_data.get('content', '')
                     if content_to_save:
                         success = save_tender_to_db(
-                            user_id=user_id,
+                            user_id=current_user_id,
                             project_name=project_name_input,
                             content=content_to_save,
                             section_type=sec_name

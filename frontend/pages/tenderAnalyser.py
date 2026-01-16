@@ -8,7 +8,7 @@ import sys
 import markdown2
 from io import BytesIO
 from xhtml2pdf import pisa
-from utils.auth import can_access
+# from utils.auth import can_access
 
 
 # Now import from components
@@ -139,9 +139,14 @@ button[title="View header anchor"] { display: none !important; }
 header { visibility: hidden; }
       
 .stApp {
-    background-color: #0d1117;
-    font-family: 'Inter', sans-serif;
-}
+            background: radial-gradient(circle at 20% 30%, #1a1c4b 0%, #0f111a 100%) !important;
+        }
+        [data-testid="stAppViewContainer"] {
+            background: transparent !important;
+        }
+        [data-testid="stHeader"] {
+            background: rgba(2, 6, 23, 0.85) !important;
+        }
 
 div.block-container {
     padding-top: 0.3rem !important; 
@@ -311,44 +316,43 @@ with center:
         if st.button("⊞", key="h_dash", help="Dashboard"):
             st.switch_page("app.py")
 
-    with header_cols[2]:
-        if can_access("tender_generation"):
-            if st.button("⎘", key="h_gen", help="Tender Generation"):
-                st.switch_page("pages/tenderGeneration.py")
-        else:
-            st.button("⎘", key="h_gen_disabled", disabled=True, help="Access restricted")
+    # with header_cols[2]:
+    #     if can_access("tender_generation"):
+    #         if st.button("⎘", key="h_gen", help="Tender Generation"):
+    #             st.switch_page("pages/tenderGeneration.py")
+    #     else:
+    #         st.button("⎘", key="h_gen_disabled", disabled=True, help="Access restricted")
 
 
-    with header_cols[3]:
-        if can_access("tender_analysis"):
-            if st.button("◈", key="h_anl", help="Tender Analysis"):
-                st.switch_page("pages/tenderAnalyser.py")
-        else:
-            st.button("◈", key="h_anl_disabled", disabled=True)
+    # with header_cols[3]:
+    #     if can_access("tender_analysis"):
+    #         if st.button("◈", key="h_anl", help="Tender Analysis"):
+    #             st.switch_page("pages/tenderAnalyser.py")
+    #     else:
+    #         st.button("◈", key="h_anl_disabled", disabled=True)
 
-    with header_cols[4]:
-        if can_access("bid_generation"):
-            if st.button("✦", key="h_bid", help="Bid Generation"):
-                st.switch_page("pages/bidGeneration.py")
-        else:
-            st.button("✦", key="h_bid_disabled", disabled=True)
+    # with header_cols[4]:
+    #     if can_access("bid_generation"):
+    #         if st.button("✦", key="h_bid", help="Bid Generation"):
+    #             st.switch_page("pages/bidGeneration.py")
+    #     else:
+    #         st.button("✦", key="h_bid_disabled", disabled=True)
 
-    with header_cols[5]:
-        if can_access("risk_analysis"):
-            if st.button("⬈", key="h_risk", help="Risk Analysis"):
-                st.switch_page("pages/riskAnalysis.py")
-        else:
-            st.button("⬈", key="h_risk_disabled", disabled=True)
+    # with header_cols[5]:
+    #     if can_access("risk_analysis"):
+    #         if st.button("⬈", key="h_risk", help="Risk Analysis"):
+    #             st.switch_page("pages/riskAnalysis.py")
+    #     else:
+    #         st.button("⬈", key="h_risk_disabled", disabled=True)
 
 logo_col, title_col = st.columns([1, 4])
 with title_col:
-    st.markdown("<h2 style='color:white; margin:0; line-height:1.2; text-align: center; margin-left:-220px;'>Tender Summarizer Studio</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='color:white; margin:0; line-height:1.2; text-align: center; margin-left:-220px;margin-top:20px;font-size:50px'>Tender Summarizer Studio</h2>", unsafe_allow_html=True)
     st.markdown("<p style='color: #94a3b8; margin:0; font-size:14px; text-align: center;margin-left: -220px;'>Proprietary AI for procurement & bid engineering.</p>", unsafe_allow_html=True)
 
 st.write("##")
 
 # 4. CONTROL BAR (INPUTS)
-st.markdown('<div class="control-bar">', unsafe_allow_html=True)
 c1, c2, c3, c4, c5 = st.columns([2, 1, 1, 1, 1])
 
 with c1:

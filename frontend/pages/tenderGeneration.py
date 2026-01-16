@@ -32,6 +32,38 @@ url = os.environ.get("SUPABASE_URL")
 key = os.environ.get("SUPABASE_KEY")
 if url and key:
     supabase: Client = create_client(url, key)
+    
+    # Session Retrieval
+    try:
+        session = supabase.auth.get_session()
+        st.session_state.sb_session = session
+        user_id = session.user.id if session else None
+    except Exception as e:
+        print(f"Session Error: {e}")
+        user_id = None
+else:
+    user_id = None
+
+def save_tender_to_db(user_id, project_name, content, section_type):
+    """
+    Saves a generated tender section to Supabase.
+    """
+    if not user_id:
+        return False
+    
+    try:
+        data = {
+            "user_id": user_id,
+            "project_name": project_name,
+            "content": content,
+            "section_type": section_type,
+            "created_at": datetime.now().isoformat()
+        }
+        supabase.table("generated_tenders").insert(data).execute()
+        return True
+    except Exception as e:
+        print(f"DB Save Error: {e}")
+        return False
 
 def get_company_context(user_id: str, section_type: str = None) -> str:
     """
@@ -727,13 +759,13 @@ with main_workspace:
             )
             st.session_state[f"edited_content_{current}"] = new_content
             
-            # Save Button
-            if st.button("💾 Save Changes", type="primary", key=f"save_{current}"):
-                st.session_state.sections[current]['content'] = new_content
-                st.session_state[f"content_{current}"] = new_content
-                st.session_state[f"edit_mode_{current}"] = False # Exit edit mode
-                st.success("Changes saved!")
-                st.rerun()
+            # Save Button (Commented out as duplicate)
+            # if st.button("💾 Save Changes", type="primary", key=f"save_{current}"):
+            #     st.session_state.sections[current]['content'] = new_content
+            #     st.session_state[f"content_{current}"] = new_content
+            #     st.session_state[f"edit_mode_{current}"] = False # Exit edit mode
+            #     st.success("Changes saved!")
+            #     st.rerun()
 
         else:
             # PREVIEW MODE
@@ -748,63 +780,95 @@ with main_workspace:
             )
             
             st.markdown(f"""
-            <style>
-                .legal-preview table {{
-                    width: 100%;
-                    max-width: 100%;
-                    border: 1px solid black;
-                    border-collapse: collapse;
-                    margin: 15px 0;
-                    display: table;
-                    table-layout: fixed;
-                }}
-                .legal-preview th {{
-                    background-color: #2c3e50;
-                    color: white;
-                    font-weight: bold;
-                    padding: 10px;
-                    border: 1px solid black;
-                    text-align: left;
-                    word-wrap: break-word;
-                }}
-                .legal-preview td {{
-                    padding: 8px;
-                    border: 1px solid black;
-                    vertical-align: top;
-                    word-wrap: break-word;
-                }}
-                .legal-preview h3 {{
-                    font-weight: bold;
-                    margin-top: 20px;
-                    border-bottom: 2px solid #333;
-                    padding-bottom: 5px;
-                }}
-                .legal-preview h4 {{
-                    font-weight: bold;
-                    margin-top: 15px;
-                    color: #2c3e50;
-                }}
-            </style>
-            <div class="legal-preview" style="
-                background-color: white;
-                padding: 40px; 
-                box-sizing: border-box;
-                width: 100%;
-                max-width: 100%;
-                border-radius: 4px;
-                box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-                font-family: 'Times New Roman', Times, serif;
-                font-size: 12pt;
-                line-height: 1.6;
-                color: #1a1a1a;
-                min-height: 800px;
-                text-align: justify;
-                border: 1px solid #ccc;
-            ">
-                {html_content}
-            </div>
-            """, unsafe_allow_html=True)
+<style>
+    .legal-preview table {{
+        width: 100%;
+        max-width: 100%;
+        border: 1px solid black;
+        border-collapse: collapse;
+        margin: 15px 0;
+        display: table;
+        table-layout: fixed;
+    }}
+    .legal-preview th {{
+        background-color: #2c3e50;
+        color: white;
+        font-weight: bold;
+        padding: 10px;
+        border: 1px solid black;
+        text-align: left;
+        word-wrap: break-word;
+    }}
+    .legal-preview td {{
+        padding: 8px;
+        border: 1px solid black;
+        vertical-align: top;
+        word-wrap: break-word;
+    }}
+    .legal-preview h3 {{
+        font-weight: bold;
+        margin-top: 20px;
+        border-bottom: 2px solid #333;
+        padding-bottom: 5px;
+    }}
+    .legal-preview h4 {{
+        font-weight: bold;
+        margin-top: 15px;
+        color: #2c3e50;
+    }}
+    /* Scrollable Container Styling */
+    .preview-scroll-container {{
+        height: 800px;
+        overflow-y: auto;
+        border: 1px solid #30363D;
+        border-radius: 8px;
+        padding: 20px;
+        background-color: #0D1117; /* Dark background frame */
+        box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+    }}
+    /* Custom Scrollbar */
+    .preview-scroll-container::-webkit-scrollbar {{
+        width: 10px;
+        height: 10px;
+    }}
+    .preview-scroll-container::-webkit-scrollbar-track {{
+        background: #0D1117;
+    }}
+    .preview-scroll-container::-webkit-scrollbar-thumb {{
+        background: #30363D;
+        border-radius: 5px;
+    }}
+    .preview-scroll-container::-webkit-scrollbar-thumb:hover {{
+        background: #58a6ff;
+    }}
+</style>
+
+<div class="preview-scroll-container">
+    <div class="legal-preview" style="
+        background-color: white;
+        padding: 40px; 
+        box-sizing: border-box;
+        width: 100%;
+        max-width: 100%;
+        border-radius: 4px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+        font-family: 'Times New Roman', Times, serif;
+        font-size: 12pt;
+        line-height: 1.6;
+        color: #1a1a1a;
+        min-height: 800px; /* Ensure paper has height */
+        text-align: justify;
+        border: 1px solid #ccc;
+    ">
+        {html_content}
+    </div>
+</div>
+""", unsafe_allow_html=True)
         
+        # CLEARING DIV to prevent float overlap issues
+        st.markdown('<div style="clear: both; margin-bottom: 20px;"></div>', unsafe_allow_html=True)
+        st.divider()
+
         # Show save button when editing
         with col_save:
             if is_editing:
@@ -813,7 +877,7 @@ with main_workspace:
                     st.rerun()
         
         # Action buttons
-        col1, col2, col3, col4 = st.columns(4)
+        col1, col2, padding_col = st.columns([1.5, 1.5, 3])
         
         with col1:
             st.button("🔄 Regenerate Section", use_container_width=True, type="primary", on_click=handle_regeneration)
@@ -830,16 +894,6 @@ with main_workspace:
                 mime="application/pdf",
                 use_container_width=True
             )
-        
-        with col3:
-             # Commented out export PDF button
-             # pdf_buffer = create_legal_pdf(edited_content)
-             # st.download_button(...)
-             pass
-        
-        with col4:
-            # Commented out mark as reviewed
-            pass
 
 # RIGHT PANEL - Controls
 with right_panel:
@@ -913,8 +967,31 @@ with right_panel:
     st.button("⚡ Generate All Sections", use_container_width=True, type="primary", on_click=handle_bulk_generation)
     st.markdown('<div style="margin-bottom: 10px;"></div>', unsafe_allow_html=True)
     
-    if st.button("💾 Save Progress", use_container_width=True):
-        st.success("Progress saved locally!")
+    # Save to Supabase DB Controls
+    project_name_input = st.text_input("Project Name", value="New Tender", help="Name for this tender project")
+    
+    if st.button("💾 Save to Cloud DB", use_container_width=True, help="Save all generated sections to Supabase"):
+        if not user_id:
+            st.warning("⚠️ You must be logged in to save to the cloud.")
+        else:
+            saved_count = 0
+            with st.spinner("Saving to database..."):
+                for sec_name, sec_data in st.session_state.sections.items():
+                    content_to_save = sec_data.get('content', '')
+                    if content_to_save:
+                        success = save_tender_to_db(
+                            user_id=user_id,
+                            project_name=project_name_input,
+                            content=content_to_save,
+                            section_type=sec_name
+                        )
+                        if success:
+                            saved_count += 1
+            
+            if saved_count > 0:
+                st.success(f"✅ Successfully saved {saved_count} sections to cloud!")
+            else:
+                st.warning("No content to save (generate sections first).")
     
     st.markdown('</div>', unsafe_allow_html=True)
 

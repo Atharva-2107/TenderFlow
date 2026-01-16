@@ -8,6 +8,8 @@ from dotenv import load_dotenv
 from supabase import create_client
 from utils.auth import can_access
 from utils.queries import get_tenders, get_bids
+import base64
+from pathlib import Path
 
 
 # ROLE_PERMISSIONS = {
@@ -76,6 +78,12 @@ st.set_page_config(
 if "page" not in st.session_state:
     st.session_state.page = "Dashboard"
 
+def get_base64_of_bin_file(path):
+    if os.path.exists(path):
+        with open(path, "rb") as f:
+            return base64.b64encode(f.read()).decode()
+    return None
+
 # GLOBAL CSS
 st.markdown("""
 <style>
@@ -84,7 +92,12 @@ st.markdown("""
 html, body, [class*="css"] {
     font-family: 'Inter', sans-serif;
 }
-            
+
+header, footer { visibility:hidden; }
+              
+div.block-container {
+    padding-top: 0.8rem !important; 
+}
 
 
 .stApp {
@@ -108,7 +121,7 @@ html, body, [class*="css"] {
     backdrop-filter: blur(10px);
     border: 1px solid rgba(255,255,255,0.12);
     border-radius: 16px;
-    padding: 12px 18px;
+    padding: 12px 12px;
     margin-bottom: 22px;
 }
 
@@ -156,7 +169,21 @@ bids = get_bids()
 left, center, right = st.columns([3, 6, 3])
 
 with left:
-    st.image("assets/logo.png", width=180)
+<<<<<<< HEAD
+    st.image("frontend/assets/logo.png", width=180)
+=======
+    logo_path = Path(__file__).resolve().parents[1] / "assets" / "logo.png"
+    logo = get_base64_of_bin_file(logo_path)
+
+    if logo:
+        st.markdown(f"""
+            <div style="display:flex; align-items:center;">
+                <img src="data:image/png;base64,{logo}" width="180">
+            </div>
+        """, unsafe_allow_html=True)
+
+    # st.image("frontend/assets/logo.png", width=180)
+>>>>>>> eb0ec7c2429500a083fd2c45bb93e9be639b42c9
 
 with center:
     header_cols = st.columns([3, 0.4, 0.4, 0.4, 0.4, 0.4])
@@ -195,7 +222,7 @@ with center:
             st.button("⬈", key="h_risk_disabled", disabled=True)
 
 with right:
-    r1, r2 = st.columns([1, 1])
+    r1, r2 = st.columns([5, 5])
 
     with r1:
         st.button("🔔", help="Notifications")
@@ -212,7 +239,7 @@ with right:
                 st.session_state.clear()
                 st.experimental_rerun()
 
-st.markdown("</div>", unsafe_allow_html=True)
+# st.markdown("</div>", unsafe_allow_html=True)
 
 # PAGE ROUTING
 if st.session_state.page == "Profile":
@@ -287,13 +314,6 @@ kpi(c2, "Win / Loss Ratio", win_ratio)
 kpi(c3, "Capture Ratio", capture_ratio)
 kpi(c4, "Registered Opportunities", len(tenders))
 
-# BID ACTIVITY
-st.markdown("<div class='section-title'>Bid Activity (All Time)</div>", unsafe_allow_html=True)
-
-# =========================
-# BID ACTIVITY (PHASE 1 - SAFE)
-# =========================
-
 st.markdown("<div class='section-title'>Bid Activity (All Time)</div>", unsafe_allow_html=True)
 
 df = pd.DataFrame(bids)
@@ -301,37 +321,59 @@ df = pd.DataFrame(bids)
 if df.empty:
     st.info("No bid activity available")
 else:
-    # Ensure required column exists
     if "created_at" not in df.columns:
         st.warning("Bid data missing 'created_at' field")
     else:
-        df["created_at"] = pd.to_datetime(df["created_at"])
-        df["Month"] = df["created_at"].dt.strftime("%b %Y")
+        df["created_at"] = pd.to_datetime(df["created_at"], errors="coerce")
+        df = df.dropna(subset=["created_at"])
+
+        # ✅ If all created_at were invalid -> show info instead of empty chart
+        if df.empty:
+            st.info("No bid activity available")
+            st.stop()
+
+        # won -> 0/1 conversion
+        if "won" in df.columns:
+            df["won"] = df["won"].fillna(False)
+            df["won"] = df["won"].astype(str).str.lower().map({
+                "true": 1, "false": 0, "1": 1, "0": 0
+            }).fillna(0).astype(int)
+        else:
+            df["won"] = 0
+
+        df["Month"] = df["created_at"].dt.to_period("M").dt.to_timestamp()
 
         activity_df = (
-            df.groupby("Month")
+            df.groupby("Month", as_index=False)
             .agg(
                 Bids_Submitted=("id", "count"),
                 Bids_Won=("won", "sum")
             )
-            .reset_index()
+            .sort_values("Month")
         )
 
-        fig = px.line(
-            activity_df,
-            x="Month",
-            y=["Bids_Submitted", "Bids_Won"],
-            markers=True
-        )
+        # ✅ Another safety check
+        if activity_df.empty:
+            st.info("No bid activity available")
+        else:
+            activity_df["Month_Label"] = activity_df["Month"].dt.strftime("%b %Y")
 
-        fig.update_layout(
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-            font_color="white",
-            legend_title_text=""
-        )
+            fig = px.line(
+                activity_df,
+                x="Month_Label",
+                y=["Bids_Submitted", "Bids_Won"],
+                markers=True
+            )
 
-        st.plotly_chart(fig, use_container_width=True)
+            fig.update_layout(
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                font_color="white",
+                legend_title_text=""
+            )
+
+            st.plotly_chart(fig, use_container_width=True)
+
 
 
 # INSIGHTS
@@ -363,19 +405,71 @@ with col1:
     # st.plotly_chart(pie, use_container_width=True)
 
 with col2:
+    st.markdown("<div class='section-title'>Top 5 Highest Bids</div>", unsafe_allow_html=True)
+
     top_bids = sorted(
-    [b for b in bids if b.get("final_bid_amount")],
-    key=lambda x: x["final_bid_amount"],
-    reverse=True
-)[:5]
+        [b for b in bids if b.get("final_bid_amount") and b.get("tender_id")],
+        key=lambda x: x["final_bid_amount"],
+        reverse=True
+    )[:5]
 
-html_rows = ""
-for i, bid in enumerate(top_bids, 1):
-    html_rows += f"<b>{i}.</b> Tender ID {bid['tender_id']} — ₹{bid['final_bid_amount']/1e7:.2f} Cr<br>"
+    if not top_bids:
+        st.info("No bids available")
+    else:
+        html_rows = ""
+        for i, bid in enumerate(top_bids, 1):
+            html_rows += f"""
+            <div style="margin-bottom: 10px;">
+                <b>{i}.</b> Tender ID {bid['tender_id']} — ₹{bid['final_bid_amount']/1e7:.2f} Cr
+            </div>
+            """
 
-components.html(
-    f"""
+        components.html(
+            f"""
+            <div style="
+                width: 100%;
+                background: linear-gradient(
+                    135deg,
+                    rgba(255,255,255,0.08),
+                    rgba(255,255,255,0.02)
+                );
+                backdrop-filter: blur(10px);
+                border: 1px solid rgba(255,255,255,0.12);
+                border-radius: 16px;
+                padding: 22px;
+                color: white;
+                font-family: Inter, sans-serif;
+            ">
+                <div style="line-height: 1.8; font-size: 15px;">
+                    {html_rows}
+                </div>
+            </div>
+            """,
+            height=260
+        )
+
+
+# REGULATORY & BID DOCUMENTATION (Scrollable Container)
+st.markdown("<div class='section-title'>Regulatory & Bid Documentation Updates</div>", unsafe_allow_html=True)
+
+try:
+    response = (
+        supabase.table("tender_documents")
+        .select("source, tender_no, document_type, structured_data, pdf_url, fetched_at")
+        .order("fetched_at", desc=True)
+        .limit(15)
+        .execute()
+    )
+    updates = response.data or []
+except Exception:
+    updates = []
+
+if not updates:
+    st.info("No recent regulatory or bid documentation updates available.")
+else:
+    scroll_html = """
     <div style="
+        font-family: 'Inter', 'Manrope', 'Segoe UI', Arial, sans-serif;
         background: linear-gradient(
             135deg,
             rgba(255,255,255,0.08),
@@ -384,102 +478,110 @@ components.html(
         backdrop-filter: blur(10px);
         border: 1px solid rgba(255,255,255,0.12);
         border-radius: 16px;
-        padding: 22px;
-        max-width: 520px;
-        margin: auto;
-        color: white;
-        font-family: Inter, sans-serif;
-    ">  
-        <h4 style="margin-bottom: 16px;">Top 5 Highest Bids</h4>
-        <div style="line-height: 2.2; font-size: 15px;">
-            {html_rows if html_rows else "No bids available"}
-        </div>
-    </div>
-    """,
-    height=300
-)
+        padding: 16px;
+        height: 380px;
+        overflow-y: auto;
+    ">
+    """
 
-# ======================================================
-# 📰 REGULATORY & BID DOCUMENTATION UPDATES (ADDED)
-# ======================================================
-
-st.markdown("<div class='section-title'>📰 Regulatory & Bid Documentation Updates</div>", unsafe_allow_html=True)
-
-try:
-    response = supabase.table("tender_documents") \
-        .select("source, tender_no, document_type, structured_data, pdf_url, fetched_at") \
-        .order("fetched_at", desc=True) \
-        .limit(8) \
-        .execute()
-
-    updates = response.data or []
-
-except Exception:
-    updates = []
-
-if not updates:
-    st.info("No recent regulatory or bid documentation updates available.")
-else:
     for doc in updates:
-        st.markdown("""
+        source = doc.get("source", "Unknown Source")
+        tender_no = doc.get("tender_no", None)
+        doc_type = doc.get("document_type", "Document")
+        pdf_url = doc.get("pdf_url", None)
+        fetched_at = doc.get("fetched_at", "")
+
+        structured = doc.get("structured_data") or {}
+        deadline = structured.get("submission_deadline", None)
+
+        fetched_label = fetched_at[:19].replace("T", " ") if fetched_at else "N/A"
+
+        scroll_html += f"""
         <div style="
-            background: linear-gradient(
-                135deg,
-                rgba(255,255,255,0.08),
-                rgba(255,255,255,0.02)
-            );
-            backdrop-filter: blur(10px);
+            background: rgba(255,255,255,0.06);
             border: 1px solid rgba(255,255,255,0.12);
             border-radius: 14px;
-            padding: 16px 18px;
+            padding: 14px 16px;
             margin-bottom: 12px;
         ">
-        """, unsafe_allow_html=True)
+            <div style="display: flex; justify-content: space-between; gap: 16px;">
 
-        colA, colB = st.columns([4, 1])
+                <div style="flex: 1; min-width: 0;">
+                    <div style="
+                        font-size: 16px;
+                        font-weight: 700;
+                        color: white;
+                        margin-bottom: 6px;
+                        line-height: 1.3;
+                    ">
+                        {doc_type}
+                    </div>
 
-        with colA:
-            st.markdown(f"**{doc['document_type']}**  \nSource: {doc['source']}")
-            if doc.get("tender_no"):
-                st.markdown(f"Tender No: `{doc['tender_no']}`")
+                    <div style="
+                        font-size: 13px;
+                        color: rgba(255,255,255,0.78);
+                        line-height: 1.4;
+                    ">
+                        Source: <span style="font-weight: 600; color: rgba(255,255,255,0.92);">{source}</span>
+                    </div>
 
-            deadline = (doc.get("structured_data") or {}).get("submission_deadline")
-            if deadline:
-                st.markdown(f"🕒 Submission Deadline: **{deadline}**")
+                    {"<div style='margin-top:8px; font-size:13px; color: rgba(255,255,255,0.9); line-height:1.4;'>🆔 Tender No: <span style='font-family: monospace; font-size: 13px; color: rgba(255,255,255,0.95);'>" + str(tender_no) + "</span></div>" if tender_no else ""}
 
-            st.caption(f"Updated: {doc['fetched_at'][:19].replace('T',' ')}")
+                    {"<div style='margin-top:6px; font-size:13px; color: rgba(255,255,255,0.92); line-height:1.4;'>⏳ Deadline: <span style='font-weight:700;'>" + str(deadline) + "</span></div>" if deadline else ""}
 
-        with colB:
-            if doc.get("pdf_url"):
-                st.markdown(f"[📄 View PDF]({doc['pdf_url']})")
+                    <div style="
+                        margin-top: 10px;
+                        font-size: 12px;
+                        color: rgba(255,255,255,0.55);
+                        line-height: 1.4;
+                    ">
+                        🕒 Updated: {fetched_label}
+                    </div>
+                </div>
 
-        # st.markdown("</div>", unsafe_allow_html=True)
-    # components.html(
-    #     """
-    #     <div style="
-    #         background: linear-gradient(
-    #             135deg,
-    #             rgba(255,255,255,0.08),
-    #             rgba(255,255,255,0.02)
-    #         );
-    #         backdrop-filter: blur(10px);
-    #         border: 1px solid rgba(255,255,255,0.12);
-    #         border-radius: 16px;
-    #         padding: 22px;
-    #         max-width: 520px;
-    #         margin: auto;
-    #         color: white;
-    #         font-family: Inter, sans-serif;
-    #     ">
-    #         <h4 style="margin-bottom: 16px;">Top 5 Highest Bids</h4>
-    #         <div style="line-height: 2.2; font-size: 15px;">
-    #             <b>1.</b> Metro Rail Project — ₹12.0 Cr<br>
-    #             <b>2.</b> Hospital Development — ₹9.5 Cr<br>
-    #             <b>3.</b> Telecom Infrastructure — ₹7.8 Cr<br>
-    #             <b>4.</b> Renewable Energy Plant — ₹6.5 Cr<br>
-    #             <b>5.</b> Highway Expansion — ₹5.0 Cr
-    #         </div>
-    #     </div>
-    #     """,
-    #     height=300
-    # )
+                <div style="min-width: 120px; display: flex; align-items: center;">
+                    {
+                        f'''
+                        <a href="{pdf_url}" target="_blank" style="
+                            display: inline-block;
+                            width: 100%;
+                            text-align: center;
+                            padding: 10px 12px;
+                            border-radius: 12px;
+                            background: rgba(255,255,255,0.12);
+                            border: 1px solid rgba(255,255,255,0.20);
+                            color: white;
+                            text-decoration: none;
+                            font-weight: 700;
+                            font-size: 13px;
+                            letter-spacing: 0.2px;
+                        ">
+                            📄 View PDF
+                        </a>
+                        ''' if pdf_url else
+                        '''
+                        <div style="
+                            width: 100%;
+                            text-align: center;
+                            padding: 10px 12px;
+                            border-radius: 12px;
+                            background: rgba(255,255,255,0.05);
+                            border: 1px solid rgba(255,255,255,0.10);
+                            color: rgba(255,255,255,0.55);
+                            font-weight: 700;
+                            font-size: 13px;
+                            letter-spacing: 0.2px;
+                        ">
+                            No PDF
+                        </div>
+                        '''
+                    }
+                </div>
+
+            </div>
+        </div>
+        """
+
+    scroll_html += "</div>"
+
+    components.html(scroll_html, height=400)

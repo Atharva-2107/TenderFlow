@@ -190,9 +190,8 @@ with col_login:
                         st.session_state["company_id"] = company_id
                         st.session_state["onboarding_complete"] = is_complete
 
-                        # --- DEBUGGING (Remove after fixing) ---
+                        # --- DEBUGGING
                         # st.error(f"DEBUG: Role={user_role}, CompID={company_id}, Complete={is_complete}")
-                        # -------------------------------------
 
                         # 3. PRIORITY CHECK: IS PROFILE DONE?
                         if is_complete:

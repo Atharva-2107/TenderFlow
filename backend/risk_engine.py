@@ -1,9 +1,9 @@
 import pdfplumber
 import re
 import torch
+import streamlit as st
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from torch.nn.functional import softmax
-from functools import lru_cache
 
 # ======================================================
 # MODEL CONFIG
@@ -11,10 +11,14 @@ from functools import lru_cache
 MODEL_NAME = "nlpaueb/legal-bert-base-uncased"
 LABELS = ["Financial", "Legal", "Payment", "Timeline", "Resource"]
 
+torch.set_num_threads(4)
+torch.backends.mkldnn.enabled = True
+
+
 # ======================================================
-# LOAD MODEL ONCE (SAFE)
+# STREAMLIT RESOURCE CACHE
 # ======================================================
-@lru_cache(maxsize=1)
+@st.cache_resource(show_spinner="Loading AI Risk Engine...")
 def load_model():
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
     model = AutoModelForSequenceClassification.from_pretrained(
@@ -28,16 +32,14 @@ def load_model():
 tokenizer, model = load_model()
 
 # ======================================================
-# TEXT CLEANING
+# TEXT EXTRACTION
 # ======================================================
 def clean_extracted_text(text: str) -> str:
     text = re.sub(r"\(cid:\d+\)", " ", text)
     text = re.sub(r"\s+", " ", text)
     return text.strip()
 
-# ======================================================
-# PDF TEXT EXTRACTION
-# ======================================================
+
 def extract_text(uploaded_file):
     text = ""
     with pdfplumber.open(uploaded_file) as pdf:
@@ -47,43 +49,6 @@ def extract_text(uploaded_file):
                 text += t + "\n"
     return clean_extracted_text(text)
 
-# ======================================================
-# METADATA DETECTION
-# ======================================================
-METADATA_KEYWORDS = [
-    "bid number", "dated", "department name", "organisation name",
-    "office name", "bid document", "opening date", "closing date",
-    "emd", "tender notice", "eligibility"
-]
-
-def is_metadata_block(text: str) -> bool:
-    t = text.lower()
-
-    if any(k in t for k in METADATA_KEYWORDS):
-        return True
-
-    digit_ratio = sum(c.isdigit() for c in text) / max(len(text), 1)
-    alpha_ratio = sum(c.isalpha() for c in text) / max(len(text), 1)
-
-    if digit_ratio > 0.45 or alpha_ratio < 0.45:
-        return True
-
-    return False
-
-# ======================================================
-# CONTRACT CLAUSE DETECTION
-# ======================================================
-def looks_like_contract_clause(text: str) -> bool:
-    keywords = [
-        "liquidated", "damages", "penalty",
-        "terminate", "termination",
-        "indemnify", "indemnity",
-        "liability", "payment", "invoice",
-        "arbitration", "force majeure",
-        "governing law", "service level", "sla"
-    ]
-    t = text.lower()
-    return any(k in t for k in keywords)
 
 # ======================================================
 # CLAUSE SPLITTING
@@ -94,191 +59,235 @@ def split_clauses(text):
 
     for c in raw:
         c = c.strip()
-
-        if len(c) < 60:
+        if len(c) < 80:
             continue
         if not re.search(r"[a-zA-Z]{4,}", c):
             continue
-        if is_metadata_block(c) and not looks_like_contract_clause(c):
-            continue
-
         clauses.append(c)
 
     return clauses
 
+
 # ======================================================
-# SINGLE-DOMINANT AI CLASSIFICATION (KEY FIX)
+# AI GATE (PERFORMANCE)
 # ======================================================
-def classify_clause(text, threshold=0.18):
-    inputs = tokenizer(
-        text,
-        truncation=True,
-        padding=True,
-        max_length=512,
-        return_tensors="pt"
-    )
+HARD_KEYWORDS = [
+    "payment", "compensation", "fees", "charges",
+    "delay", "time", "completion", "schedule",
+    "penalty", "liquidated", "damages",
+    "terminate", "termination", "indemn",
+    "liability", "arbitration", "court",
+    "fsi", "tdr", "premium"
+]
 
-    with torch.no_grad():
-        outputs = model(**inputs)
 
-    probs = softmax(outputs.logits, dim=1)[0]
-
-    detections = []
-    for i, p in enumerate(probs):
-        conf = float(p)
-        if conf >= threshold:
-            detections.append((LABELS[i], conf))
-
-    return detections
+def requires_ai_analysis(text: str) -> bool:
+    t = text.lower()
+    return any(k in t for k in HARD_KEYWORDS) or len(t.split()) > 40
 
 
 # ======================================================
-# SEVERITY SCORING (UNCHANGED LOGIC)
+# PRIMARY AI CLASSIFICATION (1 label per clause)
+# ======================================================
+def classify_clauses_batch(texts, threshold=0.12, batch_size=8):
+    results = []
+
+    for i in range(0, len(texts), batch_size):
+        batch = texts[i:i + batch_size]
+
+        inputs = tokenizer(
+            batch,
+            truncation=True,
+            padding=True,
+            max_length=256,
+            return_tensors="pt"
+        )
+
+        with torch.inference_mode():
+            outputs = model(**inputs)
+
+        probs = softmax(outputs.logits, dim=1)
+
+        for text, row in zip(batch, probs):
+            best_idx = int(torch.argmax(row))
+            confidence = float(row[best_idx])
+
+            if confidence >= threshold:
+                results.append((text, LABELS[best_idx], confidence))
+            else:
+                results.append((text, None, 0.0))
+
+    return results
+
+
+# ======================================================
+# RISK EXPANSION (DOMAIN-AWARE)
+# ======================================================
+def expand_related_risks(primary_category, text):
+    t = text.lower()
+    risks = set()
+
+    if primary_category:
+        risks.add(primary_category)
+
+    PAYMENT_TERMS = [
+        "payment", "payments", "paid", "payable",
+        "compensation", "hardship", "displacement",
+        "corpus fund", "fees", "charges",
+        "gst", "stamp duty", "premium"
+    ]
+
+    TIMELINE_TERMS = [
+        "time schedule", "completion period",
+        "completion time", "within", "months",
+        "days", "delay", "milestone", "handover"
+    ]
+
+    FINANCIAL_TERMS = [
+        "liquidated", "penalty", "damages",
+        "cost", "expense", "fsi", "tdr", "fungible"
+    ]
+
+    LEGAL_TERMS = [
+        "terminate", "termination",
+        "indemn", "liability",
+        "arbitration", "court", "litigation"
+    ]
+
+    RESOURCE_TERMS = [
+        "manpower", "staff", "labour",
+        "equipment", "machinery"
+    ]
+
+    if any(k in t for k in PAYMENT_TERMS):
+        risks.add("Payment")
+
+    if any(k in t for k in TIMELINE_TERMS):
+        risks.add("Timeline")
+
+    if any(k in t for k in FINANCIAL_TERMS):
+        risks.add("Financial")
+
+    if any(k in t for k in LEGAL_TERMS):
+        risks.add("Legal")
+
+    if any(k in t for k in RESOURCE_TERMS):
+        risks.add("Resource")
+
+    return list(risks)
+
+
+# ======================================================
+# SEVERITY
 # ======================================================
 def severity_from_confidence(confidence, text):
     base = confidence * 100
     t = text.lower()
 
-    if "liquidated" in t or "damages" in t:
+    if "liquidated" in t or "penalty" in t:
         base += 30
+    if "delay" in t:
+        base += 20
     if "terminate" in t:
         base += 25
-    if "indemn" in t:
-        base += 20
-    if "payment" in t:
-        base += 10
-    if "delay" in t:
-        base += 10
+    if "compensation" in t or "payment" in t:
+        base += 15
 
     severity = min(int(base), 95)
 
     if severity >= 75:
-        status = "Critical"
+        return severity, "Critical"
     elif severity >= 45:
-        status = "Warning"
-    else:
-        status = "Low"
+        return severity, "Warning"
+    return severity, "Low"
 
-    return severity, status
 
 # ======================================================
-# RISK HIGHLIGHT EXTRACTION
+# HIGHLIGHT
 # ======================================================
-def extract_risk_highlight(clause, category):
-    sentences = re.split(r"(?<=[.;])\s+", clause)
+def extract_risk_highlight(text, category):
+    return text.strip()
 
-    KEY_PHRASES = {
-        "Financial": ["liquidated", "penalty", "damages"],
-        "Legal": ["terminate", "indemn", "liability", "arbitration"],
-        "Payment": ["payment", "invoice", "days"],
-        "Timeline": ["delay", "milestone", "uptime"],
-        "Resource": ["manpower", "staff", "equipment"]
-    }
-
-    for s in sentences:
-        if any(k in s.lower() for k in KEY_PHRASES.get(category, [])):
-            return s.strip()
-
-    return sentences[0].strip()
 
 # ======================================================
-# TRUE AI-DRIVEN EXPLANATION (CATEGORY-LED)
+# AI IMPACT
 # ======================================================
 def generate_ai_impact(category, text):
-    t = text.lower()
-
     if category == "Financial":
-        return (
-            "The clause imposes financial obligations or penalties that could "
-            "increase project cost if conditions are breached."
-        )
-
-    if category == "Timeline":
-        return (
-            "The clause links obligations to strict timelines, increasing exposure "
-            "to penalties or performance issues in case of delay."
-        )
-
-    if category == "Legal":
-        if "terminate" in t:
-            return (
-                "The clause allows contract termination under defined conditions, "
-                "which increases legal and commercial exposure."
-            )
-        if "indemn" in t or "liability" in t:
-            return (
-                "The clause transfers legal liability to one party, potentially "
-                "increasing litigation or compliance risk."
-            )
-        return (
-            "The clause defines enforceable legal rights and obligations that may "
-            "affect contract control or dispute outcomes."
-        )
-
+        return "The clause creates monetary exposure or cost escalation risk."
     if category == "Payment":
-        return (
-            "The clause governs payment structure or timelines, which may affect "
-            "cash flow and financial planning."
-        )
-
+        return "The clause imposes payment or compensation obligations."
+    if category == "Timeline":
+        return "The clause enforces delivery timelines that may trigger delays."
+    if category == "Legal":
+        return "The clause introduces legal liability or enforcement risk."
     if category == "Resource":
-        return (
-            "The clause places operational obligations related to manpower, "
-            "equipment, or service availability."
-        )
+        return "The clause imposes manpower or operational obligations."
+    return "The clause introduces contractual risk."
 
-    return "The clause introduces contractual obligations that may carry execution risk."
 
 # ======================================================
-# MAIN ENTRY POINT
+# MAIN ENTRY POINT (SENTENCE-LEVEL RISKS)
 # ======================================================
 def analyze_pdf(uploaded_file):
     text = extract_text(uploaded_file)
     clauses = split_clauses(text)
 
+    ai_candidates = [c for c in clauses if requires_ai_analysis(c)]
+    classified = classify_clauses_batch(ai_candidates)
+
     results = []
+    seen = set()  # prevent exact duplicates
 
-    for clause in clauses:
-        detections = classify_clause(clause)
+    for clause, primary_category, confidence in classified:
 
-        if not detections:
-            continue
+        # 🔑 SPLIT INTO SENTENCES = MULTIPLE RISKS PER CATEGORY
+        sentences = re.split(r"(?<=[.;])\s+", clause)
 
+        for sentence in sentences:
+            sentence = sentence.strip()
 
-        for category, confidence in detections:
+            if len(sentence) < 50:
+                continue
 
-            highlight = extract_risk_highlight(clause, category)
-            severity, status = severity_from_confidence(confidence, clause)
+            categories = expand_related_risks(primary_category, sentence)
 
-            results.append({
-                "category": category,
-                "clause": highlight[:90] + ("..." if len(highlight) > 90 else ""),
-                "content": highlight,
-                "severity": severity,
-                "status": status,
-                "impact": generate_ai_impact(category, clause),
-                "tag_class": f"tag-{category.lower()}"
-            })
+            for category in categories:
+                key = (category, sentence)
+                if key in seen:
+                    continue
+                seen.add(key)
 
+                severity, status = severity_from_confidence(confidence or 0.6, sentence)
 
-    # ==================================================
-    # BID DOCUMENT FALLBACK
-    # ==================================================
+                results.append({
+                    "category": category,
+                    "clause": sentence[:90] + ("..." if len(sentence) > 90 else ""),
+                    "content": sentence,
+                    "severity": severity,
+                    "status": status,
+                    "impact": generate_ai_impact(category, sentence),
+                    "tag_class": f"tag-{category.lower()}"
+                })
+
     if not results:
         return [{
             "category": "Financial",
             "clause": "Bid eligibility and administrative conditions detected",
-            "content": (
-                "The document primarily contains eligibility, experience, and "
-                "administrative requirements rather than enforceable contract clauses."
-            ),
+            "content": "The document mainly contains eligibility and administrative requirements.",
             "severity": 40,
             "status": "Warning",
-            "impact": (
-                "The document appears to be bid-focused. Contractual risk analysis "
-                "will be more meaningful on ATC, SLA, or final agreement documents."
-            ),
+            "impact": "Risk analysis is more effective on final contract or SLA documents.",
             "tag_class": "tag-financial"
         }]
 
-    return results
+    STATUS_WEIGHT = {"Critical": 3, "Warning": 2, "Low": 1}
+
+    def risk_score(r):
+        return r["severity"] * 1.5 + STATUS_WEIGHT.get(r["status"], 1) * 20
+
+    results.sort(key=risk_score, reverse=True)
+
+    # Return ONLY top 10 risks as a list
+    return results[:10]
+

@@ -1,3 +1,4 @@
+import streamlit as st
 from supabase import create_client
 import os
 
@@ -7,6 +8,7 @@ supabase = create_client(
 )
 
 
+@st.cache_data(ttl=15)
 def get_tenders():
     response = (
         supabase
@@ -17,11 +19,35 @@ def get_tenders():
     return response.data or []
 
 
+@st.cache_data(ttl=15)
 def get_bids():
     response = (
         supabase
         .table("bid_history")
         .select("*")
+        .execute()
+    )
+    return response.data or []
+
+
+@st.cache_data(ttl=15)
+def get_generated_tenders():
+    response = (
+        supabase
+        .table("generated_tenders")
+        .select("*")
+        .execute()
+    )
+    return response.data or []
+
+
+def get_pending_tenders():
+    """Fetch only pending tenders with minimal data - NOT cached for real-time updates"""
+    response = (
+        supabase
+        .table("generated_tenders")
+        .select("id, project_name, status")
+        .eq("status", "pending")
         .execute()
     )
     return response.data or []

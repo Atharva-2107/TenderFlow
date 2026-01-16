@@ -4,10 +4,11 @@ import numpy as np
 import plotly.express as px
 import streamlit.components.v1 as components
 import os
+import time
 from dotenv import load_dotenv
 from supabase import create_client
 from utils.auth import can_access
-from utils.queries import get_tenders, get_bids
+from utils.queries import get_tenders, get_bids, get_generated_tenders, get_pending_tenders
 import base64
 from pathlib import Path
 
@@ -156,14 +157,112 @@ div.block-container {
     font-weight: 600;
     margin: 22px 0 12px;
 }
+
+/* NOTIFICATION BANNER */
+.notification-container {
+    margin: 4px 0 12px 0;
+    width: 100%;
+}
+.notification-card-unified {
+    /* Sleek gradient background matching theme */
+    background: linear-gradient(
+        90deg,
+        rgba(30, 41, 59, 0.7) 0%,
+        rgba(15, 23, 42, 0.85) 100%
+    );
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    
+    /* Fine border for premium feel */
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-left: 3px solid #3b82f6; /* Accent line */
+    
+    /* Shape and Spacing */
+    border-radius: 12px;
+    padding: 10px 16px; /* Slightly tighter padding */
+    width: 100%;
+    
+    /* Shadow */
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 
+                0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    
+    /* Flex layout to align items nicely */
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    
+    animation: slideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideIn {
+    from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.notification-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+}
+
+.notification-icon {
+    font-size: 18px;
+    background: rgba(59, 130, 246, 0.15);
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    color: #cbd5e1;
+}
+
+.notification-text-group {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.notification-title {
+    color: #f1f5f9;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+}
+
+.notification-subtitle {
+    color: #94a3b8;
+    font-size: 11px;
+    font-weight: 500;
+}
+</style>
 </style>
 """, unsafe_allow_html=True)
 
 # st.markdown(""" <hr> """, unsafe_allow_html=True)
 
-#Data loading
+# ============================================================
+# PENDING ACTION HANDLER (Process Win/Lose BEFORE data fetch)
+# ============================================================
+if "pending_notification_action" in st.session_state:
+    action_data = st.session_state.pop("pending_notification_action")
+    project_name = action_data["project_name"]
+    status = action_data["status"]
+    
+    # Update DB
+    supabase.table("generated_tenders").update({"status": status}).eq("project_name", project_name).execute()
+    
+    # Clear cache to ensure fresh data
+    get_generated_tenders.clear()
+    
+    # Show toast feedback
+    st.toast(f"Marked '{project_name}' as {status.title()}!")
+
+# Data loading (NOW with fresh data if action was processed above)
 tenders = get_tenders()
-bids = get_bids()
+# bids = get_bids() # REMOVED: User requested to ignore bid_history
+generated_tenders = get_generated_tenders()
 
 # HEADER NAVIGATION
 left, center, right = st.columns([3, 6, 3])
@@ -233,22 +332,71 @@ with right:
                 st.session_state.clear()
                 st.switch_page("pages/loginPage.py")
 
+st.markdown(""" <hr> """, unsafe_allow_html=True)
 
-# st.markdown("</div>", unsafe_allow_html=True)
+# NOTIFICATION AREA - Uses optimized direct query for pending tenders
+pending_tenders = get_pending_tenders()  # Direct DB query, not cached for real-time updates
 
-# PAGE ROUTING
-# if st.session_state.page == "Profile":
-#     st.markdown("<div class='section-title'>Edit Profile</div>", unsafe_allow_html=True)
-#     st.text_input("Name")
-#     st.text_input("Email")
-#     st.button("Save Changes")
-#     st.stop()
+# Get unique pending tenders by project_name (show only one notification per project)
+seen_projects = set()
+unique_pending = []
+for t in pending_tenders:
+    proj = t.get("project_name", "Unnamed")
+    if proj not in seen_projects:
+        seen_projects.add(proj)
+        unique_pending.append(t)
 
-# if st.session_state.page == "Settings":
-#     st.markdown("<div class='section-title'>Settings</div>", unsafe_allow_html=True)
-#     st.toggle("Enable Notifications")
-#     st.toggle("Dark Mode")
-#     st.stop()
+# ACTION HANDLER REVERTED: Using standard buttons to prevent session loss.
+# (HTML links cause full page reload which kills st.session_state)
+
+if unique_pending:
+    st.markdown('<div class="notification-container">', unsafe_allow_html=True)
+    for tender in unique_pending:
+        tender_id = tender.get("id")
+        project_name = tender.get("project_name", "Unnamed Tender")
+        
+        # Use columns for layout
+        # Col 0: Text Card (Styled)
+        # Col 1: Win Button
+        # Col 2: Lose Button
+        
+        # We adjust layout to make buttons look "near" the text
+        notif_cols = st.columns([0.7, 0.15, 0.15])
+        
+        with notif_cols[0]:
+            st.markdown(f'''
+                <div class="notification-card-unified" style="border-top-right-radius: 4px; border-bottom-right-radius: 4px; margin-right: -10px;">
+                    <div class="notification-content">
+                        <div class="notification-icon">🔔</div>
+                        <div class="notification-text-group">
+                            <div class="notification-title">{project_name}</div>
+                            <div class="notification-subtitle">Decision Pending</div>
+                        </div>
+                    </div>
+                </div>
+            ''', unsafe_allow_html=True)
+            
+        with notif_cols[1]:
+            # Align vertical
+            st.markdown('<div style="height: 18px"></div>', unsafe_allow_html=True)
+            if st.button("✅ Won", key=f"win_{tender_id}", type="primary", use_container_width=True):
+                # Set pending action and rerun - action will be processed BEFORE data is fetched
+                st.session_state["pending_notification_action"] = {
+                    "project_name": project_name,
+                    "status": "won"
+                }
+                st.rerun()
+                
+        with notif_cols[2]:
+             st.markdown('<div style="height: 18px"></div>', unsafe_allow_html=True)
+             if st.button("❌ Lost", key=f"lose_{tender_id}", use_container_width=True):
+                # Set pending action and rerun - action will be processed BEFORE data is fetched
+                st.session_state["pending_notification_action"] = {
+                    "project_name": project_name,
+                    "status": "lost"
+                }
+                st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown(""" <hr> """, unsafe_allow_html=True)
 
@@ -291,83 +439,100 @@ def kpi(col, title, value):
         </div>
         """, unsafe_allow_html=True)
 
-#KPI dynamic
-total_bids = len(bids)
-won_bids = sum(1 for b in bids if b.get("won") is True)
+#KPI dynamic - Now tracking actual won/lost status
+unique_gen_tenders = len(set(g.get("project_name") for g in generated_tenders if g.get("project_name")))
+total_bids = unique_gen_tenders
 
-total_value_won = sum(
-    b.get("final_bid_amount", 0)
-    for b in bids
-    if b.get("won") is True
-)
+# Count won and lost by unique project names
+won_projects = set(g.get("project_name") for g in generated_tenders if g.get("status") == "won" and g.get("project_name"))
+lost_projects = set(g.get("project_name") for g in generated_tenders if g.get("status") == "lost" and g.get("project_name"))
 
-win_ratio = round(won_bids / max(total_bids, 1), 2)
-capture_ratio = round(won_bids / max(len(tenders), 1), 2)
+won_bids = len(won_projects)
+lost_bids = len(lost_projects)
+total_value_won = 0  # Could be calculated if value field exists
+
+# Calculate win/loss ratio as actual ratio string (e.g., "3:2")
+win_ratio_display = f"{won_bids}:{lost_bids}"
+
+capture_ratio = 0
 
 kpi(c1, "Project Value Won", f"₹{total_value_won/1e7:.2f} Cr")
-kpi(c2, "Win / Loss Ratio", win_ratio)
+kpi(c2, "Win / Loss Ratio", win_ratio_display)
 kpi(c3, "Capture Ratio", capture_ratio)
 kpi(c4, "Registered Opportunities", len(tenders))
 
 st.markdown("<div class='section-title'>Bid Activity (All Time)</div>", unsafe_allow_html=True)
 
-df = pd.DataFrame(bids)
+# Process Generated Tenders (Treat as Bids Submitted)
+gen_df = pd.DataFrame(generated_tenders)
 
-if df.empty:
+if gen_df.empty:
     st.info("No bid activity available")
+    # Stop earlier if purely empty
 else:
-    if "created_at" not in df.columns:
-        st.warning("Bid data missing 'created_at' field")
+    if "created_at" in gen_df.columns:
+        gen_df["created_at"] = pd.to_datetime(gen_df["created_at"], errors="coerce")
+        gen_df = gen_df.dropna(subset=["created_at"])
+        
+        # UNIQUE TENDER LOGIC: Drop duplicates by project_name to count 1 tender per project
+        if "project_name" in gen_df.columns:
+            gen_df = gen_df.sort_values("created_at") # Ensure we keep latest if duplicates
+            gen_df = gen_df.drop_duplicates(subset=["project_name"], keep="last")
+
+        # Map won status from the original data
+        status_map = {g.get("id"): g.get("status") for g in generated_tenders}
+        gen_df["won"] = gen_df["id"].apply(lambda x: 1 if status_map.get(x) == "won" else 0)
+        combined_df = gen_df[["created_at", "won", "id"]] # Select relevant cols
     else:
-        df["created_at"] = pd.to_datetime(df["created_at"], errors="coerce")
-        df = df.dropna(subset=["created_at"])
+        combined_df = pd.DataFrame()
 
-        # ✅ If all created_at were invalid -> show info instead of empty chart
-        if df.empty:
-            st.info("No bid activity available")
-            st.stop()
+    if combined_df.empty:
+        st.info("No valid activity data available")
+        st.stop()
 
-        # won -> 0/1 conversion
-        if "won" in df.columns:
-            df["won"] = df["won"].fillna(False)
-            df["won"] = df["won"].astype(str).str.lower().map({
-                "true": 1, "false": 0, "1": 1, "0": 0
-            }).fillna(0).astype(int)
-        else:
-            df["won"] = 0
+    combined_df["Month"] = combined_df["created_at"].dt.to_period("M").dt.to_timestamp()
 
-        df["Month"] = df["created_at"].dt.to_period("M").dt.to_timestamp()
+    activity_df = (
+        combined_df.groupby("Month", as_index=False)
+        .agg(
+            Bids_Submitted=("id", "count"),
+            Bids_Won=("won", "sum")
+        )
+        .sort_values("Month")
+    )
 
-        activity_df = (
-            df.groupby("Month", as_index=False)
-            .agg(
-                Bids_Submitted=("id", "count"),
-                Bids_Won=("won", "sum")
-            )
-            .sort_values("Month")
+    # ✅ Another safety check
+    if activity_df.empty:
+        st.info("No bid activity available")
+    else:
+        # VISUAL FIX: If only 1 data point, add a preceding 0 point to show a line from 0
+        if len(activity_df) == 1:
+            first_month = activity_df.iloc[0]["Month"]
+            prev_month = first_month - pd.DateOffset(months=1)
+            zero_row = pd.DataFrame({
+                "Month": [prev_month],
+                "Bids_Submitted": [0],
+                "Bids_Won": [0]
+            })
+            activity_df = pd.concat([zero_row, activity_df], ignore_index=True)
+
+        activity_df["Month_Label"] = activity_df["Month"].dt.strftime("%b %Y")
+
+        fig = px.line(
+            activity_df,
+            x="Month_Label",
+            y=["Bids_Submitted", "Bids_Won"],
+            markers=True
         )
 
-        # ✅ Another safety check
-        if activity_df.empty:
-            st.info("No bid activity available")
-        else:
-            activity_df["Month_Label"] = activity_df["Month"].dt.strftime("%b %Y")
+        fig.update_layout(
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            font_color="white",
+            legend_title_text=""
+        )
 
-            fig = px.line(
-                activity_df,
-                x="Month_Label",
-                y=["Bids_Submitted", "Bids_Won"],
-                markers=True
-            )
-
-            fig.update_layout(
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(0,0,0,0)",
-                font_color="white",
-                legend_title_text=""
-            )
-
-            st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, use_container_width=True)
 
 
 
@@ -402,11 +567,12 @@ with col1:
 with col2:
     st.markdown("<div class='section-title'>Top 5 Highest Bids</div>", unsafe_allow_html=True)
 
-    top_bids = sorted(
-        [b for b in bids if b.get("final_bid_amount") and b.get("tender_id")],
-        key=lambda x: x["final_bid_amount"],
-        reverse=True
-    )[:5]
+    top_bids = [] 
+    # sorted(
+    #     [b for b in bids if b.get("final_bid_amount") and b.get("tender_id")],
+    #     key=lambda x: x["final_bid_amount"],
+    #     reverse=True
+    # )[:5]
 
     if not top_bids:
         st.info("No bids available")

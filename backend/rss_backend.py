@@ -4,7 +4,10 @@ import time
 import re
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import urljoin
 
+import requests
+from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from supabase import create_client
 
@@ -12,6 +15,7 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
+from selenium.common.exceptions import TimeoutException, WebDriverException
 from webdriver_manager.chrome import ChromeDriverManager
 
 # ======================================================
@@ -30,22 +34,19 @@ if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
 supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
 # ======================================================
-# STRICT BID / REGULATION VALIDATION (CORE LOGIC)
+# VALIDATION LOGIC (UNCHANGED)
 # ======================================================
 
 def is_valid_bid_update(text: str, href: str) -> bool:
     text = (text or "").strip().lower()
     href = (href or "").lower()
 
-    # ---- 1. Reject empty / very short ----
     if len(text) < 15:
         return False
 
-    # ---- 2. Reject numeric counters ----
     if re.fullmatch(r"\d+", text):
         return False
 
-    # ---- 3. Reject UI / navigation noise ----
     UI_NOISE = [
         "active tenders", "bids", "search", "calendar",
         "closing today", "recent tenders", "dashboard",
@@ -62,7 +63,6 @@ def is_valid_bid_update(text: str, href: str) -> bool:
     if any(n in text for n in UI_NOISE):
         return False
 
-    # ---- 4. Strong regulatory / document signals ----
     STRONG_SIGNALS = [
         "corrigendum", "amendment", "addendum",
         "notification", "circular",
@@ -77,14 +77,13 @@ def is_valid_bid_update(text: str, href: str) -> bool:
     if any(s in text for s in STRONG_SIGNALS):
         return True
 
-    # ---- 5. URL-based confirmation (PDF / notice pages) ----
     if any(s in href for s in ["corrigendum", "amendment", "circular", "notification", "pdf"]):
         return True
 
     return False
 
 # ======================================================
-# TAGGING
+# TAGGING (UNCHANGED)
 # ======================================================
 
 def tag_update(text: str) -> str:
@@ -107,124 +106,154 @@ def hash_content(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 # ======================================================
-# SELENIUM SETUP
+# PDF LINK RESOLUTION (UNCHANGED)
+# ======================================================
+
+def resolve_pdf_url(page_url: str) -> str | None:
+    if page_url.lower().endswith(".pdf"):
+        return page_url
+
+    try:
+        resp = requests.get(page_url, timeout=10)
+        if resp.status_code != 200:
+            return None
+
+        soup = BeautifulSoup(resp.text, "html.parser")
+
+        for a in soup.find_all("a", href=True):
+            href = a["href"].strip()
+            if href.lower().endswith(".pdf"):
+                return urljoin(page_url, href)
+
+    except Exception:
+        pass
+
+    return None
+
+# ======================================================
+# SELENIUM – SAFE SETUP (UPDATED)
 # ======================================================
 
 def setup_driver():
     options = Options()
+
+    # 🔴 CRITICAL: prevents infinite page load hang
+    options.page_load_strategy = "eager"
+
     options.add_argument("--headless=new")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-blink-features=AutomationControlled")
+    options.add_argument("--window-size=1920,1080")
     options.add_argument(
         "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
     )
+
     service = Service(ChromeDriverManager().install())
-    return webdriver.Chrome(service=service, options=options)
+    driver = webdriver.Chrome(service=service, options=options)
+
+    driver.set_page_load_timeout(30)
+    driver.set_script_timeout(30)
+
+    return driver
+
+def safe_get(driver, url: str) -> bool:
+    try:
+        driver.get(url)
+        return True
+    except TimeoutException:
+        print(f"[TIMEOUT] {url}")
+        try:
+            driver.execute_script("window.stop();")
+        except Exception:
+            pass
+        return False
+    except WebDriverException as e:
+        print(f"[DRIVER ERROR] {e}")
+        return False
 
 # ======================================================
-# SCRAPERS (STRICT)
+# SCRAPERS (FIXED)
 # ======================================================
 
 def scrape_gem():
-    print("\n🌐 Scraping GeM (safe session handling)")
     url = "https://gem.gov.in/search/search_tender"
-    driver = setup_driver()
     entries = []
+    driver = setup_driver()
 
     try:
-        driver.get(url)
-        time.sleep(6)
+        if not safe_get(driver, url):
+            return entries
 
-        elements = driver.find_elements(By.XPATH, "//a[@href]")
+        time.sleep(3)
 
-        for elem in elements:
-            try:
-                title = elem.text.strip()
-                href = elem.get_attribute("href")
+        for elem in driver.find_elements(By.XPATH, "//a[@href]"):
+            title = elem.text.strip()
+            href = elem.get_attribute("href")
 
-                if not title or len(title) < 15:
-                    continue
-
-                if not is_valid_bid_update(title, href):
-                    continue
-
-                entries.append({
-                    "title": title,
-                    "summary": f"GeM Regulatory / Bid Update: {title}",
-                    "link": href,
-                    "source": "GeM Portal",
-                    "published": datetime.utcnow().isoformat()
-                })
-
-            except Exception:
+            if not title or not is_valid_bid_update(title, href):
                 continue
+
+            entries.append({
+                "title": title,
+                "summary": f"GeM Regulatory / Bid Update: {title}",
+                "link": href,
+                "source": "GeM Portal",
+                "published": datetime.utcnow().isoformat()
+            })
 
     finally:
         driver.quit()
 
-    print(f"✓ GeM accepted records: {len(entries)}")
     return entries
 
-
 def scrape_cppp():
-    print("\n🌐 Scraping CPP Portal (safe session handling)")
     url = "https://eprocure.gov.in/cppp/"
-    driver = setup_driver()
     entries = []
+    driver = setup_driver()
 
     try:
-        driver.get(url)
-        time.sleep(6)
+        if not safe_get(driver, url):
+            return entries
 
-        elements = driver.find_elements(By.XPATH, "//a[@href]")
+        time.sleep(3)
 
-        for elem in elements:
-            try:
-                title = elem.text.strip()
-                href = elem.get_attribute("href")
+        for elem in driver.find_elements(By.XPATH, "//a[@href]"):
+            title = elem.text.strip()
+            href = elem.get_attribute("href")
 
-                if not title or len(title) < 15:
-                    continue
-
-                # STRICT filtering (same as before)
-                if not is_valid_bid_update(title, href):
-                    continue
-
-                # IMPORTANT: store raw strings, not WebElements
-                entries.append({
-                    "title": title,
-                    "summary": f"CPPP Regulatory / Bid Update: {title}",
-                    "link": href,
-                    "source": "CPP Portal",
-                    "published": datetime.utcnow().isoformat()
-                })
-
-            except Exception:
+            if not title or not is_valid_bid_update(title, href):
                 continue
 
+            entries.append({
+                "title": title,
+                "summary": f"CPPP Regulatory / Bid Update: {title}",
+                "link": href,
+                "source": "CPP Portal",
+                "published": datetime.utcnow().isoformat()
+            })
+
     finally:
-        # 🔴 driver.quit ONLY after all data is extracted
         driver.quit()
 
-    print(f"✓ CPPP accepted records: {len(entries)}")
     return entries
 
 def scrape_maharashtra_etender():
     url = "https://mahatenders.gov.in"
-    driver = setup_driver()
     entries = []
+    driver = setup_driver()
 
     try:
-        driver.get(url)
-        time.sleep(6)
+        if not safe_get(driver, url):
+            return entries
 
-        links = driver.find_elements(By.XPATH, "//a[@href]")
+        time.sleep(3)
 
-        for elem in links:
+        for elem in driver.find_elements(By.XPATH, "//a[@href]"):
             title = elem.text.strip()
             href = elem.get_attribute("href")
 
-            if not is_valid_bid_update(title, href):
+            if not title or not is_valid_bid_update(title, href):
                 continue
 
             entries.append({
@@ -241,30 +270,29 @@ def scrape_maharashtra_etender():
     return entries
 
 # ======================================================
-# MAIN PIPELINE
+# MAIN PIPELINE (SAFE)
 # ======================================================
 
 def run_backend():
-    print("\n" + "=" * 80)
-    print("🚀 TenderFlow – BID DOCUMENTATION & REGULATION INGESTION")
-    print("=" * 80)
-
     all_entries = []
-    all_entries.extend(scrape_gem())
-    all_entries.extend(scrape_cppp())
-    all_entries.extend(scrape_maharashtra_etender())
 
-    print(f"\n📊 TOTAL VALID RECORDS FOUND: {len(all_entries)}")
+    for scraper in [scrape_gem, scrape_cppp, scrape_maharashtra_etender]:
+        try:
+            all_entries.extend(scraper())
+        except Exception as e:
+            print("[SCRAPER FAILED]", e)
 
-    inserted = 0
+    print(f"📊 TOTAL VALID RECORDS: {len(all_entries)}")
 
     for entry in all_entries:
         combined = f"{entry['title']} {entry['summary']}"
+        pdf_url = resolve_pdf_url(entry["link"])
 
         payload = {
             "title": entry["title"][:500],
             "summary": entry["summary"][:2000],
             "link": entry["link"],
+            "pdf_url": pdf_url,
             "source": entry["source"],
             "published_at": entry["published"],
             "content_hash": hash_content(combined),
@@ -276,13 +304,9 @@ def run_backend():
             .upsert(payload, on_conflict="content_hash") \
             .execute()
 
-        inserted += 1
-        print("➕ Inserted:", entry["title"][:90])
+        print("➕ Inserted:", entry["title"][:80])
 
-    print("\n" + "=" * 80)
     print("✅ INGESTION COMPLETE")
-    print(f"   INSERTED RECORDS: {inserted}")
-    print("=" * 80 + "\n")
 
 # ======================================================
 # ENTRY POINT

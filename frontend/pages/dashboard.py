@@ -226,30 +226,31 @@ with right:
     with r2:
         with st.popover("⚙", help="Account"):
             if st.button("👤 Profile"):
-                st.session_state.page = "Profile"
-                st.experimental_rerun()
+                st.switch_page("pages/profile.py")
+
             if st.button("⚙ Settings"):
-                st.session_state.page = "Settings"
-                st.experimental_rerun()
+                st.switch_page("pages/settings.py")
+
             if st.button("⎋ Logout"):
                 st.session_state.clear()
-                st.experimental_rerun()
+                st.switch_page("pages/loginPage.py")
+
 
 # st.markdown("</div>", unsafe_allow_html=True)
 
 # PAGE ROUTING
-if st.session_state.page == "Profile":
-    st.markdown("<div class='section-title'>Edit Profile</div>", unsafe_allow_html=True)
-    st.text_input("Name")
-    st.text_input("Email")
-    st.button("Save Changes")
-    st.stop()
+# if st.session_state.page == "Profile":
+#     st.markdown("<div class='section-title'>Edit Profile</div>", unsafe_allow_html=True)
+#     st.text_input("Name")
+#     st.text_input("Email")
+#     st.button("Save Changes")
+#     st.stop()
 
-if st.session_state.page == "Settings":
-    st.markdown("<div class='section-title'>Settings</div>", unsafe_allow_html=True)
-    st.toggle("Enable Notifications")
-    st.toggle("Dark Mode")
-    st.stop()
+# if st.session_state.page == "Settings":
+#     st.markdown("<div class='section-title'>Settings</div>", unsafe_allow_html=True)
+#     st.toggle("Enable Notifications")
+#     st.toggle("Dark Mode")
+#     st.stop()
 
 st.markdown(""" <hr> """, unsafe_allow_html=True)
 

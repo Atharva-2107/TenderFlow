@@ -449,12 +449,19 @@ st.markdown("<div class='section-title'>Regulatory & Bid Documentation Updates</
 
 try:
     response = (
-        supabase.table("tender_documents")
-        .select("source, tender_no, document_type, structured_data, pdf_url, fetched_at")
-        .order("fetched_at", desc=True)
-        .limit(15)
-        .execute()
-    )
+    supabase.table("regulation_updates")
+    .select("""
+        title,
+        tag,
+        source,
+        link,
+        fetched_at
+    """)
+    .order("fetched_at", desc=True)
+    .limit(15)
+    .execute()
+)
+
     updates = response.data or []
 except Exception:
     updates = []
@@ -481,9 +488,9 @@ else:
 
     for doc in updates:
         source = doc.get("source", "Unknown Source")
-        tender_no = doc.get("tender_no", None)
-        doc_type = doc.get("document_type", "Document")
-        pdf_url = doc.get("pdf_url", None)
+        tender_no = doc.get("title", None)
+        doc_type = doc.get("tag", "Document")
+        pdf_url = doc.get("link", None)
         fetched_at = doc.get("fetched_at", "")
 
         structured = doc.get("structured_data") or {}
@@ -520,7 +527,7 @@ else:
                         Source: <span style="font-weight: 600; color: rgba(255,255,255,0.92);">{source}</span>
                     </div>
 
-                    {"<div style='margin-top:8px; font-size:13px; color: rgba(255,255,255,0.9); line-height:1.4;'>🆔 Tender No: <span style='font-family: monospace; font-size: 13px; color: rgba(255,255,255,0.95);'>" + str(tender_no) + "</span></div>" if tender_no else ""}
+                    {"<div style='margin-top:8px; font-size:13px; color: rgba(255,255,255,0.9); line-height:1.4;'>🆔 Name: <span style='font-family: monospace; font-size: 13px; color: rgba(255,255,255,0.95);'>" + str(tender_no) + "</span></div>" if tender_no else ""}
 
                     {"<div style='margin-top:6px; font-size:13px; color: rgba(255,255,255,0.92); line-height:1.4;'>⏳ Deadline: <span style='font-weight:700;'>" + str(deadline) + "</span></div>" if deadline else ""}
 

@@ -14,33 +14,33 @@ from dotenv import load_dotenv
 if "strategy_saved" not in st.session_state:
     st.session_state.strategy_saved = False
 
-def get_company_id(supabase):
-    """
-    Fetch company_id that belongs to the currently authenticated user.
-    """
+# def get_company_id(supabase):
+#     """
+#     Fetch company_id that belongs to the currently authenticated user.
+#     """
 
-    try:
-        auth = supabase.auth.get_user()
-        if not auth or not auth.user:
-            return None
+#     try:
+#         auth = supabase.auth.get_user()
+#         if not auth or not auth.user:
+#             return None
 
-        user_id = auth.user.id
+#         user_id = auth.user.id
 
-        # Query profiles table which links users to companies
-        res = (
-            supabase
-            .table("profiles")
-            .select("company_id")
-            .eq("id", user_id)
-            .single()
-            .execute()
-        )
+#         # Query profiles table which links users to companies
+#         res = (
+#             supabase
+#             .table("profiles")
+#             .select("company_id")
+#             .eq("id", user_id)
+#             .single()
+#             .execute()
+#         )
 
-        return res.data["company_id"] if res.data else None
+#         return res.data["company_id"] if res.data else None
 
-    except Exception as e:
-        st.error(f"Company lookup failed: {e}")
-        return None
+#     except Exception as e:
+#         st.error(f"Company lookup failed: {e}")
+#         return None
        
 # --- 1. PAGE CONFIGURATION (MUST BE FIRST) ---
 st.set_page_config(
@@ -620,6 +620,13 @@ def predict_win_api(prime_cost_rs, overhead_pct, profit_pct, estimated_budget_rs
         return max(0.05, min(0.95, prob))
 
 def bid_generation_page():
+    if not st.session_state.get("authenticated"):
+        st.error("Please login to continue.")
+        st.stop()
+
+    if not st.session_state.get("active_company_id"):
+        st.error("Company context missing. Please login again.")
+        st.stop()
     # --- MODERN STYLING (Original CSS) ---
     st.markdown("""
         <style>
@@ -917,14 +924,12 @@ def bid_generation_page():
 
         if st.button("💾 Save Strategy") and not st.session_state.strategy_saved:
             try:
-                company_id = get_company_id(supabase)
+                company_id = st.session_state["active_company_id"]
+                user_id = st.session_state.get("user_id")  # optional but useful later
 
-                if not company_id:
-                    st.error("❌ No company linked to this user.")
-                    st.stop()
-
-                res = supabase.table("bid_history").insert({
-                    "company_id": company_id,  # ✅ FK satisfied
+                res = supabase.table("bid_history_v2").insert({
+                    "company_id": company_id,
+                    "tender_id": st.session_state.tender_id,
                     "prime_cost": total_prime / 100000,
                     "overhead_pct": overhead_pct,
                     "profit_pct": profit_pct,
@@ -943,6 +948,7 @@ def bid_generation_page():
 
             except Exception as e:
                 st.error(f"Save failed: {e}")
+
         
         if st.button("🚀 Push Proposal", type="primary"):
             st.balloons()

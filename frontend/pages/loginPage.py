@@ -161,6 +161,7 @@ with col_login:
             c1, c2, c3 = st.columns([1, 1, 1])
             with c2:
                 submit = st.form_submit_button("Enter Portal", type="primary")
+
         if submit:
             if not email or not password:
                 st.error("Email and password are required")
@@ -169,29 +170,34 @@ with col_login:
                     res = supabase.auth.sign_in_with_password({
                         "email": email.strip(),
                         "password": password
-                        })
+                    })
+
                     if res.session:
                         # 1. SET BASIC SESSION
                         st.session_state["sb_session"] = res.session
                         st.session_state["user"] = res.user
                         st.session_state["authenticated"] = True
 
+                        # ✅ ADD THESE TWO LINES (CRITICAL FIX)
+                        st.session_state["user_id"] = res.user.id
+                        # (company_id set below after profile fetch)
+
                         # 2. FETCH PROFILE DATA
-                        prof_query = supabase.table("profiles").select("role, company_id, onboarding_complete, onboarding_step").eq("id", res.user.id).execute()
-                        
+                        prof_query = supabase.table("profiles").select(
+                            "role, company_id, onboarding_complete, onboarding_step"
+                        ).eq("id", res.user.id).execute()
+
                         user_data = prof_query.data[0] if prof_query.data else {}
-                        
-                        user_role = user_data.get('role', "Team Member")
-                        company_id = user_data.get('company_id')
-                        is_complete = bool(user_data.get('onboarding_complete', False))
-                        current_step = int(user_data.get('onboarding_step', 1))
-                        
+
+                        user_role = user_data.get("role", "Team Member")
+                        company_id = user_data.get("company_id")
+                        is_complete = bool(user_data.get("onboarding_complete", False))
+                        current_step = int(user_data.get("onboarding_step", 1))
+
                         st.session_state["user_role"] = user_role
                         st.session_state["company_id"] = company_id
+                        st.session_state["active_company_id"] = company_id  # ✅ ADD THIS
                         st.session_state["onboarding_complete"] = is_complete
-
-                        # --- DEBUGGING
-                        # st.error(f"DEBUG: Role={user_role}, CompID={company_id}, Complete={is_complete}")
 
                         # 3. PRIORITY CHECK: IS PROFILE DONE?
                         if is_complete:
@@ -204,18 +210,25 @@ with col_login:
                         company_onboarded = False
                         if company_id:
                             try:
-                                comp_query = supabase.table("company_information").select("id", count="exact").eq("company_id", company_id).execute()
-                                if comp_query.data: 
+                                comp_query = supabase.table(
+                                    "company_information"
+                                ).select("id", count="exact").eq(
+                                    "company_id", company_id
+                                ).execute()
+                                if comp_query.data:
                                     company_onboarded = True
                             except:
                                 pass
 
                         if company_onboarded:
-                            # Auto-update profile so next login is faster
                             try:
-                                supabase.table("profiles").update({"onboarding_complete": True, "onboarding_step": 999}).eq("id", res.user.id).execute()
-                            except: pass
-                            
+                                supabase.table("profiles").update({
+                                    "onboarding_complete": True,
+                                    "onboarding_step": 999
+                                }).eq("id", res.user.id).execute()
+                            except:
+                                pass
+
                             st.session_state["onboarding_complete"] = True
                             st.success("Company Verified.")
                             time.sleep(0.5)
@@ -223,9 +236,8 @@ with col_login:
                             st.stop()
 
                         # 5. IF WE ARE HERE, ONBOARDING IS INCOMPLETE
-                        # Decide based on Role
                         admin_roles = ["Executive", "Bid Manager", "Admin"]
-                        
+
                         if user_role in admin_roles:
                             st.warning(f"Setup incomplete. Resuming Step {current_step}...")
                             time.sleep(1)
@@ -234,9 +246,7 @@ with col_login:
                             else:
                                 st.switch_page("pages/informationCollection_1.py")
                         else:
-                            # *** FIX IS HERE ***
-                            # Force completion flag for Team Members so Dashboard doesn't kick them out
-                            st.session_state["onboarding_complete"] = True 
+                            st.session_state["onboarding_complete"] = True
                             st.info(f"Welcome {user_role}. Redirecting to Dashboard (View Only)...")
                             time.sleep(1.5)
                             st.switch_page("pages/dashboard.py")
@@ -246,7 +256,7 @@ with col_login:
 
                 except Exception as e:
                     st.error(f"Login failed: {str(e)}")
-        
+
         # NAVIGATION LINK
         st.markdown("""
             <div style="text-align:center; margin-top:4px;">
@@ -264,7 +274,6 @@ with col_login:
             </div>
         """, unsafe_allow_html=True)
 
-        # REDIRECTION LOGIC
         if st.query_params.get("go_signUp") == "true":
             st.query_params.clear()
             st.switch_page("pages/signupPage.py")

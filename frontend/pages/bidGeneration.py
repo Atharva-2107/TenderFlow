@@ -13,7 +13,35 @@ from dotenv import load_dotenv
 
 if "strategy_saved" not in st.session_state:
     st.session_state.strategy_saved = False
-    
+
+def get_company_id(supabase):
+    """
+    Fetch company_id that belongs to the currently authenticated user.
+    """
+
+    try:
+        auth = supabase.auth.get_user()
+        if not auth or not auth.user:
+            return None
+
+        user_id = auth.user.id
+
+        # Query profiles table which links users to companies
+        res = (
+            supabase
+            .table("profiles")
+            .select("company_id")
+            .eq("id", user_id)
+            .single()
+            .execute()
+        )
+
+        return res.data["company_id"] if res.data else None
+
+    except Exception as e:
+        st.error(f"Company lookup failed: {e}")
+        return None
+       
 # --- 1. PAGE CONFIGURATION (MUST BE FIRST) ---
 st.set_page_config(
     page_title="TenderFlow | AI Bid Suite",
@@ -244,6 +272,75 @@ def extract_billable_items(text):
         st.error(f"Groq failed: {e}")
         return []     
 
+def auto_fill_rates(boq_items, tender_text):
+    if not os.getenv("GROQ_API_KEY"):
+        return boq_items
+
+    priced_items = []
+
+    for item in boq_items:
+        task = item["Task"]
+
+        prompt = f"""
+You are an Indian procurement & tender costing expert.
+
+Determine a realistic **Indian local market rate** for the item below.
+
+Rules:
+- Decide whether the item is MATERIAL or SERVICE
+- Assume quantity = 1
+- Use Indian market norms (2024–2025)
+- Rate MUST be a single number in INR
+- NO ranges, NO explanation
+- If unsure, give your best expert estimate
+
+Return STRICT JSON only:
+
+{{
+  "rate": 12345
+}}
+
+Item:
+"{task}"
+
+Tender context (for scale only):
+{tender_text[:1500]}
+"""
+
+        rate = 0
+
+        try:
+            response = requests.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {os.getenv('GROQ_API_KEY')}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": "llama-3.1-8b-instant",
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": 0.2
+                },
+                timeout=25
+            )
+
+            data = response.json()
+            raw = data["choices"][0]["message"]["content"]
+
+            parsed = safe_json_parse(raw)
+            if isinstance(parsed, dict) and "rate" in parsed:
+                rate = int(parsed["rate"])
+
+        except Exception as e:
+            rate = 0
+
+        priced_items.append({
+            "Task": task,
+            "Qty": 1,
+            "Rate": rate
+        })
+
+    return priced_items
 # def auto_fill_rates(boq_items, tender_text):
 #     if not os.getenv("GROQ_API_KEY"):
 #         return boq_items
@@ -315,73 +412,75 @@ def extract_billable_items(text):
 
 #     return priced_items
 
-def auto_fill_rates(boq_items, tender_text):
-    if not os.getenv("GROQ_API_KEY"):
-        return boq_items
 
-    priced_items = []
+# was currently using 
+# def auto_fill_rates(boq_items, tender_text):
+#     if not os.getenv("GROQ_API_KEY"):
+#         return boq_items
 
-    for item in boq_items:
-        task = item["Task"]
+#     priced_items = []
 
-        prompt = f"""
-You are an Indian tender costing expert.
+#     for item in boq_items:
+#         task = item["Task"]
 
-Your job:
-- Decide whether the item is a MATERIAL or a SERVICE
-- Estimate a realistic Indian market rate in INR
+#         prompt = f"""
+# You are an Indian tender costing expert.
 
-Pricing rules:
-- If MATERIAL:
-  • Use Indian market supply rate
-  • Example: cement, steel, cables, pipes, equipment
-- If SERVICE / CHARGE:
-  • Use professional, logistics, statutory, or compensation rates
-- Assume unit quantity = 1
-- Rate must NOT be zero
-- No flat pricing across items
-- No explanations
+# Your job:
+# - Decide whether the item is a MATERIAL or a SERVICE
+# - Estimate a realistic Indian market rate in INR
 
-Return ONLY a single number (INR).
+# Pricing rules:
+# - If MATERIAL:
+#   • Use Indian market supply rate
+#   • Example: cement, steel, cables, pipes, equipment
+# - If SERVICE / CHARGE:
+#   • Use professional, logistics, statutory, or compensation rates
+# - Assume unit quantity = 1
+# - Rate must NOT be zero
+# - No flat pricing across items
+# - No explanations
 
-Tender item:
-"{task}"
+# Return ONLY a single number (INR).
 
-Tender context:
-{tender_text[:2000]}
-"""
+# Tender item:
+# "{task}"
 
-        try:
-            response = requests.post(
-                "https://api.groq.com/openai/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {os.getenv('GROQ_API_KEY')}",
-                    "Content-Type": "application/json"
-                },
-                json={
-                    "model": "llama-3.1-8b-instant",
-                    "messages": [{"role": "user", "content": prompt}],
-                    "temperature": 0.25
-                },
-                timeout=20
-            )
+# Tender context:
+# {tender_text[:2000]}
+# """
 
-            data = response.json()
-            raw = data["choices"][0]["message"]["content"].strip()
+#         try:
+#             response = requests.post(
+#                 "https://api.groq.com/openai/v1/chat/completions",
+#                 headers={
+#                     "Authorization": f"Bearer {os.getenv('GROQ_API_KEY')}",
+#                     "Content-Type": "application/json"
+#                 },
+#                 json={
+#                     "model": "llama-3.1-8b-instant",
+#                     "messages": [{"role": "user", "content": prompt}],
+#                     "temperature": 0.25
+#                 },
+#                 timeout=20
+#             )
 
-            match = re.search(r"\d[\d,]*", raw)
-            rate = int(match.group().replace(",", "")) if match else 0
+#             data = response.json()
+#             raw = data["choices"][0]["message"]["content"].strip()
 
-        except Exception:
-            rate = 0
+#             match = re.search(r"\d[\d,]*", raw)
+#             rate = int(match.group().replace(",", "")) if match else 0
 
-        priced_items.append({
-            "Task": task,
-            "Qty": 1,
-            "Rate": rate
-        })
+#         except Exception:
+#             rate = 0
 
-    return priced_items
+#         priced_items.append({
+#             "Task": task,
+#             "Qty": 1,
+#             "Rate": rate
+#         })
+
+#     return priced_items
 
 # also originally defined here
 
@@ -665,12 +764,13 @@ def bid_generation_page():
                         st.session_state.complexity_score = int(complexity_score)
 
                         # Original Database Logic
-                        supabase.table("tenders").insert({
+                        res = supabase.table("tenders").insert({
                             "authority_name": uploaded_tender.name,
                             "estimated_budget": tender_data["estimated_budget"],
                             "complexity_score": int(complexity_score),
                         }).execute()
-
+                        tender_id = res.data[0]["id"]
+                        st.session_state.tender_id = tender_id
                         st.session_state.extraction_done = True
                         st.rerun()
 
@@ -817,60 +917,29 @@ def bid_generation_page():
 
         if st.button("💾 Save Strategy") and not st.session_state.strategy_saved:
             try:
-                # 1. Get User and Company Context
-                user = st.session_state.get("user")
-                user_id = user.id if user else None
-                
-                company_id = st.session_state.get("company_id")
-                if not company_id and user_id:
-                    # Fallback fetch
-                    resp = supabase.table("profiles").select("company_id").eq("id", user_id).maybe_single().execute()
-                    if resp.data:
-                        company_id = resp.data.get("company_id")
-                        st.session_state["company_id"] = company_id
-                        
-                # 2. Link to Generated Tender (Notification)
-                project_name = "Untitled Bid"
-                if st.session_state.tender_data and "project_name" in st.session_state.tender_data:
-                    project_name = st.session_state.tender_data["project_name"]
-                
-                gen_id = None
-                # Check if tender exists in generated_tenders
-                existing_tender = supabase.table("generated_tenders").select("id").eq("project_name", project_name).execute()
-                
-                if existing_tender.data:
-                    gen_id = existing_tender.data[0]['id']
-                else:
-                    # Create new entry for dashboard notification
-                    gen_res = supabase.table("generated_tenders").insert({
-                        "project_name": project_name,
-                        "status": "Open",
-                        "user_id": user_id,
-                        # Fill required fields with placeholders for Bid Strategy
-                        "content": "Bid Strategy Only"
-                    }).execute()
-                    if gen_res.data:
-                        gen_id = gen_res.data[0]['id']
+                company_id = get_company_id(supabase)
 
-                # 3. Save Bid History
+                if not company_id:
+                    st.error("❌ No company linked to this user.")
+                    st.stop()
+
                 res = supabase.table("bid_history").insert({
-                    "company_id": company_id,
-                    "tender_id": gen_id,
+                    "company_id": company_id,  # ✅ FK satisfied
                     "prime_cost": total_prime / 100000,
                     "overhead_pct": overhead_pct,
-                    "profit_pct": profit_pct,  # Save user's actual selection
+                    "profit_pct": profit_pct,
                     "competitor_density": competitor_density,
-                    "complexity_score": st.session_state.complexity_score, # Dynamic Score
-                    "final_bid_amount": live_bid / 100000,  # Save user's actual bid
-                    "win_probability": live_win_prob,  # Save user's actual win prob
-                    "won": None # Will be updated via Dashboard
+                    "complexity_score": st.session_state.complexity_score,
+                    "final_bid_amount": live_bid / 100000,
+                    "win_probability": live_win_prob,
+                    "won": None
                 }).execute()
 
                 if res.data:
                     st.session_state.strategy_saved = True
                     st.toast("✅ Strategy saved successfully")
                 else:
-                    st.error("❌ Database insert failed")
+                    st.error("❌ Insert returned no data")
 
             except Exception as e:
                 st.error(f"Save failed: {e}")

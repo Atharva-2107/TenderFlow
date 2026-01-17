@@ -498,7 +498,7 @@ with f6:
 
 
 # KPI SECTION
-c1, c2, c3 = st.columns(3)
+c1, c2, c3, c4 = st.columns(4)
 
 def kpi(col, title, value):
     with col:
@@ -534,7 +534,8 @@ capture_ratio_display = f"{capture_ratio_val:.1f}%"
 
 kpi(c1, "Project Value Won", "₹3.40 Cr")
 kpi(c2, "Win / Loss Ratio", win_ratio_display)
-kpi(c3, "Registered Opportunities", len(tenders))
+kpi(c3, "Capture Ratio", capture_ratio_display)
+kpi(c4, "Registered Opportunities", len(tenders))
 
 st.markdown("<div class='section-title'>Bid Activity (All Time)</div>", unsafe_allow_html=True)
 

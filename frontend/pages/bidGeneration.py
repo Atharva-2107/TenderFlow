@@ -10,6 +10,15 @@ import os
 from PyPDF2 import PdfReader
 from supabase import create_client
 from dotenv import load_dotenv
+import base64
+from pathlib import Path
+from utils.auth import can_access
+
+def get_base64_of_bin_file(path):
+    if os.path.exists(path):
+        with open(path, "rb") as f:
+            return base64.b64encode(f.read()).decode()
+    return None
 
 if "strategy_saved" not in st.session_state:
     st.session_state.strategy_saved = False
@@ -629,39 +638,413 @@ def bid_generation_page():
         st.stop()
     # --- MODERN STYLING (Original CSS) ---
     st.markdown("""
-        <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=JetBrains+Mono:wght@400;700&display=swap');
-        .stApp { background-color: #09090B; color: #FAFAFA; font-family: 'Inter', sans-serif; }
-        .glass-card {
-            background: rgba(24, 24, 27, 0.8);
-            border-radius: 16px;
-            padding: 24px;
-            border: 1px solid rgba(63, 63, 70, 0.5);
-            margin-bottom: 20px;
-        }
-        .bid-box {
-            background: linear-gradient(135deg, #6D28D9 0%, #4C1D95 100%);
-            border-radius: 16px;
-            padding: 32px;
-            text-align: center;
-            box-shadow: 0 0 30px rgba(139, 92, 246, 0.2);
-            border: 1px solid rgba(167, 139, 250, 0.3);
-        }
-        .bid-price {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 3.2rem;
-            font-weight: 700;
-            color: #FFFFFF;
-            letter-spacing: -2px;
-        }
-        .label-text { color: #A1A1AA; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; }
-        .stButton>button { border-radius: 10px; background-color: #7C3AED; color: white; border: none; font-weight: 600; width: 100%; }
-        header, footer { visibility: hidden; }
-        </style>
-    """, unsafe_allow_html=True)
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap');
 
+:root{
+    --bg1: #1a1c4b;
+    --bg2: #0f111a;
+    --card: rgba(24, 24, 27, 0.82);
+    --card2: rgba(18, 18, 22, 0.72);
+    --border: rgba(255, 255, 255, 0.10);
+    --border2: rgba(168, 85, 247, 0.22);
+    --text: #F4F4F5;
+    --muted: rgba(244, 244, 245, 0.65);
+    --muted2: rgba(244, 244, 245, 0.45);
+    --accent: #A855F7;
+    --accent2: rgba(168, 85, 247, 0.18);
+    --shadow: 0 18px 45px rgba(0,0,0,0.35);
+    --shadowSoft: 0 10px 25px rgba(0,0,0,0.25);
+    --radius: 18px;
+}
+
+html, body, [class*="css"] {
+    font-family: 'Inter', sans-serif !important;
+    color: var(--text) !important;
+}
+
+/* Streamlit App Background */
+.stApp {
+    background: radial-gradient(circle at 20% 30%, var(--bg1) 0%, var(--bg2) 100%) !important;
+}
+
+/* Hide default Streamlit header/footer */
+header { visibility: hidden; }
+footer { visibility: hidden; }
+
+/* Reduce top padding */
+div.block-container {
+    padding-top: 0.6rem !important;
+    padding-bottom: 2.2rem !important;
+}
+
+/* ====== Global Typography ====== */
+h1, h2, h3, h4 {
+    letter-spacing: -0.02em !important;
+    font-weight: 700 !important;
+    color: var(--text) !important;
+}
+
+p, label, div {
+    color: var(--text) !important;
+}
+small, .stCaption, .stMarkdown p {
+    color: var(--muted) !important;
+}
+
+/* ====== Header Nav Container ====== */
+.header-nav {
+    background: linear-gradient(
+        135deg,
+        rgba(255,255,255,0.10),
+        rgba(255,255,255,0.03)
+    );
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 18px;
+    margin-bottom: 18px;
+    box-shadow: var(--shadowSoft);
+    backdrop-filter: blur(12px);
+}
+
+/* ====== Cards ====== */
+.glass-card {
+    background: transparent !important;
+    border-radius: var(--radius);
+    padding: 10px 10px;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadowSoft);
+    margin-bottom: 18px;
+    position: relative;
+    overflow: hidden;
+}
+
+.glass-card:before{
+    content:"";
+    position:absolute;
+    inset:0;
+    background: radial-gradient(circle at 20% 10%, var(--accent2) 0%, transparent 55%);
+    pointer-events:none;
+}
+
+/* ====== Premium Bid Box ====== */
+.bid-box {
+    background: linear-gradient(135deg, rgba(168, 85, 247, 0.35) 0%, rgba(15, 17, 26, 0.9) 55%, rgba(168, 85, 247, 0.18) 100%);
+    border-radius: 22px;
+    padding: 28px 26px;
+    text-align: center;
+    box-shadow: 0 22px 55px rgba(168, 85, 247, 0.15);
+    border: 1px solid rgba(168, 85, 247, 0.28);
+    position: relative;
+    overflow: hidden;
+}
+
+.bid-box:after{
+    content:"";
+    position:absolute;
+    width: 420px;
+    height: 420px;
+    top: -250px;
+    left: -250px;
+    background: radial-gradient(circle, rgba(168, 85, 247, 0.35) 0%, transparent 60%);
+    filter: blur(2px);
+    pointer-events:none;
+}
+
+/* Big Price */
+.bid-price {
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 3.1rem;
+    font-weight: 700;
+    color: #FFFFFF !important;
+    letter-spacing: -1.5px;
+    margin-top: 6px;
+    margin-bottom: 6px;
+}
+
+/* Labels */
+.label-text {
+    color: var(--muted2) !important;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+}
+
+/* ====== Buttons (Global) ====== */
+.stButton>button {
+    width: 100%;
+    border-radius: 14px !important;
+    border: 1px solid rgba(168, 85, 247, 0.25) !important;
+    background: linear-gradient(135deg, rgba(168, 85, 247, 0.95) 0%, rgba(124, 58, 237, 0.85) 100%) !important;
+    color: white !important;
+    font-weight: 700 !important;
+    font-size: 0.95rem !important;
+    padding: 0.7rem 1rem !important;
+    box-shadow: 0 14px 35px rgba(168, 85, 247, 0.22) !important;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border 0.15s ease;
+}
+
+.stButton>button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 18px 40px rgba(168, 85, 247, 0.28) !important;
+    border: 1px solid rgba(168, 85, 247, 0.45) !important;
+}
+
+.stButton>button:active {
+    transform: translateY(0px) scale(0.99);
+}
+
+/* Disabled buttons */
+.stButton>button:disabled {
+    opacity: 0.55 !important;
+    cursor: not-allowed !important;
+    box-shadow: none !important;
+}
+
+/* ====== Sliders / Inputs ====== */
+.stSlider label, .stSelectSlider label {
+    font-weight: 600 !important;
+    color: var(--muted) !important;
+}
+                
+div[data-testid="stSlider"] [data-baseweb="slider"] div[role="slider"]{
+    background-color: #FFFFFF !important;
+    border: 2px solid #FFFFFF !important;
+    box-shadow: 0 0 0 4px rgba(168, 85, 247, 0.20) !important; /* optional glow */
+}
+
+.stTextInput input, .stNumberInput input, .stTextArea textarea {
+    background: rgba(255,255,255,0.06) !important;
+    border: 1px solid rgba(255,255,255,0.10) !important;
+    border-radius: 12px !important;
+    color: var(--text) !important;
+}
+
+.stTextInput input:focus, .stNumberInput input:focus, .stTextArea textarea:focus {
+    border: 1px solid rgba(168, 85, 247, 0.55) !important;
+    box-shadow: 0 0 0 4px rgba(168, 85, 247, 0.15) !important;
+}
+
+/* ====== Data Editor Styling ====== */
+div[data-testid="stDataFrame"] {
+    border-radius: var(--radius) !important;
+    overflow: hidden !important;
+    border: 1px solid rgba(255,255,255,0.10) !important;
+    box-shadow: var(--shadowSoft);
+}
+
+div[data-testid="stDataFrame"] * {
+    font-size: 0.92rem !important;
+}
+
+/* ====== Divider ====== */
+hr {
+    border: none !important;
+    height: 1px !important;
+    background: linear-gradient(90deg, transparent, rgba(168,85,247,0.35), transparent) !important;
+    margin: 10px 0 18px 0 !important;
+}
+
+/* Track fill (progress) */
+div[data-testid="stSlider"] [data-baseweb="slider"] div > div > div{
+    background-color: var(--accent) !important;
+    border-radius: 10px 10px;
+}
+
+
+/* =========================
+   FIX 1: Right panel alignment
+   (Win chance / profit / bid / complexity)
+   ========================= */
+.tf-metric-grid{
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px 16px;
+    margin-top: 8px;
+    padding: 14px 14px;
+    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,0.10);
+    background: rgba(255,255,255,0.04);
+}
+
+.tf-metric-label{
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: var(--muted) !important;
+}
+
+.tf-metric-value{
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text) !important;
+    font-family: 'JetBrains Mono', monospace !important;
+    text-align: right;
+}
+
+.tf-metric-highlight{
+    grid-column: 1 / -1;
+    text-align: center;
+    margin-top: 6px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(168,85,247,0.22);
+    font-size: 1rem;
+    font-weight: 800;
+    color: var(--accent) !important;
+}
+                
+/* ====== Alerts look premium ====== */
+.stAlert {
+    border-radius: 14px !important;
+    border: 1px solid rgba(255,255,255,0.10) !important;
+    background: rgba(255,255,255,0.06) !important;
+    box-shadow: var(--shadowSoft);
+}
+
+/* Make markdown links accent */
+a {
+    color: var(--accent) !important;
+    text-decoration: none !important;
+}
+a:hover {
+    text-decoration: underline !important;
+}
+
+/* ====== Scrollbar (subtle premium) ====== */
+::-webkit-scrollbar {
+    width: 10px;
+}
+::-webkit-scrollbar-track {
+    background: rgba(255,255,255,0.04);
+}
+::-webkit-scrollbar-thumb {
+    background: rgba(168, 85, 247, 0.35);
+    border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(168, 85, 247, 0.55);
+}
+                
+/* Fix: stop HTML being displayed like code/text */
+.tf-metric-grid-wrap{
+    all: unset;
+    display: block;
+}
+
+.tf-metric-grid-wrap *{
+    white-space: normal !important;
+}
+
+
+</style>
+""", unsafe_allow_html=True)
+
+    # st.markdown("""
+    #     <style>
+    #     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=JetBrains+Mono:wght@400;700&display=swap');
+    #     .stApp { background: radial-gradient(circle at 20% 30%, #1a1c4b 0%, #0f111a 100%); color: #FAFAFA; font-family: 'Inter', sans-serif; }
+                
+    #     header { visibility: hidden; }
+
+    #     div.block-container {
+    #         padding-top: 0.3rem !important; 
+    #     }
+                
+    #     /* HEADER NAV CONTAINER */
+    #     .header-nav {
+    #         background: linear-gradient(
+    #             135deg,
+    #             rgba(255,255,255,0.08),
+    #             rgba(255,255,255,0.02)
+    #         );
+    #         backdrop-filter: blur(10px);
+    #         border: 1px solid rgba(255,255,255,0.12);
+    #         border-radius: 16px;
+    #         padding: 12px 18px;
+    #         margin-bottom: 22px;
+    #     }
+
+    #     .glass-card {
+    #         background: rgba(24, 24, 27, 0.8);
+    #         border-radius: 16px;
+    #         padding: 24px;
+    #         border: 1px solid rgba(63, 63, 70, 0.5);
+    #         margin-bottom: 20px;
+    #     }
+    #     .bid-box {
+    #         background: linear-gradient(135deg, #6D28D9 0%, #4C1D95 100%);
+    #         border-radius: 16px;
+    #         padding: 32px;
+    #         text-align: center;
+    #         box-shadow: 0 0 30px rgba(139, 92, 246, 0.2);
+    #         border: 1px solid rgba(167, 139, 250, 0.3);
+    #     }
+    #     .bid-price {
+    #         font-family: 'JetBrains Mono', monospace;
+    #         font-size: 3.2rem;
+    #         font-weight: 700;
+    #         color: #FFFFFF;
+    #         letter-spacing: -2px;
+    #     }
+    #     .label-text { color: #A1A1AA; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; }
+    #     .stButton>button { border-radius: 10px; background-color: #7C3AED; color: white; border: none; font-weight: 600; width: 100%; }
+    #     header, footer { visibility: hidden; }
+    #     </style>
+    # """, unsafe_allow_html=True)
+
+    # HEADER NAVIGATION
+    left, center = st.columns([3, 6])
+
+    with left:
+        logo_path = Path(__file__).resolve().parents[1] / "assets" / "logo.png"
+        logo = get_base64_of_bin_file(logo_path)
+
+        if logo:
+            st.markdown(f"""
+                <div style="display:flex; align-items:center;">
+                    <img src="data:image/png;base64,{logo}" width="200">
+                </div>
+            """, unsafe_allow_html=True)
+
+    with center:
+        header_cols = st.columns([3, 0.4, 0.4, 0.4, 0.4, 0.4])
+
+        with header_cols[1]:
+            if st.button("⊞", key="h_dash", help="Dashboard"):
+                st.switch_page("app.py")
+
+        with header_cols[2]:
+            if can_access("tender_generation"):
+                if st.button("⎘", key="h_gen", help="Tender Generation"):
+                    st.switch_page("pages/tenderGeneration.py")
+            else:
+                st.button("⎘", key="h_gen_disabled", disabled=True, help="Access restricted")
+
+
+        with header_cols[3]:
+            if can_access("tender_analysis"):
+                if st.button("◈", key="h_anl", help="Tender Analysis"):
+                    st.switch_page("pages/tenderAnalyser.py")
+            else:
+                st.button("◈", key="h_anl_disabled", disabled=True)
+
+        with header_cols[4]:
+            if can_access("bid_generation"):
+                if st.button("✦", key="h_bid", help="Bid Generation"):
+                    st.switch_page("pages/bidGeneration.py")
+            else:
+                st.button("✦", key="h_bid_disabled", disabled=True)
+
+        with header_cols[5]:
+            if can_access("risk_analysis"):
+                if st.button("⬈", key="h_risk", help="Risk Analysis"):
+                    st.switch_page("pages/riskAnalysis.py")
+            else:
+                st.button("⬈", key="h_risk_disabled", disabled=True)
+
+    st.markdown("<div> <hr> </div>", unsafe_allow_html=True)
     # --- HEADER ---
-    st.markdown("<h1 style='margin-bottom: 0;'>TenderFlow <span style='color: #A855F7;'>AI</span></h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='margin-bottom: 0;'>Bid <span style='color: #a855f7;'>Generation</span></h1>", unsafe_allow_html=True)
     st.markdown("<p style='color: #71717A;'>Smart Bid Generation & Optimization Engine</p>", unsafe_allow_html=True)
 
     # --- INITIALIZATION LOGIC (CENTERED UI) ---
@@ -895,13 +1278,13 @@ def bid_generation_page():
         ))
         st.plotly_chart(fig, use_container_width=True)
 
-        st.markdown(f"**Your Current Win Chance:** {live_win_prob*100:.2f}%")
-        st.markdown(f"**Your Selected Profit:** {profit_pct}%")
-        st.markdown(f"**AI Recommended Profit:** {ai_recommended_profit}%")
+        # st.markdown(f"**Your Current Win Chance:** {live_win_prob*100:.2f}%")
+        # st.markdown(f"**Your Selected Profit:** {profit_pct}%")
+        # st.markdown(f"**AI Recommended Profit:** {ai_recommended_profit}%")
         
-        st.markdown(f"<div style='text-align:center; font-weight:600; color:#A855F7;'>{live_win_prob*100:.2f}% Chance of Winning</div>", unsafe_allow_html=True) 
-        st.markdown(f"**Current Bid:** {format_inr(live_bid)}")
-        st.markdown(f"**Complexity Score:** {complexity_score}/10")
+        # st.markdown(f"<div style='text-align:center; font-weight:600; color:#A855F7;'>{live_win_prob*100:.2f}% Chance of Winning</div>", unsafe_allow_html=True) 
+        # st.markdown(f"**Current Bid:** {format_inr(live_bid)}")
+        # st.markdown(f"**Complexity Score:** {complexity_score}/10")
         
         # Dynamic Feedback based on USER'S current selection
         if live_win_prob > 0.8:
@@ -922,10 +1305,14 @@ def bid_generation_page():
         else:
             st.success("✅ **Your selection matches AI recommendation!**")
 
+
+        btn1, btn2 = st.columns([2,2])
+
+    with btn1:
         if st.button("💾 Save Strategy") and not st.session_state.strategy_saved:
             try:
                 company_id = st.session_state["active_company_id"]
-                user_id = st.session_state.get("user_id")  # optional but useful later
+                user_id = st.session_state.get("user_id")
 
                 res = supabase.table("bid_history_v2").insert({
                     "company_id": company_id,
@@ -949,9 +1336,10 @@ def bid_generation_page():
             except Exception as e:
                 st.error(f"Save failed: {e}")
 
-        
+    with btn2:
         if st.button("🚀 Push Proposal", type="primary"):
             st.balloons()
+
         st.markdown('</div>', unsafe_allow_html=True)
 
 if __name__ == "__main__":

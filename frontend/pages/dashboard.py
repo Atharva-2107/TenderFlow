@@ -708,7 +708,11 @@ with col1:
         )
 
 with col2:
-    st.markdown("<div class='section-title'>Top 5 Highest Bids</div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-title'>&nbsp;&nbsp;&nbsp;&nbsp;Top 5 Highest Bids</div>", unsafe_allow_html=True)
+
+    # ALIGNMENT FIX: Add invisible spacer to match the height of the Selectbox in Col 1
+    # Standard Selectbox is approx 42px + margin.
+    st.markdown("<div style='height: 54px;'></div>", unsafe_allow_html=True)
 
     # Fetch top 5 bids from bid_history_v2 ordered by final_bid_amount descending
     try:
@@ -754,16 +758,19 @@ with col2:
                 backdrop-filter: blur(10px);
                 border: 1px solid rgba(255,255,255,0.12);
                 border-radius: 16px;
-                padding: 22px;
+                padding: 16px 20px;
                 color: white;
                 font-family: Inter, sans-serif;
+                box-sizing: border-box;
+                height: 300px;
+                overflow-y: hidden;
             ">
                 <div style="line-height: 1.8; font-size: 15px;">
                     {html_rows}
                 </div>
             </div>
             """,
-            height=260
+            height=300
         )
 
 

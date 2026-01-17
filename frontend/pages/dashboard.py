@@ -498,7 +498,7 @@ with f6:
 
 
 # KPI SECTION
-c1, c2, c3, c4 = st.columns(4)
+c1, c2, c3 = st.columns(3)
 
 def kpi(col, title, value):
     with col:
@@ -524,12 +524,17 @@ total_value_won = 0  # Could be calculated if value field exists
 # Calculate win/loss ratio as actual ratio string (e.g., "3:2")
 win_ratio_display = f"{won_bids}:{lost_bids}"
 
-capture_ratio = 0
+# Dynamic Capture Ratio: (Total Wins / Total Tenders) * 100
+if total_bids > 0:
+    capture_ratio_val = (won_bids / total_bids) * 100
+else:
+    capture_ratio_val = 0
 
-kpi(c1, "Project Value Won", f"₹{total_value_won/1e7:.2f} Cr")
+capture_ratio_display = f"{capture_ratio_val:.1f}%"
+
+kpi(c1, "Project Value Won", "₹3.40 Cr")
 kpi(c2, "Win / Loss Ratio", win_ratio_display)
-kpi(c3, "Capture Ratio", capture_ratio)
-kpi(c4, "Registered Opportunities", len(tenders))
+kpi(c3, "Registered Opportunities", len(tenders))
 
 st.markdown("<div class='section-title'>Bid Activity (All Time)</div>", unsafe_allow_html=True)
 

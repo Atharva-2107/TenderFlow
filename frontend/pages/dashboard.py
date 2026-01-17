@@ -637,21 +637,35 @@ with col1:
 with col2:
     st.markdown("<div class='section-title'>Top 5 Highest Bids</div>", unsafe_allow_html=True)
 
-    top_bids = [] 
-    # sorted(
-    #     [b for b in bids if b.get("final_bid_amount") and b.get("tender_id")],
-    #     key=lambda x: x["final_bid_amount"],
-    #     reverse=True
-    # )[:5]
+    # Fetch top 5 bids from bid_history_v2 ordered by final_bid_amount descending
+    try:
+        top_bids_response = (
+            supabase
+            .table("bid_history_v2")
+            .select("id, project_name, category, final_bid_amount")
+            .order("final_bid_amount", desc=True)
+            .limit(5)
+            .execute()
+        )
+        top_bids = top_bids_response.data or []
+    except Exception as e:
+        top_bids = []
+        st.warning(f"Could not fetch top bids: {e}")
 
     if not top_bids:
         st.info("No bids available")
     else:
         html_rows = ""
         for i, bid in enumerate(top_bids, 1):
+            project_name = bid.get('project_name', 'Unnamed Project')
+            category = bid.get('category', '')
+            bid_amount = bid.get('final_bid_amount', 0) or 0
+            # final_bid_amount is stored in Lakhs, convert to Crores for display
+            amount_cr = bid_amount / 100  # Lakhs to Crores
             html_rows += f"""
             <div style="margin-bottom: 10px;">
-                <b>{i}.</b> Tender ID {bid['tender_id']} — ₹{bid['final_bid_amount']/1e7:.2f} Cr
+                <b>{i}.</b> {project_name} — ₹{amount_cr:.2f} Cr
+                <span style="color: rgba(255,255,255,0.5); font-size: 0.85rem;">({category})</span>
             </div>
             """
 
@@ -690,7 +704,7 @@ try:
         title,
         tag,
         source,
-        link,
+        pdf_url,
         fetched_at
     """)
     .order("fetched_at", desc=True)
@@ -726,7 +740,7 @@ else:
         source = doc.get("source", "Unknown Source")
         tender_no = doc.get("title", None)
         doc_type = doc.get("tag", "Document")
-        pdf_url = doc.get("link", None)
+        pdf_url = doc.get("pdf_url", None)
         fetched_at = doc.get("fetched_at", "")
 
         structured = doc.get("structured_data") or {}

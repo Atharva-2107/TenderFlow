@@ -23,34 +23,7 @@ def get_base64_of_bin_file(path):
 if "strategy_saved" not in st.session_state:
     st.session_state.strategy_saved = False
 
-# def get_company_id(supabase):
-#     """
-#     Fetch company_id that belongs to the currently authenticated user.
-#     """
 
-#     try:
-#         auth = supabase.auth.get_user()
-#         if not auth or not auth.user:
-#             return None
-
-#         user_id = auth.user.id
-
-#         # Query profiles table which links users to companies
-#         res = (
-#             supabase
-#             .table("profiles")
-#             .select("company_id")
-#             .eq("id", user_id)
-#             .single()
-#             .execute()
-#         )
-
-#         return res.data["company_id"] if res.data else None
-
-#     except Exception as e:
-#         st.error(f"Company lookup failed: {e}")
-#         return None
-       
 # --- 1. PAGE CONFIGURATION (MUST BE FIRST) ---
 st.set_page_config(
     page_title="TenderFlow | AI Bid Suite",
@@ -350,258 +323,7 @@ Tender context (for scale only):
         })
 
     return priced_items
-# def auto_fill_rates(boq_items, tender_text):
-#     if not os.getenv("GROQ_API_KEY"):
-#         return boq_items
 
-#     priced_items = []
-
-#     for item in boq_items:
-#         task = item["Task"]
-#         rate = 0
-
-#         for attempt in range(2):  # 🔁 retry once
-#             prompt = f"""
-# You are an Indian tender costing expert.
-
-# Decide whether the item is MATERIAL or SERVICE and assign a realistic Indian market rate.
-
-# Rules:
-# - Assume quantity = 1
-# - Rate must be a NUMBER greater than 0
-# - NO explanation
-# - NO ranges
-# - Output STRICT JSON ONLY
-
-# FORMAT:
-# {{ "rate": 7500 }}
-
-# Item:
-# "{task}"
-
-# Tender context:
-# {tender_text[:2000]}
-# """
-
-#             try:
-#                 response = requests.post(
-#                     "https://api.groq.com/openai/v1/chat/completions",
-#                     headers={
-#                         "Authorization": f"Bearer {os.getenv('GROQ_API_KEY')}",
-#                         "Content-Type": "application/json"
-#                     },
-#                     json={
-#                         "model": "llama-3.1-8b-instant",
-#                         "messages": [{"role": "user", "content": prompt}],
-#                         "temperature": 0.1
-#                     },
-#                     timeout=20
-#                 )
-
-#                 data = response.json()
-#                 raw = data["choices"][0]["message"]["content"]
-
-#                 parsed = safe_json_parse(raw)
-#                 if isinstance(parsed, dict) and "rate" in parsed:
-#                     rate = int(parsed["rate"])
-#                     if rate > 0:
-#                         break  # ✅ success
-
-#             except Exception as e:
-#                 pass
-
-#         if rate == 0:
-#             st.warning(f"⚠️ AI could not price: {task}")
-
-#         priced_items.append({
-#             "Task": task,
-#             "Qty": 1,
-#             "Rate": rate
-#         })
-
-#     return priced_items
-
-
-# was currently using 
-# def auto_fill_rates(boq_items, tender_text):
-#     if not os.getenv("GROQ_API_KEY"):
-#         return boq_items
-
-#     priced_items = []
-
-#     for item in boq_items:
-#         task = item["Task"]
-
-#         prompt = f"""
-# You are an Indian tender costing expert.
-
-# Your job:
-# - Decide whether the item is a MATERIAL or a SERVICE
-# - Estimate a realistic Indian market rate in INR
-
-# Pricing rules:
-# - If MATERIAL:
-#   • Use Indian market supply rate
-#   • Example: cement, steel, cables, pipes, equipment
-# - If SERVICE / CHARGE:
-#   • Use professional, logistics, statutory, or compensation rates
-# - Assume unit quantity = 1
-# - Rate must NOT be zero
-# - No flat pricing across items
-# - No explanations
-
-# Return ONLY a single number (INR).
-
-# Tender item:
-# "{task}"
-
-# Tender context:
-# {tender_text[:2000]}
-# """
-
-#         try:
-#             response = requests.post(
-#                 "https://api.groq.com/openai/v1/chat/completions",
-#                 headers={
-#                     "Authorization": f"Bearer {os.getenv('GROQ_API_KEY')}",
-#                     "Content-Type": "application/json"
-#                 },
-#                 json={
-#                     "model": "llama-3.1-8b-instant",
-#                     "messages": [{"role": "user", "content": prompt}],
-#                     "temperature": 0.25
-#                 },
-#                 timeout=20
-#             )
-
-#             data = response.json()
-#             raw = data["choices"][0]["message"]["content"].strip()
-
-#             match = re.search(r"\d[\d,]*", raw)
-#             rate = int(match.group().replace(",", "")) if match else 0
-
-#         except Exception:
-#             rate = 0
-
-#         priced_items.append({
-#             "Task": task,
-#             "Qty": 1,
-#             "Rate": rate
-#         })
-
-#     return priced_items
-
-# also originally defined here
-
-# def auto_fill_rates(boq_items, tender_text):
-#     if not os.getenv("GROQ_API_KEY"):
-#         return boq_items
-
-#     enriched_items = []
-#     billable_items = []
-
-#     for item in boq_items:
-#         item_type = classify_item(item["Task"])  # ✅ DEFINE IT HERE
-
-#         # 🚫 Skip non-billable items completely
-#         if item_type == "non_billable":
-#             item["Qty"] = 0
-#             item["Rate"] = 0
-#             continue
-
-#         # 🧱 Material fallback pricing
-#         if item["Rate"] == 0 and item_type == "material":
-#             t = item["Task"].lower()
-#             for k, v in DEFAULT_MATERIAL_RATES.items():
-#                 if k in t:
-#                     item["Rate"] = v
-#                     item["Qty"] = 1
-#                     break
-
-#         # 📦 Collect for AI pricing
-#         enriched_items.append({
-#             "task": item["Task"],
-#             "type": item_type
-#         })
-
-#         billable_items.append(item)
-
-#     prompt = f"""
-# You are an Indian tender costing expert.
-
-# For each item below, estimate a REALISTIC Indian market rate in INR.
-
-# Rules:
-# - If type = "material":
-#   - Use typical Indian market supply rates
-#   - Assume unit quantity = 1
-# - If type = "service":
-#   - Use professional / expert / compensation rates
-# - NO flat pricing
-# - Each item MUST have a different rate
-# - Use realistic Indian market variance
-# - Round to nearest 500 or 1000
-# - Do NOT explain anything
-
-# Return STRICT JSON ONLY in this format:
-# [
-#   {{"task": "...", "rate": 25000}}
-# ]
-
-# Items:
-# {json.dumps(enriched_items, indent=2)}
-
-# Tender context:
-# {tender_text[:3000]}
-# """
-
-#     try:
-#         response = requests.post(
-#             "https://api.groq.com/openai/v1/chat/completions",
-#             headers={
-#                 "Authorization": f"Bearer {os.getenv('GROQ_API_KEY')}",
-#                 "Content-Type": "application/json"
-#             },
-#             json={
-#                 "model": "llama-3.1-70b-versatile",
-#                 "messages": [{"role": "user", "content": prompt}],
-#                 "temperature": 0.15
-#             },
-#             timeout=30
-#         )
-
-#         data = response.json()
-#         if "choices" not in data:
-#             return boq_items
-
-#         raw = data["choices"][0]["message"]["content"]
-#         parsed = safe_json_parse(raw)
-
-#         rate_map = {}
-#         for r in parsed:
-#             if "task" in r and "rate" in r:
-#                 key = re.sub(r"[^a-z0-9 ]", "", r["task"].lower())
-#                 rate_map[key] = float(r["rate"])
-                
-#         # 🔥 APPLY AI RATES SAFELY
-#         for item in boq_items:
-#             clean_task = re.sub(r"[^a-z0-9 ]", "", item["Task"].lower())
-
-#             if clean_task in rate_map:
-#                 item["Rate"] = rate_map[clean_task]
-#                 item["Qty"] = 1
-    
-#         # Apply rates
-#         for item in boq_items:
-#             clean_task = re.sub(r"[^a-z0-9 ]", "", item["Task"].lower())
-#             item["Qty"] = 1
-#             item["Rate"] = rate_map.get(clean_task, item.get("Rate", 0))
-
-#         return boq_items
-
-#     except Exception as e:
-#         st.warning(f"AI pricing failed: {e}")
-#         return boq_items
 
     
 def predict_win_api(prime_cost_rs, overhead_pct, profit_pct, estimated_budget_rs, complexity, competitors):
@@ -1316,47 +1038,68 @@ a:hover {
             st.success("✅ **Your selection matches AI recommendation!**")
 
 
+        
         btn1, btn2 = st.columns([2,2])
 
-    with btn1:
-        # Project name input for saving (mandatory)
-        st.markdown('<p class="label-text">Save Strategy</p>', unsafe_allow_html=True)
-        st.markdown('<span style="color: #A855F7; font-size: 0.85rem;">Project Name <span style="color: #EF4444;">*</span></span>', unsafe_allow_html=True)
-        project_name_input = st.text_input(
-            "Project Name", 
-            value="", 
-            placeholder="Enter project name (required)...",
-            help="Name for this bid strategy (mandatory)",
-            key="bid_project_name",
-            label_visibility="collapsed"
-        )
-        
-        # Category dropdown (mandatory)
-        st.markdown('<span style="color: #A855F7; font-size: 0.85rem;">Category <span style="color: #EF4444;">*</span></span>', unsafe_allow_html=True)
-        category_options = [
-            "Select any one",
-            "Infrastructure",
-            "IT & Technology",
-            "Construction",
-            "Supply & Procurement",
-            "Consulting Services",
-            "Maintenance & Operations",
-            "Healthcare",
-            "Education",
-            "Energy & Utilities",
-            "Transport & Logistics",
-            "Other"
-        ]
-        project_category = st.selectbox(
-            "Category",
-            options=category_options,
-            index=0,
-            help="Select the category for this bid (mandatory)",
-            key="bid_category",
-            label_visibility="collapsed"
-        )
-        
-        if st.button("💾 Save Strategy", use_container_width=True) and not st.session_state.strategy_saved:
+        with btn1:
+            st.markdown('<p class="label-text">Save Strategy</p>', unsafe_allow_html=True)
+
+        # ✅ Inputs side-by-side
+        f1, f2 = st.columns(2, gap="medium")
+
+        with f1:
+            st.markdown(
+                '<span style="color: #A855F7; font-size: 0.85rem;">Project Name <span style="color: #EF4444;">*</span></span>',
+                unsafe_allow_html=True
+            )
+            project_name_input = st.text_input(
+                "Project Name",
+                value="",
+                placeholder="Enter project name (required)...",
+                help="Name for this bid strategy (mandatory)",
+                key="bid_project_name",
+                label_visibility="collapsed"
+            )
+
+        with f2:
+            st.markdown(
+                '<span style="color: #A855F7; font-size: 0.85rem;">Category <span style="color: #EF4444;">*</span></span>',
+                unsafe_allow_html=True
+            )
+            category_options = [
+                "Select any one",
+                "Infrastructure",
+                "IT & Technology",
+                "Construction",
+                "Supply & Procurement",
+                "Consulting Services",
+                "Maintenance & Operations",
+                "Healthcare",
+                "Education",
+                "Energy & Utilities",
+                "Transport & Logistics",
+                "Other"
+            ]
+            project_category = st.selectbox(
+                "Category",
+                options=category_options,
+                index=0,
+                help="Select the category for this bid (mandatory)",
+                key="bid_category",
+                label_visibility="collapsed"
+            )
+
+        # ✅ Buttons side-by-side equally (inside btn1)
+        b1, b2 = st.columns(2, gap="medium")
+
+        with b1:
+            save_clicked = st.button("💾 Save Strategy", use_container_width=True)
+
+        with b2:
+            push_clicked = st.button("🚀 Push Proposal", type="primary", use_container_width=True)
+
+        # ✅ Same save logic (just triggered from save_clicked)
+        if save_clicked and not st.session_state.strategy_saved:
             if not project_name_input or not project_name_input.strip():
                 st.warning("⚠️ Please enter a project name before saving.")
             elif project_category == "Select any one":
@@ -1390,11 +1133,93 @@ a:hover {
                 except Exception as e:
                     st.error(f"Save failed: {e}")
 
-    with btn2:
-        if st.button("🚀 Push Proposal", type="primary"):
+        # ✅ Same push logic
+        if push_clicked:
             st.balloons()
 
-        st.markdown('</div>', unsafe_allow_html=True)
+
+    with btn2:
+        # 👇 Keep empty (so layout stays clean)
+        st.empty()
+
+
+    # with btn1:
+    #     # Project name input for saving (mandatory)
+    #     st.markdown('<p class="label-text">Save Strategy</p>', unsafe_allow_html=True)
+    #     st.markdown('<span style="color: #A855F7; font-size: 0.85rem;">Project Name <span style="color: #EF4444;">*</span></span>', unsafe_allow_html=True)
+    #     project_name_input = st.text_input(
+    #         "Project Name", 
+    #         value="", 
+    #         placeholder="Enter project name (required)...",
+    #         help="Name for this bid strategy (mandatory)",
+    #         key="bid_project_name",
+    #         label_visibility="collapsed"
+    #     )
+        
+    #     # Category dropdown (mandatory)
+    #     st.markdown('<span style="color: #A855F7; font-size: 0.85rem;">Category <span style="color: #EF4444;">*</span></span>', unsafe_allow_html=True)
+    #     category_options = [
+    #         "Select any one",
+    #         "Infrastructure",
+    #         "IT & Technology",
+    #         "Construction",
+    #         "Supply & Procurement",
+    #         "Consulting Services",
+    #         "Maintenance & Operations",
+    #         "Healthcare",
+    #         "Education",
+    #         "Energy & Utilities",
+    #         "Transport & Logistics",
+    #         "Other"
+    #     ]
+    #     project_category = st.selectbox(
+    #         "Category",
+    #         options=category_options,
+    #         index=0,
+    #         help="Select the category for this bid (mandatory)",
+    #         key="bid_category",
+    #         label_visibility="collapsed"
+    #     )
+        
+    #     if st.button("💾 Save Strategy", use_container_width=True) and not st.session_state.strategy_saved:
+    #         if not project_name_input or not project_name_input.strip():
+    #             st.warning("⚠️ Please enter a project name before saving.")
+    #         elif project_category == "Select any one":
+    #             st.warning("⚠️ Please select a category before saving.")
+    #         else:
+    #             try:
+    #                 company_id = st.session_state["active_company_id"]
+    #                 user_id = st.session_state.get("user_id")
+
+    #                 res = supabase.table("bid_history_v2").insert({
+    #                     "company_id": company_id,
+    #                     "tender_id": st.session_state.tender_id,
+    #                     "project_name": project_name_input.strip(),
+    #                     "category": project_category,
+    #                     "prime_cost": total_prime / 100000,
+    #                     "overhead_pct": overhead_pct,
+    #                     "profit_pct": profit_pct,
+    #                     "competitor_density": competitor_density,
+    #                     "complexity_score": st.session_state.complexity_score,
+    #                     "final_bid_amount": live_bid / 100000,
+    #                     "win_probability": live_win_prob,
+    #                     "won": None
+    #                 }).execute()
+
+    #                 if res.data:
+    #                     st.session_state.strategy_saved = True
+    #                     st.toast(f"✅ Strategy saved for '{project_name_input}'")
+    #                 else:
+    #                     st.error("❌ Insert returned no data")
+
+    #             except Exception as e:
+    #                 st.error(f"Save failed: {e}")
+
+    # with btn2:
+    #     if st.button("🚀 Push Proposal", type="primary"):
+    #         st.balloons()
+
+    #     st.markdown('</div>', unsafe_allow_html=True)
 
 if __name__ == "__main__":
     bid_generation_page()

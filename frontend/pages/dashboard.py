@@ -611,28 +611,101 @@ col1, col2 = st.columns(2)
 
 with col1:
     st.markdown("<div class='section-title'>Tenders by Category</div>", unsafe_allow_html=True)
-    st.info("Category insights will be enabled once structured fields are finalized.")
-    # st.markdown("<div class='section-title'>Tenders by Category</div>", unsafe_allow_html=True)
-    # pie = px.pie(
-    #     st.info("Category insights will be enabled once structured fields are finalized.")
-    #     # names=["Construction", "IT & Telecom", "Healthcare", "Energy"],
-    #     # values=[40, 27, 18, 15],
-    #     # hole=0.6
-    # )
-    # pie.update_layout(
-    #     height=320,
-    #     margin=dict(t=20, b=20, l=20, r=20),
-    #     legend=dict(
-    #         orientation="h",
-    #         yanchor="top",
-    #         y=-0.15,
-    #         xanchor="center",
-    #         x=0.5
-    #     ),
-    #     paper_bgcolor="rgba(0,0,0,0)",
-    #     font_color="white"
-    # )
-    # st.plotly_chart(pie, use_container_width=True)
+    
+    # 1. Category Dropdown
+    cat_options = ["Any", "Infrastructure", "IT & Technology", "Construction", 
+                   "Supply & Procurement", "Healthcare", "Education", 
+                   "Transport & Logistics", "Energy & Utilities"]
+    
+    selected_cat = st.selectbox("Filter Category", cat_options, label_visibility="collapsed")
+    
+    # 2. Filter Logic
+    # Filter unique tenders by project_name to avoid duplicates (same logic as metrics)
+    # Using the 'generated_tenders' list fetched earlier
+    
+    # Deduplicate first
+    seen_projs = set()
+    unique_tenders_list = []
+    # Sort by created_at desc if possible
+    # Assuming list is already somewhat ordered or we just take unique
+    sorted_gen = sorted(generated_tenders, key=lambda x: x.get("created_at", ""), reverse=True)
+    
+    for t in sorted_gen:
+        pname = t.get("project_name")
+        if pname and pname not in seen_projs:
+            seen_projs.add(pname)
+            unique_tenders_list.append(t)
+            
+    # Apply Category Filter
+    if selected_cat == "Any":
+        # User requested: dont show tenders that have no category
+        final_list = [t for t in unique_tenders_list if t.get("category") and t.get("category") not in ["None", ""]]
+    else:
+        final_list = [t for t in unique_tenders_list if t.get("category") == selected_cat]
+
+    # 3. Display List
+    if not final_list:
+        st.info(f"No tenders found for category: {selected_cat}")
+    else:
+        # Build HTML rows
+        # Format: "1. ProjectName (Category)" - No Value
+        html_cat_rows = ""
+        for i, item in enumerate(final_list[:8], 1): # Limit to 8
+            name = item.get("project_name", "Unknown")
+            cat = item.get("category")
+            
+            html_cat_rows += f"""
+            <div style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-weight: 500; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 70%;" title="{name}"><b>{i}.</b> {name}</span>
+                <span style="font-size: 12px; color: #a1a1aa; background: rgba(255,255,255,0.05); padding: 2px 8px; border-radius: 6px; white-space: nowrap;">{cat}</span>
+            </div>
+            """
+
+        components.html(
+            f"""
+            <style>
+                /* Custom Scrollbar */
+                ::-webkit-scrollbar {{
+                    width: 6px;
+                    height: 6px;
+                }}
+                ::-webkit-scrollbar-track {{
+                    background: transparent;
+                }}
+                ::-webkit-scrollbar-thumb {{
+                    background: rgba(255, 255, 255, 0.2);
+                    border-radius: 3px;
+                }}
+                ::-webkit-scrollbar-thumb:hover {{
+                    background: rgba(255, 255, 255, 0.3);
+                }}
+            </style>
+            <div style="
+                width: 100%;
+                background: linear-gradient(
+                    135deg,
+                    rgba(255,255,255,0.08),
+                    rgba(255,255,255,0.02)
+                );
+                backdrop-filter: blur(10px);
+                border: 1px solid rgba(255,255,255,0.12);
+                border-radius: 16px;
+                padding: 16px 20px;
+                color: white;
+                font-family: Inter, sans-serif;
+                box-sizing: border-box; 
+                height: 300px;
+                overflow-y: auto;
+                overflow-x: hidden;
+            ">
+                <div style="line-height: 1.6;">
+                    {html_cat_rows}
+                </div>
+            </div>
+            """,
+            height=300,
+            scrolling=False 
+        )
 
 with col2:
     st.markdown("<div class='section-title'>Top 5 Highest Bids</div>", unsafe_allow_html=True)

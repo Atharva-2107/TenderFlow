@@ -65,7 +65,7 @@ else:
 
 
 # LOGIC FUNCTIONS (PRESERVED - from 1st code)
-def save_tender_to_db(user_id, project_name, content, section_type, pdf_bytes=None):
+def save_tender_to_db(user_id, project_name, content, section_type, category="Any", pdf_bytes=None):
     if not user_id:
         return False
 
@@ -93,6 +93,7 @@ def save_tender_to_db(user_id, project_name, content, section_type, pdf_bytes=No
             "project_name": project_name,
             "content": content,
             "section_type": section_type,
+            "category": category,
             "created_at": datetime.now().isoformat()
         }
 
@@ -771,6 +772,20 @@ with right_pane:
 
     # Save to Supabase DB (PRESERVED)
     st.markdown("### Cloud Save")
+    
+    category_options = [
+        "Any", "Infrastructure", "IT & Technology", "Construction", 
+        "Supply & Procurement", "Healthcare", "Education", 
+        "Transport & Logistics", "Energy & Utilities"
+    ]
+    
+    selected_category = st.selectbox(
+        "Category",
+        options=category_options,
+        index=0,
+        help="Select the category for this tender"
+    )
+
     project_name_input = st.text_input("Project Name", value="New Tender", help="Name for this tender project")
 
     if st.button("Save to Cloud DB", use_container_width=True, help="Save all generated sections to Supabase"):
@@ -792,6 +807,7 @@ with right_pane:
                             project_name=project_name_input,
                             content=content_to_save,
                             section_type=sec_name,
+                            category=selected_category,
                             pdf_bytes=pdf_bytes
                         )
                         if success:

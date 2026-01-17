@@ -242,7 +242,7 @@ def extract_billable_items(text):
             ],
             "temperature": 0
         },
-        timeout=30
+        timeout=15
             )
 
             data = response.json()
@@ -321,7 +321,7 @@ Tender context (for scale only):
                     "messages": [{"role": "user", "content": prompt}],
                     "temperature": 0.2
                 },
-                timeout=25
+                timeout=15
             )
 
             data = response.json()
@@ -670,7 +670,7 @@ def bid_generation_page():
         _, col_mid, _ = st.columns([1, 2, 1]) 
 
         with col_mid:
-            st.markdown('<div class="glass-card" style="text-align: center;">', unsafe_allow_html=True)
+            # st.markdown('<div class="glass-card" style="text-align: center;">', unsafe_allow_html=True)
             st.markdown("### 📂 Initialize New Bid")
             st.write("Upload your technical proposal to begin AI cost extraction.")
 
@@ -683,15 +683,25 @@ def bid_generation_page():
             if uploaded_tender:
                 file_id = f"{uploaded_tender.name}_{uploaded_tender.size}"
 
-                if st.session_state.get("processed_file") == file_id:
-                    st.session_state.extraction_done = True
-                else:
-                    st.session_state.processed_file = file_id
+                # Skip if already processed this exact file
+                if st.session_state.get("processed_file") == file_id and st.session_state.extraction_done:
+                    return  # Already done, dashboard will show
+                
+                # Skip if currently analyzing (prevents rerun loop)
+                if st.session_state.get("analyzing_file") == file_id:
+                    st.info("🔮 Analysis in progress...")
+                    return
                     
+                # Reset state for new file
                 if st.session_state.get("last_file") != uploaded_tender.name:
                     st.session_state.last_file = uploaded_tender.name
                     st.session_state.cost_df = pd.DataFrame(columns=["Task", "Qty", "Rate"])
                     st.session_state.extraction_done = False
+                    st.session_state.processed_file = None
+                
+                # Mark as analyzing to prevent duplicate runs
+                st.session_state.analyzing_file = file_id
+                
                 with st.spinner("🔮 Analyzing tender…"):
                     try:
                         reader = PdfReader(uploaded_tender)
@@ -744,8 +754,6 @@ def bid_generation_page():
                         boq_items = auto_fill_rates(boq_items, text)
 
                         st.session_state.cost_df = pd.DataFrame(boq_items)
-
-                        st.write("🔍 Materials detected:", st.session_state.cost_df)
                         
                         def extract_amount(label):
                             # Search for the label followed by currency and digits/commas
@@ -778,12 +786,15 @@ def bid_generation_page():
                         }).execute()
                         tender_id = res.data[0]["id"]
                         st.session_state.tender_id = tender_id
+                        
+                        # Mark as completed
+                        st.session_state.processed_file = file_id
+                        st.session_state.analyzing_file = None
                         st.session_state.extraction_done = True
                         st.rerun()
-
-                        st.success("Tender analyzed successfully")
                         
                     except Exception as e:
+                        st.session_state.analyzing_file = None  # Clear on error
                         st.error(f"Analysis failed: {str(e)}")
             st.markdown('</div>', unsafe_allow_html=True)
         return
@@ -884,7 +895,6 @@ def bid_generation_page():
         
         st.markdown("<br>", unsafe_allow_html=True)
 
-        st.markdown('<div class="glass-card">', unsafe_allow_html=True)
         st.markdown('<p class="label-text">AI Win Confidence</p>', unsafe_allow_html=True)
         
         fig = go.Figure(go.Indicator(
@@ -922,32 +932,76 @@ def bid_generation_page():
         else:
             st.success("✅ **Your selection matches AI recommendation!**")
 
-        if st.button("💾 Save Strategy") and not st.session_state.strategy_saved:
-            try:
-                company_id = st.session_state["active_company_id"]
-                user_id = st.session_state.get("user_id")  # optional but useful later
+        # Project name input for saving (mandatory)
+        st.markdown('<p class="label-text">Save Strategy</p>', unsafe_allow_html=True)
+        st.markdown('<span style="color: #A855F7; font-size: 0.85rem;">Project Name <span style="color: #EF4444;">*</span></span>', unsafe_allow_html=True)
+        project_name_input = st.text_input(
+            "Project Name", 
+            value="", 
+            placeholder="Enter project name (required)...",
+            help="Name for this bid strategy (mandatory)",
+            key="bid_project_name",
+            label_visibility="collapsed"
+        )
+        
+        # Category dropdown (mandatory)
+        st.markdown('<span style="color: #A855F7; font-size: 0.85rem;">Category <span style="color: #EF4444;">*</span></span>', unsafe_allow_html=True)
+        category_options = [
+            "Select any one",
+            "Infrastructure",
+            "IT & Technology",
+            "Construction",
+            "Supply & Procurement",
+            "Consulting Services",
+            "Maintenance & Operations",
+            "Healthcare",
+            "Education",
+            "Energy & Utilities",
+            "Transport & Logistics",
+            "Other"
+        ]
+        project_category = st.selectbox(
+            "Category",
+            options=category_options,
+            index=0,
+            help="Select the category for this bid (mandatory)",
+            key="bid_category",
+            label_visibility="collapsed"
+        )
+        
+        if st.button("💾 Save Strategy", use_container_width=True) and not st.session_state.strategy_saved:
+            if not project_name_input or not project_name_input.strip():
+                st.warning("⚠️ Please enter a project name before saving.")
+            elif project_category == "Select any one":
+                st.warning("⚠️ Please select a category before saving.")
+            else:
+                try:
+                    company_id = st.session_state["active_company_id"]
+                    user_id = st.session_state.get("user_id")  # optional but useful later
 
-                res = supabase.table("bid_history_v2").insert({
-                    "company_id": company_id,
-                    "tender_id": st.session_state.tender_id,
-                    "prime_cost": total_prime / 100000,
-                    "overhead_pct": overhead_pct,
-                    "profit_pct": profit_pct,
-                    "competitor_density": competitor_density,
-                    "complexity_score": st.session_state.complexity_score,
-                    "final_bid_amount": live_bid / 100000,
-                    "win_probability": live_win_prob,
-                    "won": None
-                }).execute()
+                    res = supabase.table("bid_history_v2").insert({
+                        "company_id": company_id,
+                        "tender_id": st.session_state.tender_id,
+                        "project_name": project_name_input.strip(),
+                        "category": project_category,
+                        "prime_cost": total_prime / 100000,
+                        "overhead_pct": overhead_pct,
+                        "profit_pct": profit_pct,
+                        "competitor_density": competitor_density,
+                        "complexity_score": st.session_state.complexity_score,
+                        "final_bid_amount": live_bid / 100000,
+                        "win_probability": live_win_prob,
+                        "won": None
+                    }).execute()
 
-                if res.data:
-                    st.session_state.strategy_saved = True
-                    st.toast("✅ Strategy saved successfully")
-                else:
-                    st.error("❌ Insert returned no data")
+                    if res.data:
+                        st.session_state.strategy_saved = True
+                        st.toast(f"✅ Strategy saved for '{project_name_input}'")
+                    else:
+                        st.error("❌ Insert returned no data")
 
-            except Exception as e:
-                st.error(f"Save failed: {e}")
+                except Exception as e:
+                    st.error(f"Save failed: {e}")
 
         
         if st.button("🚀 Push Proposal", type="primary"):

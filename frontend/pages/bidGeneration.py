@@ -1316,47 +1316,68 @@ a:hover {
             st.success("✅ **Your selection matches AI recommendation!**")
 
 
+        
         btn1, btn2 = st.columns([2,2])
 
-    with btn1:
-        # Project name input for saving (mandatory)
-        st.markdown('<p class="label-text">Save Strategy</p>', unsafe_allow_html=True)
-        st.markdown('<span style="color: #A855F7; font-size: 0.85rem;">Project Name <span style="color: #EF4444;">*</span></span>', unsafe_allow_html=True)
-        project_name_input = st.text_input(
-            "Project Name", 
-            value="", 
-            placeholder="Enter project name (required)...",
-            help="Name for this bid strategy (mandatory)",
-            key="bid_project_name",
-            label_visibility="collapsed"
-        )
-        
-        # Category dropdown (mandatory)
-        st.markdown('<span style="color: #A855F7; font-size: 0.85rem;">Category <span style="color: #EF4444;">*</span></span>', unsafe_allow_html=True)
-        category_options = [
-            "Select any one",
-            "Infrastructure",
-            "IT & Technology",
-            "Construction",
-            "Supply & Procurement",
-            "Consulting Services",
-            "Maintenance & Operations",
-            "Healthcare",
-            "Education",
-            "Energy & Utilities",
-            "Transport & Logistics",
-            "Other"
-        ]
-        project_category = st.selectbox(
-            "Category",
-            options=category_options,
-            index=0,
-            help="Select the category for this bid (mandatory)",
-            key="bid_category",
-            label_visibility="collapsed"
-        )
-        
-        if st.button("💾 Save Strategy", use_container_width=True) and not st.session_state.strategy_saved:
+        with btn1:
+            st.markdown('<p class="label-text">Save Strategy</p>', unsafe_allow_html=True)
+
+        # ✅ Inputs side-by-side
+        f1, f2 = st.columns(2, gap="medium")
+
+        with f1:
+            st.markdown(
+                '<span style="color: #A855F7; font-size: 0.85rem;">Project Name <span style="color: #EF4444;">*</span></span>',
+                unsafe_allow_html=True
+            )
+            project_name_input = st.text_input(
+                "Project Name",
+                value="",
+                placeholder="Enter project name (required)...",
+                help="Name for this bid strategy (mandatory)",
+                key="bid_project_name",
+                label_visibility="collapsed"
+            )
+
+        with f2:
+            st.markdown(
+                '<span style="color: #A855F7; font-size: 0.85rem;">Category <span style="color: #EF4444;">*</span></span>',
+                unsafe_allow_html=True
+            )
+            category_options = [
+                "Select any one",
+                "Infrastructure",
+                "IT & Technology",
+                "Construction",
+                "Supply & Procurement",
+                "Consulting Services",
+                "Maintenance & Operations",
+                "Healthcare",
+                "Education",
+                "Energy & Utilities",
+                "Transport & Logistics",
+                "Other"
+            ]
+            project_category = st.selectbox(
+                "Category",
+                options=category_options,
+                index=0,
+                help="Select the category for this bid (mandatory)",
+                key="bid_category",
+                label_visibility="collapsed"
+            )
+
+        # ✅ Buttons side-by-side equally (inside btn1)
+        b1, b2 = st.columns(2, gap="medium")
+
+        with b1:
+            save_clicked = st.button("💾 Save Strategy", use_container_width=True)
+
+        with b2:
+            push_clicked = st.button("🚀 Push Proposal", type="primary", use_container_width=True)
+
+        # ✅ Same save logic (just triggered from save_clicked)
+        if save_clicked and not st.session_state.strategy_saved:
             if not project_name_input or not project_name_input.strip():
                 st.warning("⚠️ Please enter a project name before saving.")
             elif project_category == "Select any one":
@@ -1390,11 +1411,93 @@ a:hover {
                 except Exception as e:
                     st.error(f"Save failed: {e}")
 
-    with btn2:
-        if st.button("🚀 Push Proposal", type="primary"):
+        # ✅ Same push logic
+        if push_clicked:
             st.balloons()
 
-        st.markdown('</div>', unsafe_allow_html=True)
+
+    with btn2:
+        # 👇 Keep empty (so layout stays clean)
+        st.empty()
+
+
+    # with btn1:
+    #     # Project name input for saving (mandatory)
+    #     st.markdown('<p class="label-text">Save Strategy</p>', unsafe_allow_html=True)
+    #     st.markdown('<span style="color: #A855F7; font-size: 0.85rem;">Project Name <span style="color: #EF4444;">*</span></span>', unsafe_allow_html=True)
+    #     project_name_input = st.text_input(
+    #         "Project Name", 
+    #         value="", 
+    #         placeholder="Enter project name (required)...",
+    #         help="Name for this bid strategy (mandatory)",
+    #         key="bid_project_name",
+    #         label_visibility="collapsed"
+    #     )
+        
+    #     # Category dropdown (mandatory)
+    #     st.markdown('<span style="color: #A855F7; font-size: 0.85rem;">Category <span style="color: #EF4444;">*</span></span>', unsafe_allow_html=True)
+    #     category_options = [
+    #         "Select any one",
+    #         "Infrastructure",
+    #         "IT & Technology",
+    #         "Construction",
+    #         "Supply & Procurement",
+    #         "Consulting Services",
+    #         "Maintenance & Operations",
+    #         "Healthcare",
+    #         "Education",
+    #         "Energy & Utilities",
+    #         "Transport & Logistics",
+    #         "Other"
+    #     ]
+    #     project_category = st.selectbox(
+    #         "Category",
+    #         options=category_options,
+    #         index=0,
+    #         help="Select the category for this bid (mandatory)",
+    #         key="bid_category",
+    #         label_visibility="collapsed"
+    #     )
+        
+    #     if st.button("💾 Save Strategy", use_container_width=True) and not st.session_state.strategy_saved:
+    #         if not project_name_input or not project_name_input.strip():
+    #             st.warning("⚠️ Please enter a project name before saving.")
+    #         elif project_category == "Select any one":
+    #             st.warning("⚠️ Please select a category before saving.")
+    #         else:
+    #             try:
+    #                 company_id = st.session_state["active_company_id"]
+    #                 user_id = st.session_state.get("user_id")
+
+    #                 res = supabase.table("bid_history_v2").insert({
+    #                     "company_id": company_id,
+    #                     "tender_id": st.session_state.tender_id,
+    #                     "project_name": project_name_input.strip(),
+    #                     "category": project_category,
+    #                     "prime_cost": total_prime / 100000,
+    #                     "overhead_pct": overhead_pct,
+    #                     "profit_pct": profit_pct,
+    #                     "competitor_density": competitor_density,
+    #                     "complexity_score": st.session_state.complexity_score,
+    #                     "final_bid_amount": live_bid / 100000,
+    #                     "win_probability": live_win_prob,
+    #                     "won": None
+    #                 }).execute()
+
+    #                 if res.data:
+    #                     st.session_state.strategy_saved = True
+    #                     st.toast(f"✅ Strategy saved for '{project_name_input}'")
+    #                 else:
+    #                     st.error("❌ Insert returned no data")
+
+    #             except Exception as e:
+    #                 st.error(f"Save failed: {e}")
+
+    # with btn2:
+    #     if st.button("🚀 Push Proposal", type="primary"):
+    #         st.balloons()
+
+    #     st.markdown('</div>', unsafe_allow_html=True)
 
 if __name__ == "__main__":
     bid_generation_page()

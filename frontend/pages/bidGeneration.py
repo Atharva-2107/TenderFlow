@@ -729,7 +729,9 @@ def bid_generation_page():
         competitor_density = st.slider("Competitor Density (No. of bidders)", 1, 12, 6)
 
     with right_col:
+        # DYNAMIC BID: Use user's selected values from sliders
         live_bid = total_prime * (1 + overhead_pct/100) * (1 + profit_pct/100)
+        live_gross_profit = live_bid - total_prime
 
         live_win_prob = predict_win_api(
             total_prime,
@@ -740,15 +742,12 @@ def bid_generation_page():
             competitor_density
         )
 
-        # Original Optimization Loop Logic
-        # base = total_prime * (1 + overhead_pct / 100)
-        
-        # best_score = -1
-        # best_profit = profit_pct
-        # best_bid = base * (1 + profit_pct / 100)
-        # best_win_prob = 0
+        # AI OPTIMIZATION: Find best profit % for recommendation (separate from user's choice)
         base = total_prime * (1 + overhead_pct / 100)
-        best_score, best_bid, best_profit, best_win_prob = -1, live_bid, profit_pct, live_win_prob
+        best_score = -1
+        ai_recommended_profit = profit_pct
+        ai_recommended_bid = live_bid
+        ai_recommended_win_prob = live_win_prob
 
         for p in range(5, 31):
             bid = base * (1 + p / 100)
@@ -760,38 +759,18 @@ def bid_generation_page():
             )
             score = (win_prob * 0.7) + ((p / 30) * 0.3)
             if score > best_score:
-                best_score, best_bid, best_profit, best_win_prob = score, bid, p, win_prob
-
-
-        # Loop through profit ranges as per your original logic
-        for p in range(5, 31):
-            bid = base * (1 + p / 100)
-            win_prob = predict_win_api(
-                prime_cost_rs=total_prime,
-                overhead_pct=overhead_pct,
-                profit_pct=p,
-                estimated_budget_rs=estimated_budget,
-                complexity=complexity_score,
-                competitors=competitor_density
-            )
-            # Original objective function: balance win chance + margin
-            score = (win_prob * 0.7) + ((p / 30) * 0.3)
-
-            if score > best_score:
                 best_score = score
-                best_profit = p
-                best_bid = bid
-                best_win_prob = win_prob
+                ai_recommended_profit = p
+                ai_recommended_bid = bid
+                ai_recommended_win_prob = win_prob
 
-        # Update displays based on best found configuration
-        gross_profit = best_bid - total_prime
-
+        # DISPLAY: Show bid based on USER'S slider selections (dynamic)
         st.markdown(f"""
             <div class="bid-box">
                 <div class="label-text" style="color: #DDD6FE;">Final Optimized Bid</div>
-                <div class="bid-price">{format_inr(best_bid)}</div>
+                <div class="bid-price">{format_inr(live_bid)}</div>
                 <div style="font-size: 0.85rem; color: #C4B5FD; opacity: 0.9;">
-                    Gross Profit: {format_inr(gross_profit)}
+                    Gross Profit: {format_inr(live_gross_profit)}
                 </div>
             </div>
         """, unsafe_allow_html=True)
@@ -809,35 +788,82 @@ def bid_generation_page():
         ))
         st.plotly_chart(fig, use_container_width=True)
 
-        st.markdown(f"**Live Win Chance:** {live_win_prob*100:.2f}%")
-        st.markdown(f"**AI Recommended Profit:** {best_profit}%")
+        st.markdown(f"**Your Current Win Chance:** {live_win_prob*100:.2f}%")
+        st.markdown(f"**Your Selected Profit:** {profit_pct}%")
+        st.markdown(f"**AI Recommended Profit:** {ai_recommended_profit}%")
         
-        # fig.update_layout(height=160, margin=dict(l=10, r=10, t=10, b=10), paper_bgcolor='rgba(0,0,0,0)')
-        # st.plotly_chart(fig, use_container_width=True)
-        
-        st.markdown(f"<div style='text-align:center; font-weight:600; color:#A855F7;'>{best_win_prob*100:.2f}% Chance of Winning</div>", unsafe_allow_html=True) 
-        st.markdown(f"**Final Bid:** {format_inr(best_bid)}")
+        st.markdown(f"<div style='text-align:center; font-weight:600; color:#A855F7;'>{live_win_prob*100:.2f}% Chance of Winning</div>", unsafe_allow_html=True) 
+        st.markdown(f"**Current Bid:** {format_inr(live_bid)}")
         st.markdown(f"**Complexity Score:** {complexity_score}/10")
         
-        # Dynamic Feedback
-        if best_win_prob > 0.8:
+        # Dynamic Feedback based on USER'S current selection
+        if live_win_prob > 0.8:
             st.success("✅ **Strong Positioning**")
-        elif best_win_prob > 0.5:
+        elif live_win_prob > 0.5:
             st.warning("⚖️ **Competitive Baseline**")
         else:
             st.error("🚨 **Low Probability**")
-            
-        st.info(f"💡 **AI Suggestion:** A {best_profit-2}% margin would increase win chance by ~11%.")
+        
+        # AI Suggestion comparing user's choice vs AI recommendation
+        if ai_recommended_profit != profit_pct:
+            profit_diff = ai_recommended_profit - profit_pct
+            win_diff = (ai_recommended_win_prob - live_win_prob) * 100
+            if profit_diff < 0:
+                st.info(f"💡 **AI Suggestion:** Reducing profit to {ai_recommended_profit}% could increase win chance by ~{win_diff:.1f}%.")
+            else:
+                st.info(f"💡 **AI Suggestion:** Consider {ai_recommended_profit}% profit margin for optimal balance.")
+        else:
+            st.success("✅ **Your selection matches AI recommendation!**")
 
         if st.button("💾 Save Strategy") and not st.session_state.strategy_saved:
             try:
+                # 1. Get User and Company Context
+                user = st.session_state.get("user")
+                user_id = user.id if user else None
+                
+                company_id = st.session_state.get("company_id")
+                if not company_id and user_id:
+                    # Fallback fetch
+                    resp = supabase.table("profiles").select("company_id").eq("id", user_id).maybe_single().execute()
+                    if resp.data:
+                        company_id = resp.data.get("company_id")
+                        st.session_state["company_id"] = company_id
+                        
+                # 2. Link to Generated Tender (Notification)
+                project_name = "Untitled Bid"
+                if st.session_state.tender_data and "project_name" in st.session_state.tender_data:
+                    project_name = st.session_state.tender_data["project_name"]
+                
+                gen_id = None
+                # Check if tender exists in generated_tenders
+                existing_tender = supabase.table("generated_tenders").select("id").eq("project_name", project_name).execute()
+                
+                if existing_tender.data:
+                    gen_id = existing_tender.data[0]['id']
+                else:
+                    # Create new entry for dashboard notification
+                    gen_res = supabase.table("generated_tenders").insert({
+                        "project_name": project_name,
+                        "status": "Open",
+                        "user_id": user_id,
+                        # Fill required fields with placeholders for Bid Strategy
+                        "content": "Bid Strategy Only"
+                    }).execute()
+                    if gen_res.data:
+                        gen_id = gen_res.data[0]['id']
+
+                # 3. Save Bid History
                 res = supabase.table("bid_history").insert({
+                    "company_id": company_id,
+                    "tender_id": gen_id,
                     "prime_cost": total_prime / 100000,
                     "overhead_pct": overhead_pct,
-                    "profit_pct": best_profit,
+                    "profit_pct": profit_pct,  # Save user's actual selection
                     "competitor_density": competitor_density,
-                    "final_bid_amount": best_bid / 100000,
-                    "win_probability": best_win_prob,
+                    "complexity_score": st.session_state.complexity_score, # Dynamic Score
+                    "final_bid_amount": live_bid / 100000,  # Save user's actual bid
+                    "win_probability": live_win_prob,  # Save user's actual win prob
+                    "won": None # Will be updated via Dashboard
                 }).execute()
 
                 if res.data:

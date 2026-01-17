@@ -19,6 +19,11 @@ import math
 import nest_asyncio
 import fitz  # PyMuPDF - 15-21x faster than PyPDF
 import gc
+from ml.trainModel import train_model
+import pandas as pd
+import xgboost as xgb
+import json
+from pydantic import BaseModel
 
 # Prevent event loop errors in async contexts
 nest_asyncio.apply()
@@ -1077,6 +1082,91 @@ async def analyze_tender(
             "status": "error",
             "message": str(e)
         }
+
+# --- AI MODEL SERVING ---
+model = None
+feature_columns = None
+
+def load_ai_model():
+    global model, feature_columns
+    try:
+        model = xgb.Booster()
+        # Use absolute path or relative to execution dir
+        model.load_model("ml/tenderflow_xgboost.json")
+        with open("ml/feature_columns.json", "r") as f:
+            feature_columns = json.load(f)
+        print("✅ AI Model loaded successfully")
+    except Exception as e:
+        print(f"⚠️ Model load failed (using fallback): {e}")
+        model = None
+
+class PredictRequest(BaseModel):
+    prime_cost_lakh: float
+    overhead_pct: float
+    profit_pct: float
+    estimated_budget_lakh: float
+    complexity_score: int
+    competitor_density: int
+
+@app.post("/predict-win")
+async def predict_win(data: PredictRequest):
+    global model, feature_columns
+    
+    if not model:
+        load_ai_model()
+    
+    if not model:
+         # Fallback if model still not loaded (e.g. no training data yet)
+         print("Model not available, returning default")
+         return {"win_probability": 0.5, "note": "Model not loaded"}
+
+    try:
+        # Prepare inputs matching training features
+        # Training used: prime_cost, overhead_pct, profit_pct, complexity_score, competitor_density
+        # Note: estimated_budget is ignored as per training data availability
+        input_dict = {
+            "prime_cost": data.prime_cost_lakh,
+            "overhead_pct": data.overhead_pct,
+            "profit_pct": data.profit_pct,
+            "complexity_score": data.complexity_score,
+            "competitor_density": data.competitor_density
+        }
+        
+        # Ensure DataFrame aligns with feature columns
+        df = pd.DataFrame([input_dict])
+        
+        # Add missing cols if any (robustness)
+        for c in feature_columns:
+            if c not in df.columns:
+                df[c] = 0
+                
+        # Reorder
+        df = df[feature_columns]
+        
+        dtest = xgb.DMatrix(df)
+        preds = model.predict(dtest)
+        prob = float(preds[0])
+        return {"win_probability": prob}
+    except Exception as e:
+        print(f"Prediction error: {e}")
+        return {"win_probability": 0.5}
+
+@app.post("/retrain-model")
+async def retrain_model_endpoint():
+    """Trigger the XGBoost model retraining process using latest Supabase data"""
+    try:
+        # Run training synchronously (can be background task for scalability)
+        success = train_model()
+        if success:
+            # RELOAD MODEL IN MEMORY
+            load_ai_model()
+            return {"status": "success", "message": "Model retrained and reloaded successfully"}
+        else:
+            raise HTTPException(status_code=500, detail="Training returned False")
+    except Exception as e:
+        print(f"Retraining Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 if __name__ == "__main__":
     import uvicorn

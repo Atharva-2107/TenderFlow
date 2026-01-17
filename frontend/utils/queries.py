@@ -51,3 +51,15 @@ def get_pending_tenders():
         .execute()
     )
     return response.data or []
+
+
+def get_pending_bids():
+    """Fetch only pending bids (won=null) with minimal data - NOT cached for real-time updates"""
+    response = (
+        supabase
+        .table("bid_history_v2")
+        .select("id, project_name, category, won")
+        .is_("won", "null")
+        .execute()
+    )
+    return response.data or []

@@ -8,7 +8,7 @@ import time
 from dotenv import load_dotenv
 from supabase import create_client
 from utils.auth import can_access
-from utils.queries import get_tenders, get_bids, get_generated_tenders, get_pending_tenders
+from utils.queries import get_tenders, get_bids, get_generated_tenders, get_pending_tenders, get_pending_bids
 import base64
 from pathlib import Path
 
@@ -259,6 +259,22 @@ if "pending_notification_action" in st.session_state:
     # Show toast feedback
     st.toast(f"Marked '{project_name}' as {status.title()}!")
 
+# ============================================================
+# PENDING BID ACTION HANDLER (Process Win/Lose for Bid Strategies)
+# ============================================================
+if "pending_bid_action" in st.session_state:
+    action_data = st.session_state.pop("pending_bid_action")
+    bid_id = action_data["bid_id"]
+    project_name = action_data["project_name"]
+    won_status = action_data["won"]  # True for Won, False for Lost
+    
+    # Update DB - won column in bid_history_v2
+    supabase.table("bid_history_v2").update({"won": won_status}).eq("id", bid_id).execute()
+    
+    # Show toast feedback
+    result_text = "Won" if won_status else "Lost"
+    st.toast(f"Marked bid '{project_name}' as {result_text}!")
+
 # Data loading (NOW with fresh data if action was processed above)
 tenders = get_tenders()
 # bids = get_bids() # REMOVED: User requested to ignore bid_history
@@ -390,10 +406,64 @@ if unique_pending:
         with notif_cols[2]:
              st.markdown('<div style="height: 18px"></div>', unsafe_allow_html=True)
              if st.button("❌ Lost", key=f"lose_{tender_id}", use_container_width=True):
-                # Set pending action and rerun - action will be processed BEFORE data is fetched
                 st.session_state["pending_notification_action"] = {
                     "project_name": project_name,
                     "status": "lost"
+                }
+                st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# BID STRATEGY NOTIFICATIONS - Pending bid decisions
+pending_bids = get_pending_bids()  # Direct DB query, not cached for real-time updates
+
+# Get unique pending bids by project_name
+seen_bid_projects = set()
+unique_pending_bids = []
+for bid in pending_bids:
+    proj = bid.get("project_name", "Unnamed")
+    if proj not in seen_bid_projects:
+        seen_bid_projects.add(proj)
+        unique_pending_bids.append(bid)
+
+if unique_pending_bids:
+    st.markdown('<div class="notification-container">', unsafe_allow_html=True)
+    for bid in unique_pending_bids:
+        bid_id = bid.get("id")
+        project_name = bid.get("project_name", "Unnamed Bid")
+        category = bid.get("category", "")
+        
+        bid_notif_cols = st.columns([0.7, 0.15, 0.15])
+        
+        with bid_notif_cols[0]:
+            st.markdown(f'''
+                <div class="notification-card-unified" style="border-left: 3px solid #10b981; border-top-right-radius: 4px; border-bottom-right-radius: 4px; margin-right: -10px;">
+                    <div class="notification-content">
+                        <div class="notification-icon" style="background: rgba(16, 185, 129, 0.15);">💰</div>
+                        <div class="notification-text-group">
+                            <div class="notification-title">{project_name}</div>
+                            <div class="notification-subtitle">Bid Strategy • {category if category else "Uncategorized"}</div>
+                        </div>
+                    </div>
+                </div>
+            ''', unsafe_allow_html=True)
+            
+        with bid_notif_cols[1]:
+            st.markdown('<div style="height: 18px"></div>', unsafe_allow_html=True)
+            if st.button("✅ Won", key=f"bid_win_{bid_id}", type="primary", use_container_width=True):
+                st.session_state["pending_bid_action"] = {
+                    "bid_id": bid_id,
+                    "project_name": project_name,
+                    "won": True
+                }
+                st.rerun()
+                
+        with bid_notif_cols[2]:
+            st.markdown('<div style="height: 18px"></div>', unsafe_allow_html=True)
+            if st.button("❌ Lost", key=f"bid_lose_{bid_id}", use_container_width=True):
+                st.session_state["pending_bid_action"] = {
+                    "bid_id": bid_id,
+                    "project_name": project_name,
+                    "won": False
                 }
                 st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)

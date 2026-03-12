@@ -258,22 +258,9 @@ def parse_pdf_hybrid_quality(file_path: str) -> list:
                 BATCH_SIZE = 20
                 batches = [pages_needing_ocr[i:i + BATCH_SIZE] for i in range(0, len(pages_needing_ocr), BATCH_SIZE)]
                 
-                ocr_results = []
-                ocr_results = []
                 # OPTIMIZATION: Limit concurrent OCR usage to prevent API/System overload
                 max_ocr_workers = min(3, os.cpu_count() or 3)
                 
-                with ThreadPoolExecutor(max_workers=max_ocr_workers) as executor: # Reduced concurrent API calls
-                    future_to_batch = {executor.submit(process_ocr_batch, batch, i): batch for i, batch in enumerate(batches)}
-                    
-                    for future in as_completed(future_to_batch):
-                        result_docs = future.result()
-                        ocr_results.extend(result_docs)
-                
-                # Simple mapping: Assuming LlamaParse returns docs in order of pages in the batch PDF
-                # We need to be careful. LlamaParse generally preserves order.
-                # However, since we batch, we need to map results back to specific page numbers carefully.
-                # A safer approach is to trust that `ocr_results` contains text for the pages we sent.
                 # But parallel returns are out of order. We need deeper mapping structure.
                 
                 # REVISED STRATEGY: Map batch results back to logic. 
@@ -282,21 +269,17 @@ def parse_pdf_hybrid_quality(file_path: str) -> list:
                 # BUT, wait. LlamaParse `load_data` returns a list of docs.
                 # If we process batches, we know which pages were in each batch.
                 
-                # Rerunning with simpler ordered collection
-                all_ocr_docs_ordered = []
-                # Rerunning with simpler ordered collection
-                all_ocr_docs_ordered = []
                 # OPTIMIZATION: Consistent worker count
                 with ThreadPoolExecutor(max_workers=max_ocr_workers) as executor:
-                    # Submit all batches
+                    # Submit all batches in order
                     futures = []
                     for i, batch in enumerate(batches):
                         futures.append(executor.submit(process_ocr_batch, batch, i))
                         
-                    # Collect results in order of submission (batches)
+                    # Collect results in submission order (preserves batch ordering)
+                    all_ocr_docs_ordered = []
                     for future, batch in zip(futures, batches):
                         batch_docs = future.result()
-                        # Map these docs to the pages in this batch
                         for i, doc in enumerate(batch_docs):
                             if i < len(batch):
                                 original_page = batch[i]
@@ -1128,6 +1111,7 @@ async def predict_win(data: PredictRequest):
             "prime_cost": data.prime_cost_lakh,
             "overhead_pct": data.overhead_pct,
             "profit_pct": data.profit_pct,
+            "estimated_budget": data.estimated_budget_lakh,
             "complexity_score": data.complexity_score,
             "competitor_density": data.competitor_density
         }

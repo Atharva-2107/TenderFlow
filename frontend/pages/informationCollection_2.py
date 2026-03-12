@@ -201,6 +201,22 @@ st.markdown("""
         </div>
         """, unsafe_allow_html=True)
 
+# SKIP SHORTCUT
+with st.expander("⚡ Skip Setup & Go to Dashboard", expanded=False):
+    st.warning("**Shortcut Mode** — Skip the remaining setup and go directly to the dashboard. You can complete your profile later.")
+    skip_col1, skip_col2, skip_col3 = st.columns([1, 1, 1])
+    with skip_col2:
+        if st.button("🚀 Skip to Dashboard", key="skip_to_dash_2", use_container_width=True):
+            try:
+                supabase.table("profiles").update({
+                    "onboarding_complete": True,
+                    "onboarding_step": 999
+                }).eq("id", user_id).execute()
+            except Exception:
+                pass
+            st.session_state["onboarding_complete"] = True
+            st.switch_page("pages/dashboard.py")
+
 # FORM LAYOUT
 c1, c2 = st.columns(2, gap="large")
 

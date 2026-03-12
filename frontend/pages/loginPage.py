@@ -276,7 +276,7 @@ with col_login:
 
         if st.query_params.get("go_signUp") == "true":
             st.query_params.clear()
-            st.switch_page("pages/signupPage.py")
+            st.switch_page("pages/signPage.py")
 
         st.markdown("""
             <p style='text-align:center;color:#2d313e;font-size:10px;margin-top:50px'>

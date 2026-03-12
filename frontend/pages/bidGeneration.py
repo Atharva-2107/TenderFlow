@@ -103,13 +103,23 @@ except ImportError:
 @st.cache_resource
 def load_model():
     try:
-        model = xgb.XGBClassifier()
-        model.load_model("ml/tenderflow_xgboost.json")
+        import pickle
+        # Load XGBClassifier from pkl (supports predict_proba)
+        with open("ml/tenderflow_xgboost.pkl", "rb") as f:
+            model = pickle.load(f)
         with open("ml/feature_columns.json") as f:
             features = json.load(f)
         return model, features
     except Exception:
-        return None, None
+        # Fallback: try loading from JSON with XGBClassifier
+        try:
+            model = xgb.XGBClassifier()
+            model.load_model("ml/tenderflow_xgboost.json")
+            with open("ml/feature_columns.json") as f:
+                features = json.load(f)
+            return model, features
+        except Exception:
+            return None, None
 
 model, FEATURE_COLUMNS = load_model()
 
@@ -169,90 +179,92 @@ def keyword_fallback_items(text):
     ]
     
 def extract_billable_items(text):
-    # st.code(raw, language="json")
     if not os.getenv("GROQ_API_KEY"):
         st.warning("Groq API key missing")
         return []
 
     prompt = f"""
-    You are a tender BOQ extraction engine.
+You are a specialized tender BOQ (Bill of Quantities) extraction engine for Indian government and infrastructure projects.
 
-    From the tender document below, extract ALL billable or quote-required items.
+From the tender document text below, extract ALL billable or quote-required line items.
 
-    Include:
-    - BOQ headings
-    - Schedule items
-    - Commercial bid items
-    - Compensation / payment items
-    - Charges, fees, services, deliverables
+Include:
+- BOQ headings and schedule items
+- Commercial bid items
+- Compensation / payment line items
+- Service fees, charges, or deliverables with a monetary component
+- Supply items, materials, equipment
 
-    Rules:
-    - Headings only (NOT full sentences)
-    - 3–12 words per item
-    - No quantities
-    - No rates
-    - No explanations
-    - Output ONLY a valid JSON array of strings
-    - Max 30 items
+Strict Rules:
+- Each item: SHORT heading only (3-12 words), no quantities, no rates, no explanations
+- Skip eligibility criteria, conditions of contract, general instructions, annexures
+- Output ONLY a valid JSON array of strings
+- Do NOT include any text before or after the JSON array
+- Maximum 30 items
+- If no clear BOQ items found, return an empty array: []
 
-    EXAMPLE OUTPUT:
-    [
-    "Hardship compensation amount",
-    "Monthly displacement compensation",
-    "Stamp duty and registration charges"
-    ]
+EXAMPLE:
+[
+  "Hardship compensation lump sum amount",
+  "Monthly displacement compensation per family",
+  "Stamp duty and registration charges",
+  "RCC column construction per floor",
+  "Electrical panel supply and installation"
+]
 
-    TENDER TEXT:
-    {text[:4000]}
+TENDER TEXT (first 4000 chars):
+{text[:4000]}
 
-    """
+JSON ARRAY OUTPUT:
+"""
 
     try:
-            response = requests.post(
-        "https://api.groq.com/openai/v1/chat/completions",
-        headers={
-            "Authorization": f"Bearer {os.getenv('GROQ_API_KEY')}",
-            "Content-Type": "application/json"
-        },
-        json={
-            "model": "llama-3.1-8b-instant",
-            "messages": [
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ],
-            "temperature": 0
-        },
-        timeout=15
-            )
+        response = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {os.getenv('GROQ_API_KEY')}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": "llama-3.3-70b-versatile",
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": "You are a BOQ extraction engine. Always return only a valid JSON array. Never explain anything."
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                "temperature": 0,
+                "max_tokens": 1024
+            },
+            timeout=30
+        )
 
-            data = response.json()
+        data = response.json()
 
-            # 🔍 FULL DEBUG (TEMPORARY)
-            # st.write("🔴 Raw Groq response:")
-            # st.json(data)
+        if "choices" not in data:
+            error_msg = data.get("error", {}).get("message", "Unknown Groq error")
+            st.error(f"Groq error: {error_msg}")
+            return []
+        
+        raw = data["choices"][0]["message"]["content"]
+        items = safe_json_parse(raw)
 
-            if "choices" not in data:
-                error_msg = data.get("error", {}).get("message", "Unknown Groq error")
-                st.error(f"Groq error: {error_msg}")
-                return []
-            
-            raw = data["choices"][0]["message"]["content"]
+        if not isinstance(items, list):
+            return []
 
-            # 🔍 DEBUG (temporary – REMOVE after verification)
-            # st.code(raw, language="json")
-
-            items = safe_json_parse(raw)
-
-            return [
-                {"Task": normalize_task(item), "Qty": 1, "Rate": 0}
-                for item in items
-            ]
+        return [
+            {"Task": normalize_task(item), "Qty": 1, "Rate": 0}
+            for item in items
+            if isinstance(item, str) and item.strip()
+        ]
 
     except Exception as e:
         st.error(f"Groq failed: {e}")
-        return []     
+        return []
 
 def auto_fill_rates(boq_items, tender_text):
     if not os.getenv("GROQ_API_KEY"):
@@ -262,31 +274,50 @@ def auto_fill_rates(boq_items, tender_text):
 
     for item in boq_items:
         task = item["Task"]
+        item_type = classify_item(task)
 
-        prompt = f"""
-You are an Indian procurement & tender costing expert.
+        # Use default rates for known materials to avoid expensive API calls
+        task_lower = task.lower()
+        default_rate = None
+        for mat_key, mat_rate in DEFAULT_MATERIAL_RATES.items():
+            if mat_key in task_lower:
+                default_rate = mat_rate
+                break
 
-Determine a realistic **Indian local market rate** for the item below.
+        if default_rate is not None:
+            priced_items.append({"Task": task, "Qty": 1, "Rate": default_rate})
+            continue
+
+        category_hint = {
+            "material": "raw material or construction supply",
+            "service": "professional service or labour work",
+            "non_billable": "administrative or documentation item"
+        }.get(item_type, "general item")
+
+        prompt = f"""You are an Indian procurement and tender costing expert specializing in government projects.
+
+Determine a realistic Indian local market rate for the item below.
+
+Context:
+- Item Type: {category_hint}
+- Year: 2024-2025
+- Market: Indian government/PSU procurement
 
 Rules:
-- Decide whether the item is MATERIAL or SERVICE
-- Assume quantity = 1
-- Use Indian market norms (2024–2025)
 - Rate MUST be a single number in INR
-- NO ranges, NO explanation
-- If unsure, give your best expert estimate
+- Assume quantity = 1 unit
+- For services: per day/lump sum as appropriate
+- For materials: per standard unit (kg, MT, cum, bag, etc.)
+- NO ranges, NO explanation, NO units in the number
+- If item is non-billable or administrative, return 0
+- Return STRICT JSON only: {{"rate": 12345}}
 
-Return STRICT JSON only:
+Item: "{task}"
 
-{{
-  "rate": 12345
-}}
+Tender context (scale reference only):
+{tender_text[:800]}
 
-Item:
-"{task}"
-
-Tender context (for scale only):
-{tender_text[:1500]}
+JSON:
 """
 
         rate = 0
@@ -299,21 +330,25 @@ Tender context (for scale only):
                     "Content-Type": "application/json"
                 },
                 json={
-                    "model": "llama-3.1-8b-instant",
-                    "messages": [{"role": "user", "content": prompt}],
-                    "temperature": 0.2
+                    "model": "llama-3.3-70b-versatile",
+                    "messages": [
+                        {"role": "system", "content": "You are a pricing engine. Return only valid JSON with a single 'rate' key."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    "temperature": 0.1,
+                    "max_tokens": 50
                 },
                 timeout=15
             )
 
             data = response.json()
-            raw = data["choices"][0]["message"]["content"]
+            if "choices" in data:
+                raw = data["choices"][0]["message"]["content"]
+                parsed = safe_json_parse(raw)
+                if isinstance(parsed, dict) and "rate" in parsed:
+                    rate = int(parsed["rate"])
 
-            parsed = safe_json_parse(raw)
-            if isinstance(parsed, dict) and "rate" in parsed:
-                rate = int(parsed["rate"])
-
-        except Exception as e:
+        except Exception:
             rate = 0
 
         priced_items.append({
@@ -324,31 +359,81 @@ Tender context (for scale only):
 
     return priced_items
 
+def predict_win_probability(
+    prime_cost,
+    overhead_pct,
+    profit_pct,
+    estimated_budget,
+    complexity_score,
+    competitors,
+):
+    """
+    Hybrid win probability: blends ML model output with analytical formula.
+    Falls back to formula-only if model is unavailable.
+    """
 
-    
-def predict_win_api(prime_cost_rs, overhead_pct, profit_pct, estimated_budget_rs, complexity, competitors):
-    """Original API Logic with Fallback simulation"""
-    payload = {
-        "prime_cost_lakh": prime_cost_rs / 100000,
-        "overhead_pct": overhead_pct,
-        "profit_pct": profit_pct,
-        "estimated_budget_lakh": estimated_budget_rs / 100000,
-        "complexity_score": int(complexity),
-        "competitor_density": int(competitors),
-    }
+    # --- Analytical Formula ---
+    bid_price = prime_cost * (1 + overhead_pct / 100) * (1 + profit_pct / 100)
+    price_ratio = bid_price / max(estimated_budget, 1)
 
-    try:
-        r = requests.post("http://127.0.0.1:8000/predict-win", json=payload, timeout=2)
-        data = r.json()
-        if "win_probability" in data: return data["win_probability"]
-        elif "probability" in data: return data["probability"]
-        elif "win_prob" in data: return data["win_prob"]
-        return 0.5
-    except:
-        # Fallback Simulation Logic (Maintains responsiveness if API is down)
-        base = 0.85
-        prob = base - (profit_pct * 0.015) - (competitors * 0.04)
-        return max(0.05, min(0.95, prob))
+    if price_ratio <= 1:
+        price_score = 1 - (price_ratio - 0.9) * 0.8
+    else:
+        price_score = max(0, 1 - (price_ratio - 1) * 2)
+    price_score = min(max(price_score, 0), 1)
+
+    profit_score = 1 - (profit_pct / 40)
+    profit_score = min(max(profit_score, 0), 1)
+
+    competition_score = 1 / (1 + competitors * 0.35)
+
+    complexity_norm = 1 - (complexity_score / 12)
+    complexity_norm = min(max(complexity_norm, 0), 1)
+
+    formula_prob = (
+        price_score * 0.45 +
+        profit_score * 0.25 +
+        competition_score * 0.20 +
+        complexity_norm * 0.10
+    )
+
+    # --- ML Model Prediction ---
+    ml_prob = None
+    if model is not None and FEATURE_COLUMNS is not None:
+        try:
+            input_data = {
+                "prime_cost": prime_cost,
+                "overhead_pct": overhead_pct,
+                "profit_pct": profit_pct,
+                "estimated_budget": estimated_budget,
+                "complexity_score": complexity_score,
+                "competitor_density": competitors
+            }
+            df_input = pd.DataFrame([input_data])
+            # Ensure all required features are present
+            for col in FEATURE_COLUMNS:
+                if col not in df_input.columns:
+                    df_input[col] = 0
+            df_input = df_input[FEATURE_COLUMNS]
+            ml_prob = float(model.predict_proba(df_input)[0][1])
+        except Exception:
+            ml_prob = None
+
+    # --- Blend: 60% ML, 40% formula (or 100% formula if ML unavailable) ---
+    if ml_prob is not None:
+        raw_prob = ml_prob * 0.60 + formula_prob * 0.40
+    else:
+        raw_prob = formula_prob
+
+    # Smooth transitions to avoid jarring jumps
+    prev = st.session_state.get("last_win_prob", raw_prob)
+    smooth_prob = prev * 0.75 + raw_prob * 0.25
+
+    # Clamp to realistic bounds
+    final_prob = min(max(smooth_prob, 0.08), 0.92)
+
+    st.session_state["last_win_prob"] = final_prob
+    return final_prob
 
 def bid_generation_page():
     if not st.session_state.get("authenticated"):
@@ -358,6 +443,7 @@ def bid_generation_page():
     if not st.session_state.get("active_company_id"):
         st.error("Company context missing. Please login again.")
         st.stop()
+        
     # --- MODERN STYLING (Original CSS) ---
     st.markdown("""
 <style>
@@ -661,102 +747,39 @@ a:hover {
 </style>
 """, unsafe_allow_html=True)
 
-    # st.markdown("""
-    #     <style>
-    #     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=JetBrains+Mono:wght@400;700&display=swap');
-    #     .stApp { background: radial-gradient(circle at 20% 30%, #1a1c4b 0%, #0f111a 100%); color: #FAFAFA; font-family: 'Inter', sans-serif; }
-                
-    #     header { visibility: hidden; }
-
-    #     div.block-container {
-    #         padding-top: 0.3rem !important; 
-    #     }
-                
-    #     /* HEADER NAV CONTAINER */
-    #     .header-nav {
-    #         background: linear-gradient(
-    #             135deg,
-    #             rgba(255,255,255,0.08),
-    #             rgba(255,255,255,0.02)
-    #         );
-    #         backdrop-filter: blur(10px);
-    #         border: 1px solid rgba(255,255,255,0.12);
-    #         border-radius: 16px;
-    #         padding: 12px 18px;
-    #         margin-bottom: 22px;
-    #     }
-
-    #     .glass-card {
-    #         background: rgba(24, 24, 27, 0.8);
-    #         border-radius: 16px;
-    #         padding: 24px;
-    #         border: 1px solid rgba(63, 63, 70, 0.5);
-    #         margin-bottom: 20px;
-    #     }
-    #     .bid-box {
-    #         background: linear-gradient(135deg, #6D28D9 0%, #4C1D95 100%);
-    #         border-radius: 16px;
-    #         padding: 32px;
-    #         text-align: center;
-    #         box-shadow: 0 0 30px rgba(139, 92, 246, 0.2);
-    #         border: 1px solid rgba(167, 139, 250, 0.3);
-    #     }
-    #     .bid-price {
-    #         font-family: 'JetBrains Mono', monospace;
-    #         font-size: 3.2rem;
-    #         font-weight: 700;
-    #         color: #FFFFFF;
-    #         letter-spacing: -2px;
-    #     }
-    #     .label-text { color: #A1A1AA; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; }
-    #     .stButton>button { border-radius: 10px; background-color: #7C3AED; color: white; border: none; font-weight: 600; width: 100%; }
-    #     header, footer { visibility: hidden; }
-    #     </style>
-    # """, unsafe_allow_html=True)
-
-    # HEADER NAVIGATION
+    # HEADER
     left, center = st.columns([3, 6])
 
     with left:
         logo_path = Path(__file__).resolve().parents[1] / "assets" / "logo.png"
         logo = get_base64_of_bin_file(logo_path)
-
         if logo:
-            st.markdown(f"""
-                <div style="display:flex; align-items:center;">
-                    <img src="data:image/png;base64,{logo}" width="200">
-                </div>
-            """, unsafe_allow_html=True)
+            st.markdown(f'<img src="data:image/png;base64,{logo}" width="180" style="margin-top:4px">', unsafe_allow_html=True)
 
     with center:
-        header_cols = st.columns([3, 0.4, 0.4, 0.4, 0.4, 0.4])
+        header_cols = st.columns([3, 0.5, 0.5, 0.5, 0.5, 0.5])
 
         with header_cols[1]:
             if st.button("⊞", key="h_dash", help="Dashboard"):
                 st.switch_page("app.py")
-
         with header_cols[2]:
             if can_access("tender_generation"):
                 if st.button("⎘", key="h_gen", help="Tender Generation"):
                     st.switch_page("pages/tenderGeneration.py")
             else:
-                st.button("⎘", key="h_gen_disabled", disabled=True, help="Access restricted")
-
-
+                st.button("⎘", key="h_gen_disabled", disabled=True)
         with header_cols[3]:
             if can_access("tender_analysis"):
                 if st.button("◈", key="h_anl", help="Tender Analysis"):
                     st.switch_page("pages/tenderAnalyser.py")
             else:
                 st.button("◈", key="h_anl_disabled", disabled=True)
-
         with header_cols[4]:
             if can_access("bid_generation"):
                 if st.button("✦", key="h_bid", help="Bid Generation"):
                     st.switch_page("pages/bidGeneration.py")
             else:
                 st.button("✦", key="h_bid_disabled", disabled=True)
-
         with header_cols[5]:
             if can_access("risk_analysis"):
                 if st.button("⬈", key="h_risk", help="Risk Analysis"):
@@ -764,26 +787,32 @@ a:hover {
             else:
                 st.button("⬈", key="h_risk_disabled", disabled=True)
 
-    st.markdown("<div> <hr> </div>", unsafe_allow_html=True)
-    # --- HEADER ---
-    st.markdown("<h1 style='margin-bottom: 0;'>Bid <span style='color: #a855f7;'>Generation</span></h1>", unsafe_allow_html=True)
-    st.markdown("<p style='color: #71717A;'>Smart Bid Generation & Optimization Engine</p>", unsafe_allow_html=True)
+    # PAGE TITLE
+    st.markdown("""
+    <div style="border-bottom:1px solid rgba(168,85,247,0.2);padding-bottom:14px;margin:10px 0 20px;">
+        <h1 style="color:white;font-size:24px;font-weight:800;margin:0;">Bid <span style='color:#a855f7'>Generation</span></h1>
+        <p style="color:rgba(255,255,255,0.45);margin:3px 0 0;font-size:13px;">Smart Bid Generation &amp; Optimization Engine</p>
+    </div>
+    """, unsafe_allow_html=True)
 
-    # --- INITIALIZATION LOGIC (CENTERED UI) ---
+    # UPLOAD PANEL
     if not st.session_state.extraction_done:
-        st.markdown("<div style='height: 15vh;'></div>", unsafe_allow_html=True)
-        _, col_mid, _ = st.columns([1, 2, 1]) 
-
+        st.markdown("<div style='height:8vh'></div>", unsafe_allow_html=True)
+        _, col_mid, _ = st.columns([1, 1.6, 1])
         with col_mid:
-            # st.markdown('<div class="glass-card" style="text-align: center;">', unsafe_allow_html=True)
-            st.markdown("### 📂 Initialize New Bid")
-            st.write("Upload your technical proposal to begin AI cost extraction.")
-
-            uploaded_tender = st.file_uploader(
-                "Drop PDF here",
-                type=["pdf"],
-                label_visibility="collapsed"
-            )
+            st.markdown("""
+            <div style="text-align:center;margin-bottom:24px;">
+                <div style="font-size:44px;margin-bottom:10px;">📂</div>
+                <h2 style="color:white;font-size:20px;font-weight:700;margin:0;">Initialize New Bid</h2>
+                <p style="color:rgba(255,255,255,0.45);font-size:13px;margin:6px 0 0;">Upload your tender PDF to begin AI-powered cost extraction</p>
+            </div>
+            """, unsafe_allow_html=True)
+            with st.container(border=True):
+                uploaded_tender = st.file_uploader(
+                    "Drop PDF here",
+                    type=["pdf"],
+                    label_visibility="collapsed"
+                )
 
             if uploaded_tender:
                 file_id = f"{uploaded_tender.name}_{uploaded_tender.size}"
@@ -797,12 +826,13 @@ a:hover {
                     st.info("🔮 Analysis in progress...")
                     return
                     
-                # Reset state for new file
+                # Reset strategy_saved flag when a new file is detected
                 if st.session_state.get("last_file") != uploaded_tender.name:
                     st.session_state.last_file = uploaded_tender.name
                     st.session_state.cost_df = pd.DataFrame(columns=["Task", "Qty", "Rate"])
                     st.session_state.extraction_done = False
                     st.session_state.processed_file = None
+                    st.session_state.strategy_saved = False  # Reset save flag for new file
                 
                 # Mark as analyzing to prevent duplicate runs
                 st.session_state.analyzing_file = file_id
@@ -904,15 +934,15 @@ a:hover {
             st.markdown('</div>', unsafe_allow_html=True)
         return
 
-    # --- DASHBOARD VIEW (AFTER EXTRACTION) ---
+    # DASHBOARD - POST-EXTRACTION
     tender_data = st.session_state.tender_data or {}
     complexity_score = st.session_state.complexity_score or 5
 
-    st.divider()
     left_col, right_col = st.columns([1.8, 1.2], gap="large")
-    st.caption("🤖 Materials suggested by AI. Please verify quantities & rates before bidding.")
+
     with left_col:
-        st.markdown('<p class="label-text">Resource Ledger</p>', unsafe_allow_html=True)
+        st.markdown('<p class="label-text">📋 Bill of Quantities (BOQ)</p>', unsafe_allow_html=True)
+        st.caption("🤖 Items extracted by AI. Verify quantities & rates before submitting.")
         
         edited_df = st.data_editor(
             st.session_state.cost_df,
@@ -956,14 +986,14 @@ a:hover {
         live_bid = total_prime * (1 + overhead_pct/100) * (1 + profit_pct/100)
         live_gross_profit = live_bid - total_prime
 
-        live_win_prob = predict_win_api(
-            total_prime,
-            overhead_pct,
-            profit_pct,
-            estimated_budget,
-            st.session_state.complexity_score,
-            competitor_density
-        )
+        live_win_prob = predict_win_probability(
+        prime_cost=total_prime,
+        overhead_pct=overhead_pct,
+        profit_pct=profit_pct,
+        estimated_budget=estimated_budget,
+        complexity_score=st.session_state.complexity_score,
+        competitors=competitor_density,
+    )
 
         # AI OPTIMIZATION: Find best profit % for recommendation (separate from user's choice)
         base = total_prime * (1 + overhead_pct / 100)
@@ -974,12 +1004,15 @@ a:hover {
 
         for p in range(5, 31):
             bid = base * (1 + p / 100)
-            win_prob = predict_win_api(
-                total_prime, overhead_pct, p,
-                estimated_budget,
-                st.session_state.complexity_score,
-                competitor_density
+            win_prob = predict_win_probability(
+                prime_cost=total_prime,
+                overhead_pct=overhead_pct,
+                profit_pct=p,
+                estimated_budget=estimated_budget,
+                complexity_score=st.session_state.complexity_score,
+                competitors=competitor_density
             )
+            
             score = (win_prob * 0.7) + ((p / 30) * 0.3)
             if score > best_score:
                 best_score = score
@@ -1137,89 +1170,4 @@ a:hover {
         if push_clicked:
             st.balloons()
 
-
-    with btn2:
-        # 👇 Keep empty (so layout stays clean)
-        st.empty()
-
-
-    # with btn1:
-    #     # Project name input for saving (mandatory)
-    #     st.markdown('<p class="label-text">Save Strategy</p>', unsafe_allow_html=True)
-    #     st.markdown('<span style="color: #A855F7; font-size: 0.85rem;">Project Name <span style="color: #EF4444;">*</span></span>', unsafe_allow_html=True)
-    #     project_name_input = st.text_input(
-    #         "Project Name", 
-    #         value="", 
-    #         placeholder="Enter project name (required)...",
-    #         help="Name for this bid strategy (mandatory)",
-    #         key="bid_project_name",
-    #         label_visibility="collapsed"
-    #     )
-        
-    #     # Category dropdown (mandatory)
-    #     st.markdown('<span style="color: #A855F7; font-size: 0.85rem;">Category <span style="color: #EF4444;">*</span></span>', unsafe_allow_html=True)
-    #     category_options = [
-    #         "Select any one",
-    #         "Infrastructure",
-    #         "IT & Technology",
-    #         "Construction",
-    #         "Supply & Procurement",
-    #         "Consulting Services",
-    #         "Maintenance & Operations",
-    #         "Healthcare",
-    #         "Education",
-    #         "Energy & Utilities",
-    #         "Transport & Logistics",
-    #         "Other"
-    #     ]
-    #     project_category = st.selectbox(
-    #         "Category",
-    #         options=category_options,
-    #         index=0,
-    #         help="Select the category for this bid (mandatory)",
-    #         key="bid_category",
-    #         label_visibility="collapsed"
-    #     )
-        
-    #     if st.button("💾 Save Strategy", use_container_width=True) and not st.session_state.strategy_saved:
-    #         if not project_name_input or not project_name_input.strip():
-    #             st.warning("⚠️ Please enter a project name before saving.")
-    #         elif project_category == "Select any one":
-    #             st.warning("⚠️ Please select a category before saving.")
-    #         else:
-    #             try:
-    #                 company_id = st.session_state["active_company_id"]
-    #                 user_id = st.session_state.get("user_id")
-
-    #                 res = supabase.table("bid_history_v2").insert({
-    #                     "company_id": company_id,
-    #                     "tender_id": st.session_state.tender_id,
-    #                     "project_name": project_name_input.strip(),
-    #                     "category": project_category,
-    #                     "prime_cost": total_prime / 100000,
-    #                     "overhead_pct": overhead_pct,
-    #                     "profit_pct": profit_pct,
-    #                     "competitor_density": competitor_density,
-    #                     "complexity_score": st.session_state.complexity_score,
-    #                     "final_bid_amount": live_bid / 100000,
-    #                     "win_probability": live_win_prob,
-    #                     "won": None
-    #                 }).execute()
-
-    #                 if res.data:
-    #                     st.session_state.strategy_saved = True
-    #                     st.toast(f"✅ Strategy saved for '{project_name_input}'")
-    #                 else:
-    #                     st.error("❌ Insert returned no data")
-
-    #             except Exception as e:
-    #                 st.error(f"Save failed: {e}")
-
-    # with btn2:
-    #     if st.button("🚀 Push Proposal", type="primary"):
-    #         st.balloons()
-
-    #     st.markdown('</div>', unsafe_allow_html=True)
-
-if __name__ == "__main__":
-    bid_generation_page()
+bid_generation_page()

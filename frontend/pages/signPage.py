@@ -216,13 +216,15 @@ with col_signup:
                         if login_res.session:
                             st.session_state["sb_session"] = login_res.session
                             st.session_state["user"] = login_res.user
+                            st.session_state["user_id"] = login_res.user.id        # ✅ Required by bid generation
                             st.session_state["user_role"] = role
                             st.session_state["company_id"] = company_id
+                            st.session_state["active_company_id"] = company_id    # ✅ Required by bid generation
                             st.session_state["authenticated"] = True
 
                             # 5. REDIRECTION LOGIC
                             if team_choice == "Create New Team":
-                                st.success(f"Team Created! Your Invite Code is: {final_invite_code}")
+                                st.success(f"Team Created! Your Invite Code is: **{final_invite_code}** — save this to invite teammates.")
                                 time.sleep(2)
                                 st.session_state["onboarding_complete"] = False
                                 st.switch_page("pages/informationCollection_1.py")

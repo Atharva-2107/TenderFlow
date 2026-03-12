@@ -1,11 +1,25 @@
 import json
-import ollama
+import os
 import pdfplumber
 import re
-import streamlit as st
+from dotenv import load_dotenv
+from groq import Groq
+
+load_dotenv()
 
 LABELS = ["Financial", "Legal", "Payment", "Timeline", "Resource"]
-OLLAMA_MODEL = "llama3.1"  
+
+# Initialize Groq client
+_groq_client = None
+
+def get_groq_client():
+    global _groq_client
+    if _groq_client is None:
+        api_key = os.getenv("GROQ_API_KEY")
+        if api_key:
+            _groq_client = Groq(api_key=api_key)
+    return _groq_client
+
 
 # TEXT EXTRACTION
 def clean_extracted_text(text: str) -> str:
@@ -54,18 +68,19 @@ HARD_KEYWORDS = [
 def requires_ai_analysis(text: str) -> bool:
     t = text.lower()
     return any(k in t for k in HARD_KEYWORDS)
-    # return any(k in t for k in HARD_KEYWORDS) or len(t.split()) > 40
 
 
-def classify_clause_ollama(text: str):
+def classify_clause_groq(text: str):
     """
+    Uses Groq API (llama-3.3-70b-versatile) to classify clauses.
     Returns: (category, confidence)
-    category: one of LABELS or None
-    confidence: 0.0 to 1.0
     """
+    client = get_groq_client()
+    if not client:
+        # Fallback to keyword classification
+        return keyword_classify(text)
 
-    prompt = f"""
-You are a contract risk classifier.
+    prompt = f"""You are a contract risk classifier.
 
 Classify the following clause into ONLY ONE category from:
 Financial, Legal, Payment, Timeline, Resource
@@ -73,27 +88,30 @@ Financial, Legal, Payment, Timeline, Resource
 Return output strictly as JSON like:
 {{
   "category": "Financial|Legal|Payment|Timeline|Resource|None",
-  "confidence": 0.0
+  "confidence": 0.85
 }}
 
+Do NOT include any explanation. Only return the JSON.
+
 Clause:
-\"\"\"{text}\"\"\"
+\"\"\"{text[:800]}\"\"\"
 """
 
     try:
-        res = ollama.chat(
-            model=OLLAMA_MODEL,
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": prompt}],
-            options={"temperature": 0}
+            temperature=0,
+            max_tokens=100
         )
 
-        content = res["message"]["content"].strip()
+        content = response.choices[0].message.content.strip()
 
         # Extract JSON safely
         start = content.find("{")
         end = content.rfind("}")
         if start == -1 or end == -1:
-            return None, 0.0
+            return keyword_classify(text)
 
         data = json.loads(content[start:end + 1])
 
@@ -105,19 +123,46 @@ Clause:
 
         return category, confidence
 
-    except Exception:
+    except Exception as e:
+        print(f"[risk_engine] Groq classify failed: {e}. Using keyword fallback.")
+        return keyword_classify(text)
+
+
+def keyword_classify(text: str):
+    """
+    Pure keyword-based fallback classifier.
+    Returns (category, confidence).
+    """
+    t = text.lower()
+
+    scores = {
+        "Payment": sum(1 for k in ["payment", "compensation", "fees", "charges", "corpus fund", "gst", "stamp duty", "premium", "paid", "payable"] if k in t),
+        "Financial": sum(1 for k in ["liquidated", "penalty", "damages", "cost", "expense", "fsi", "tdr", "fungible"] if k in t),
+        "Timeline": sum(1 for k in ["delay", "time", "completion", "schedule", "milestone", "months", "days", "handover", "deadline"] if k in t),
+        "Legal": sum(1 for k in ["terminate", "termination", "indemn", "liability", "arbitration", "court", "litigation"] if k in t),
+        "Resource": sum(1 for k in ["manpower", "staff", "labour", "equipment", "machinery"] if k in t),
+    }
+
+    best_cat = max(scores, key=scores.get)
+    best_score = scores[best_cat]
+
+    if best_score == 0:
         return None, 0.0
+
+    # Normalize confidence (0 to 1 range, max 3 keyword hits = 1.0)
+    confidence = min(best_score / 3.0, 1.0)
+    return best_cat, confidence
 
 
 def classify_clauses_batch(texts, threshold=0.12, batch_size=8):
     """
-    Keeps same output format as LegalBERT:
-    [(text, category, confidence), ...]
+    Classifies a list of clauses.
+    Returns: [(text, category, confidence), ...]
     """
     results = []
 
     for text in texts:
-        category, confidence = classify_clause_ollama(text)
+        category, confidence = classify_clause_groq(text)
 
         if category and confidence >= threshold:
             results.append((text, category, confidence))
@@ -210,19 +255,37 @@ def extract_risk_highlight(text, category):
     return text.strip()
 
 
-# AI IMPACT
+# AI IMPACT — Enhanced with Groq for richer insights
 def generate_ai_impact(category, text):
+    """Generate a context-aware impact statement based on category and clause text."""
+    t = text.lower()
+
     if category == "Financial":
-        return "The clause creates monetary exposure or cost escalation risk."
+        if "liquidated" in t or "penalty" in t:
+            return "This clause imposes **liquidated damages or penalty clauses** that create direct financial liability. Quantify the maximum exposure and ensure mitigation strategies are in place."
+        return "The clause creates monetary exposure, cost escalation, or financial liability risk that could affect project profitability."
+
     if category == "Payment":
-        return "The clause imposes payment or compensation obligations."
+        if "corpus fund" in t or "displacement" in t:
+            return "The clause mandates **corpus fund contributions or displacement compensation** — these are non-negotiable financial obligations requiring upfront capital allocation."
+        return "The clause imposes payment or compensation obligations with defined timelines. Delayed payment may attract interest or penalties."
+
     if category == "Timeline":
-        return "The clause enforces delivery timelines that may trigger delays."
+        if "delay" in t:
+            return "This clause carries **delay risk** — non-completion within stipulated time triggers penalties. Review extension of time (EOT) provisions carefully."
+        return "The clause enforces strict delivery timelines. Failure to meet milestones may trigger penalties or contract termination."
+
     if category == "Legal":
-        return "The clause introduces legal liability or enforcement risk."
+        if "arbitration" in t:
+            return "This clause specifies **arbitration as the dispute resolution mechanism** — understand the jurisdiction, arbitrator selection, and enforceability."
+        if "terminate" in t or "termination" in t:
+            return "The clause grants **termination rights** — understand under what conditions and what the financial/legal consequences are."
+        return "The clause introduces legal liability, indemnity obligations, or enforcement risk that requires legal review."
+
     if category == "Resource":
-        return "The clause imposes manpower or operational obligations."
-    return "The clause introduces contractual risk."
+        return "The clause imposes **manpower, equipment, or resource deployment obligations** that must be pre-planned to avoid compliance failures."
+
+    return "The clause introduces contractual risk requiring review and mitigation strategy."
 
 
 # MAIN ENTRY POINT (SENTENCE-LEVEL RISKS)
@@ -238,7 +301,7 @@ def analyze_pdf(uploaded_file):
 
     for clause, primary_category, confidence in classified:
 
-        # 🔑 SPLIT INTO SENTENCES = MULTIPLE RISKS PER CATEGORY
+        # SPLIT INTO SENTENCES = MULTIPLE RISKS PER CATEGORY
         sentences = re.split(r"(?<=[.;])\s+", clause)
 
         for sentence in sentences:
@@ -285,6 +348,5 @@ def analyze_pdf(uploaded_file):
 
     results.sort(key=risk_score, reverse=True)
 
-    # Return ONLY top 10 risks as a list
+    # Return top 10 risks
     return results[:10]
-

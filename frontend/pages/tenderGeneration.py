@@ -292,19 +292,19 @@ def create_pdf(text_content):
 # PAGE CONFIG (PRESERVED)
 st.set_page_config(
     page_title="Automated Tender Generation",
-    page_icon="📄",
+    page_icon="ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã¢â‚¬Å¾",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
 
-# CSS (UI = 2nd code)
+# CSS
 st.markdown(f"""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
 
 .stApp {{
-    background: {BG_GRADIENT} !important;
+    background: radial-gradient(circle at 20% 30%, #1a1c4b 0%, #0f111a 100%) !important;
     font-family: 'Plus Jakarta Sans', sans-serif;
     color: {THEME_WHITE};
 }}
@@ -312,57 +312,190 @@ st.markdown(f"""
 header, footer {{ visibility: hidden; }}
 
 .block-container {{
-    margin-top: -70px;
+    padding-top: 0.5rem !important;
+    max-width: 100% !important;
 }}
 
+/* Alerts */
 .stAlert {{
-    background-color: rgba(168, 85, 247, 0.1);
-    border: 1px solid {THEME_PURPLE};
+    background: rgba(168, 85, 247, 0.08);
+    border: 1px solid rgba(168,85,247,0.25);
+    border-radius: 12px;
     color: white;
 }}
 
+/* Buttons */
 button[kind="primary"] {{
-    background-color: {THEME_PURPLE} !important;
+    background: linear-gradient(135deg, #7c3aed, #a855f7) !important;
     border: none !important;
     color: white !important;
-    border-radius: 12px !important;
+    border-radius: 10px !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.3px !important;
+    transition: opacity 0.15s !important;
+}}
+
+button[kind="primary"]:hover {{
+    opacity: 0.88 !important;
 }}
 
 button[kind="secondary"] {{
-    background-color: rgba(255,255,255,0.05) !important;
-    color: white !important;
-    border: 1px solid rgba(255,255,255,0.1) !important;
-    border-radius: 12px !important;
+    background: rgba(255,255,255,0.06) !important;
+    color: rgba(255,255,255,0.85) !important;
+    border: 1px solid rgba(255,255,255,0.12) !important;
+    border-radius: 10px !important;
+    font-weight: 600 !important;
 }}
 
+button[kind="secondary"]:hover {{
+    background: rgba(255,255,255,0.10) !important;
+}}
+
+/* Section Navigation Buttons */
+div[data-testid="stVerticalBlock"] > div > div[data-testid="stVerticalBlock"] button {{
+    text-align: left !important;
+    justify-content: flex-start !important;
+}}
+
+/* Progress Bar */
 div[data-baseweb="progress-bar"] > div > div {{
-    background-color: {THEME_PURPLE} !important;
+    background: linear-gradient(90deg, #7c3aed, #a855f7) !important;
 }}
 
+/* Text Areas */
+.stTextArea textarea {{
+    background: rgba(255,255,255,0.04) !important;
+    color: white !important;
+    border: 1px solid rgba(168,85,247,0.35) !important;
+    border-radius: 12px !important;
+    font-family: 'Plus Jakarta Sans', sans-serif !important;
+    font-size: 14px !important;
+    line-height: 1.7 !important;
+}}
+
+/* File Uploader */
+[data-testid="stFileUploadDropzone"] {{
+    background: rgba(168,85,247,0.06) !important;
+    border: 2px dashed rgba(168,85,247,0.35) !important;
+    border-radius: 12px !important;
+    color: rgba(255,255,255,0.7) !important;
+}}
+
+/* Checkboxes & Toggles */
+[data-testid="stCheckbox"] label,
+[data-testid="stToggle"] label {{
+    color: rgba(255,255,255,0.8) !important;
+    font-size: 13px !important;
+}}
+
+/* Radio */
+.stRadio label {{
+    color: rgba(255,255,255,0.75) !important;
+    font-size: 13px !important;
+}}
+
+/* Select Slider */
+[data-testid="stSlider"] div {{
+    color: rgba(255,255,255,0.8) !important;
+}}
+
+/* Select Box */
+.stSelectbox label, .stTextInput label {{
+    color: rgba(255,255,255,0.55) !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+}}
+
+/* Download Button */
+[data-testid="stDownloadButton"] > button {{
+    background: rgba(255,255,255,0.06) !important;
+    border: 1px solid rgba(255,255,255,0.12) !important;
+    color: rgba(255,255,255,0.85) !important;
+    border-radius: 10px !important;
+}}
+
+/* Section Title */
 .section-title {{
-    font-size: 2.5rem;
+    font-size: 2.2rem;
     font-weight: 800;
-    background: white;
+    background: linear-gradient(135deg, #ffffff, #d8b4fe);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
-    margin-bottom: 5px;
+    margin-bottom: 2px;
 }}
 
+/* Document Paper */
 .document-paper {{
-    background: transparent !important;
-    color: white;
-    padding: 50px;
-    border-radius: 2px;
-    min-height: 1000px;
-    font-family: 'Times New Roman', Times, serif;
-    box-shadow: 0 20px 40px rgba(0,0,0,0.4);
-    line-height: 1.6;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.07);
+    color: rgba(255,255,255,0.92);
+    padding: 40px 48px;
+    border-radius: 16px;
+    min-height: 700px;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    line-height: 1.8;
+    font-size: 14px;
 }}
 
-.stTextArea textarea {{
-    background: rgba(0,0,0,0.2) !important;
-    color: white !important;
-    border: 1px solid {THEME_PURPLE} !important;
+.document-paper h1, .document-paper h2, .document-paper h3 {{
+    color: white;
+    margin-top: 1.4em;
+}}
+
+.document-paper table {{
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+}}
+
+.document-paper th {{
+    background: rgba(168,85,247,0.2);
+    color: white;
+    padding: 10px 12px;
+    text-align: left;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    border: 1px solid rgba(168,85,247,0.25);
+}}
+
+.document-paper td {{
+    color: rgba(255,255,255,0.8);
+    padding: 9px 12px;
+    border: 1px solid rgba(255,255,255,0.07);
+    font-size: 13px;
+}}
+
+.document-paper tr:nth-child(even) td {{
+    background: rgba(255,255,255,0.02);
+}}
+
+/* Pane Cards */
+.pane-section {{
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 14px;
+    padding: 16px;
+    margin-bottom: 14px;
+}}
+
+.pane-label {{
+    color: rgba(255,255,255,0.4);
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 10px;
+}}
+
+/* Eligibility Outline */
+.eligibility-outline {{
+    border: 1.5px dashed rgba(168, 85, 247, 0.45);
+    border-radius: 12px;
+    padding: 8px;
+    background: rgba(168, 85, 247, 0.04);
 }}
 </style>
 """, unsafe_allow_html=True)
@@ -371,11 +504,11 @@ div[data-baseweb="progress-bar"] > div > div {{
 # SESSION STATE (PRESERVED)
 if 'sections' not in st.session_state:
     st.session_state.sections = {
-        'Eligibility Response': {'status': '⚠', 'content': '', 'clauses': 0},
-        'Technical Proposal': {'status': '⚠', 'content': '', 'clauses': 0},
-        'Financial Statements': {'status': '❌', 'content': '', 'clauses': 0},
-        'Declarations & Forms': {'status': '✅', 'content': '', 'clauses': 0},
-        'Annexures': {'status': '❌', 'content': '', 'clauses': 0}
+        'Eligibility Response': {'status': 'Ã¢Å¡Â ', 'content': '', 'clauses': 0},
+        'Technical Proposal': {'status': 'Ã¢Å¡Â ', 'content': '', 'clauses': 0},
+        'Financial Statements': {'status': 'Ã¢ÂÅ’', 'content': '', 'clauses': 0},
+        'Declarations & Forms': {'status': 'Ã¢Å“â€¦', 'content': '', 'clauses': 0},
+        'Annexures': {'status': 'Ã¢ÂÅ’', 'content': '', 'clauses': 0}
     }
 
 if 'current_section' not in st.session_state:
@@ -396,71 +529,77 @@ if 'current_filename' not in st.session_state:
     st.session_state.current_filename = None
 
 
-# HEADER NAVIGATION (UI from 2nd code)
-left, center = st.columns([3, 6])
+# HEADER NAVIGATION
+left, center = st.columns([3, 7])
 
 with left:
     logo_path = Path(__file__).resolve().parents[1] / "assets" / "logo.png"
     logo = get_base64_of_bin_file(logo_path)
     if logo:
-        st.markdown(f"""
-            <div style="display:flex; align-items:center;">
-                <img src="data:image/png;base64,{logo}" width="200">
-            </div>
-        """, unsafe_allow_html=True)
+        st.markdown(f'<img src="data:image/png;base64,{logo}" width="180" style="margin-top:4px">', unsafe_allow_html=True)
 
 with center:
-    header_cols = st.columns([3, 0.4, 0.4, 0.4, 0.4, 0.4])
-
-    with header_cols[1]:
-        if st.button("⊞", key="h_dash", help="Dashboard"):
+    nav_cols = st.columns([3, 0.5, 0.5, 0.5, 0.5, 0.5])
+    with nav_cols[1]:
+        if st.button("Ã¢Å Å¾", key="h_dash", help="Dashboard"):
             st.switch_page("app.py")
-
-    with header_cols[2]:
+    with nav_cols[2]:
         if can_access("tender_generation"):
-            if st.button("⎘", key="h_gen", help="Tender Generation"):
+            if st.button("Ã¢Å½Ëœ", key="h_gen", help="Tender Generation"):
                 st.switch_page("pages/tenderGeneration.py")
         else:
-            st.button("⎘", key="h_gen_disabled", disabled=True, help="Access restricted")
-
-    with header_cols[3]:
+            st.button("Ã¢Å½Ëœ", key="h_gen_disabled", disabled=True, help="Access restricted")
+    with nav_cols[3]:
         if can_access("tender_analysis"):
-            if st.button("◈", key="h_anl", help="Tender Analysis"):
+            if st.button("Ã¢â€”Ë†", key="h_anl", help="Tender Analysis"):
                 st.switch_page("pages/tenderAnalyser.py")
         else:
-            st.button("◈", key="h_anl_disabled", disabled=True)
-
-    with header_cols[4]:
+            st.button("Ã¢â€”Ë†", key="h_anl_disabled", disabled=True)
+    with nav_cols[4]:
         if can_access("bid_generation"):
-            if st.button("✦", key="h_bid", help="Bid Generation"):
+            if st.button("Ã¢Å“Â¦", key="h_bid", help="Bid Generation"):
                 st.switch_page("pages/bidGeneration.py")
         else:
-            st.button("✦", key="h_bid_disabled", disabled=True)
-
-    with header_cols[5]:
+            st.button("Ã¢Å“Â¦", key="h_bid_disabled", disabled=True)
+    with nav_cols[5]:
         if can_access("risk_analysis"):
-            if st.button("⬈", key="h_risk", help="Risk Analysis"):
+            if st.button("Ã¢Â¬Ë†", key="h_risk", help="Risk Analysis"):
                 st.switch_page("pages/riskAnalysis.py")
         else:
-            st.button("⬈", key="h_risk_disabled", disabled=True)
+            st.button("Ã¢Â¬Ë†", key="h_risk_disabled", disabled=True)
 
 
-# TOP BANNER (PRESERVED DATA, UI like 2nd)
+# TOP BANNER
 st.markdown(f"""
-<div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom: 26px; border-bottom: 1px solid rgba(168, 85, 247, 0.3); padding-bottom: 16px;">
+<div style="
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    margin: 14px 0 22px 0;
+    padding-bottom: 16px;
+    border-bottom: 1px solid rgba(168,85,247,0.25);
+">
     <div>
         <h1 class="section-title">Tender Studio</h1>
-        <p style="color: rgba(255,255,255,0.6); margin: 0;">AI-Powered Clause Generation & Response Drafting</p>
-        <p style="color: rgba(255,255,255,0.35); margin: 6px 0 0 0; font-size: 0.9rem;">
-            <strong>Submission Deadline:</strong> {st.session_state.tender_config['deadline']}
+        <p style="color:rgba(255,255,255,0.5);margin:2px 0 0 0;font-size:13px;">AI-Powered Clause Generation &amp; Response Drafting</p>
+        <p style="color:rgba(255,255,255,0.3);margin:4px 0 0 0;font-size:12px;">
+            <strong style="color:rgba(168,85,247,0.8)">Deadline:</strong> {st.session_state.tender_config['deadline']}
         </p>
     </div>
     <div style="text-align:right;">
-        <span style="font-weight:700; color:{THEME_PURPLE};">Authority:</span>
-        <span>{st.session_state.tender_config['authority']}</span><br>
-        <span style="display:inline-block; margin-top:6px; padding:6px 10px; border:1px solid rgba(168,85,247,0.35); border-radius:12px; background: rgba(168,85,247,0.08);">
-            {st.session_state.tender_config['status']}
-        </span>
+        <div style="color:rgba(255,255,255,0.4);font-size:11px;text-transform:uppercase;letter-spacing:1px;">Authority</div>
+        <div style="color:white;font-size:15px;font-weight:600;margin-top:2px;">{st.session_state.tender_config['authority']}</div>
+        <div style="
+            display:inline-block;
+            margin-top:6px;
+            padding:5px 12px;
+            border:1px solid rgba(168,85,247,0.35);
+            border-radius:100px;
+            background:rgba(168,85,247,0.1);
+            color:rgba(168,85,247,0.9);
+            font-size:12px;
+            font-weight:700;
+        ">{st.session_state.tender_config['status']}</div>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -483,10 +622,10 @@ def handle_regeneration():
 
         company_context = ""
         if user_id_local:
-            st.toast("🔍 Fetching company data...")
+            st.toast("ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ‚Â Fetching company data...")
             company_context = get_company_context(user_id_local)
             if company_context:
-                st.toast(f"✅ Context loaded ({len(company_context)} chars)")
+                st.toast(f"ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Context loaded ({len(company_context)} chars)")
 
         payload = {
             "filename": st.session_state.current_filename,
@@ -563,19 +702,31 @@ def handle_export_complete_docx():
 # 3-PANE LAYOUT (UI from 2nd code, data/logic from 1st)
 left_pane, center_pane, right_pane = st.columns([1, 3.5, 1], gap="large")
 
-# ---------------- LEFT PANE ----------------
+# Ã¢â€â‚¬Ã¢â€â‚¬ LEFT PANE Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 with left_pane:
-    st.markdown("<br><br>", unsafe_allow_html=True)
-    st.markdown("### 📤 Source")
-
+    # Upload Section
+    st.markdown('<div class="pane-label">Ã°Å¸â€œÂ¤ Source Document</div>', unsafe_allow_html=True)
     with st.container(border=True):
-        uploaded_file = st.file_uploader("Upload RFP", type=['pdf'], label_visibility="collapsed")
+        uploaded_file = st.file_uploader("Upload RFP / Tender PDF", type=['pdf'], label_visibility="collapsed")
 
         use_hq_parsing = st.checkbox(
-            "Enable High Quality Parsing (Slower, Cloud-based)",
+            "High-Quality OCR Parsing",
             value=False,
-            help="Uses LlamaParse Vision to better extract tables and scanned text. Requires valid API Key."
+            help="Uses LlamaParse for tables & scanned docs. Slower."
         )
+
+        if uploaded_file:
+            # Reset pdf_uploaded state when a NEW file is selected
+            if uploaded_file.name != st.session_state.get("current_filename"):
+                st.session_state.pdf_uploaded = False
+                st.session_state.current_filename = None
+                # Reset section contents for the new document
+                for sec_name in st.session_state.sections:
+                    st.session_state.sections[sec_name]['content'] = ''
+                    st.session_state.sections[sec_name]['clauses'] = 0
+                    st.session_state.sections[sec_name]['status'] = 'Ã¢Å¡Â '
+                    if f"edited_content_{sec_name}" in st.session_state:
+                        del st.session_state[f"edited_content_{sec_name}"]
 
         if uploaded_file and not st.session_state.pdf_uploaded:
             try:
@@ -583,46 +734,60 @@ with left_pane:
                     files = {"file": (uploaded_file.name, uploaded_file, "application/pdf")}
                     data = {"parsing_mode": "High-Quality" if use_hq_parsing else "Fast"}
 
-                    response = requests.post(f"{API_BASE_URL}/upload-tender", files=files, data=data)
+                    response = requests.post(
+                        f"{API_BASE_URL}/upload-tender",
+                        files=files,
+                        data=data,
+                        timeout=120
+                    )
 
                     if response.status_code == 200:
                         st.session_state.pdf_uploaded = True
                         st.session_state.current_filename = uploaded_file.name
 
-                        # Auto-update statuses (PRESERVED)
                         st.session_state.sections['Eligibility Response']['status'] = '✅'
                         st.session_state.sections['Technical Proposal']['status'] = '✅'
                         st.session_state.sections['Financial Statements']['status'] = '✅'
                         st.session_state.sections['Declarations & Forms']['status'] = '✅'
                         st.session_state.sections['Annexures']['status'] = '✅'
 
-                        # Clause counts (PRESERVED)
                         st.session_state.sections['Eligibility Response']['clauses'] = 12
                         st.session_state.sections['Technical Proposal']['clauses'] = 8
                         st.session_state.sections['Financial Statements']['clauses'] = 5
                         st.session_state.sections['Declarations & Forms']['clauses'] = 4
                         st.session_state.sections['Annexures']['clauses'] = 3
 
-                        mode_msg = "High Quality (Vision)" if use_hq_parsing else "Fast (Local)"
-                        st.success(f"✅ Document Analyzed & Indexed! Mode: {mode_msg}")
+                        mode_msg = "OCR" if use_hq_parsing else "Fast"
+                        st.success(f"✅ Indexed! Mode: {mode_msg}")
                         st.rerun()
                     else:
-                        st.error(f"Analysis failed: {response.text}")
+                        st.error(f"Upload failed: {response.text}")
 
+            except requests.exceptions.Timeout:
+                st.error("⏱️ Timed out. Try Fast mode or a smaller file.")
             except Exception as e:
-                st.error(f"Connection Error: {str(e)}")
+                st.error(f"Error: {str(e)}")
 
-    st.markdown("### 📑 Sections")
+    if st.session_state.pdf_uploaded:
+        st.markdown(f'<div style="color:#86efac;font-size:11px;margin-top:4px;">📄 {st.session_state.current_filename}</div>', unsafe_allow_html=True)
+
+    st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
+
+    # Sections
+    st.markdown('<div class="pane-label">📑 Sections</div>', unsafe_allow_html=True)
+
+    STATUS_COLORS = {'✅': '#86efac', '⚠': '#fcd34d', '❌': '#f87171'}
 
     for section_name, section_data in st.session_state.sections.items():
         is_active = section_name == st.session_state.current_section
+        status = section_data['status']
+        sc = STATUS_COLORS.get(status, 'white')
 
-        # Apply dotted outline ONLY for Eligibility Response
         if section_name == "Eligibility Response":
             st.markdown('<div class="eligibility-outline">', unsafe_allow_html=True)
 
         if st.button(
-            f"{section_data['status']} {section_name}",
+            f"{status} {section_name}",
             key=f"nav_{section_name}",
             use_container_width=True,
             type="primary" if is_active else "secondary"
@@ -633,31 +798,29 @@ with left_pane:
         if section_name == "Eligibility Response":
             st.markdown('</div>', unsafe_allow_html=True)
 
-
-#  CENTER PANE
+# ── CENTER PANE ──────────────────────────────────────────────
 with center_pane:
     current = st.session_state.current_section
     section_data = st.session_state.sections[current]
 
-    col_title, col_toggle = st.columns([3, 1])
-    with col_title:
-        st.markdown(f"## {current}")
+    # Toolbar header
+    toolbar_left, toolbar_right = st.columns([3, 1])
+    with toolbar_left:
+        st.markdown(f"""
+        <div style="margin-bottom:8px;">
+            <h2 style="color:white;font-size:22px;font-weight:700;margin:0;">{current}</h2>
+            <p style="color:rgba(255,255,255,0.35);font-size:12px;margin:3px 0 0 0;">
+                {'📋 Generated from ' + str(section_data['clauses']) + ' clauses' if section_data['clauses'] > 0 else '⬆ Upload a tender document to enable AI generation'}
+            </p>
+        </div>""", unsafe_allow_html=True)
 
-    with col_toggle:
-        is_editing = st.toggle("Editor", value=False, key=f"edit_mode_{current}")
+    with toolbar_right:
+        is_editing = st.toggle("✏️ Edit Mode", value=False, key=f"edit_mode_{current}")
 
-    # Clause info (PRESERVED)
-    if section_data['clauses'] > 0:
-        st.markdown(
-            f"<small style='color: rgba(255,255,255,0.45);'>📋 Generated from {section_data['clauses']} clauses</small>",
-            unsafe_allow_html=True
-        )
-    else:
-        st.info("🔄 Upload a tender document to generate this section")
+    st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
 
-    # Content render (PRESERVED)
-    default_text = "Click 'Generate all Sections' to draft this proposal section using AI."
-
+    # Content
+    default_text = "Click **Generate All Sections** in the right panel to draft this proposal using AI."
     if f"edited_content_{current}" not in st.session_state:
         st.session_state[f"edited_content_{current}"] = section_data['content'] or default_text
 
@@ -665,2844 +828,115 @@ with center_pane:
         new_content = st.text_area(
             "Edit Content",
             value=st.session_state[f"edited_content_{current}"],
-            height=800,
+            height=680,
             label_visibility="collapsed",
             key=f"editor_{current}"
         )
         st.session_state[f"edited_content_{current}"] = new_content
 
-        col_save_space, col_save_btn = st.columns([3, 1])
-        with col_save_btn:
-            if st.button("💾 Save", key=f"save_edit_{current}", use_container_width=True):
+        save_col1, save_col2 = st.columns([3, 1])
+        with save_col2:
+            if st.button("Ã°Å¸â€™Â¾ Save Edits", key=f"save_edit_{current}", use_container_width=True, type="primary"):
                 st.session_state.sections[current]['content'] = new_content
                 st.session_state[f"content_{current}"] = new_content
-                st.success("Changes saved!")
+                st.success("Saved!")
                 st.rerun()
-
     else:
         display_content = st.session_state.sections[current]['content'] or default_text
         html_content = markdown2.markdown(display_content, extras=["tables", "header-ids"])
+        st.markdown(f'<div class="document-paper">{html_content}</div>', unsafe_allow_html=True)
 
-        st.markdown(f"""
-            <div class="document-paper">
-                {html_content}
-            </div>
-        """, unsafe_allow_html=True)
+    st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
 
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    # Action buttons (PRESERVED)
-    col1, col2 = st.columns([1, 1])
-
-    with col1:
-        st.button("🔄 Regenerate Section", use_container_width=True, type="primary", on_click=handle_regeneration)
-
-    with col2:
+    # Action row
+    act1, act2 = st.columns(2)
+    with act1:
+        st.button("Ã°Å¸â€â€ž Regenerate Section", use_container_width=True, type="primary", on_click=handle_regeneration)
+    with act2:
         full_text = handle_export_complete_docx()
         full_pdf = create_legal_pdf(full_text)
-
         st.download_button(
-            "💾 Export Complete Tender",
+            "Ã°Å¸â€œÂ¥ Export Complete Tender PDF",
             data=full_pdf,
-            file_name=f"Full_Tender_Response_{st.session_state.current_filename}.pdf",
+            file_name=f"TenderResponse_{st.session_state.current_filename or 'Draft'}.pdf",
             mime="application/pdf",
             use_container_width=True
         )
 
 
-# RIGHT PANE
+
+# Ã¢â€â‚¬Ã¢â€â‚¬ RIGHT PANE Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 with right_pane:
-    st.markdown("### Generation Controls")
 
-    # Tone selector (PRESERVED)
-    st.markdown("**Tone Style**")
-    st.radio(
-        "Tone",
-        ["Formal", "Ultra-Formal"],
-        label_visibility="collapsed",
-        key="gen_tone"
-    )
+    st.markdown('<div class="pane-label">Ã¢Å¡â„¢Ã¯Â¸Â Generation Controls</div>', unsafe_allow_html=True)
 
-    # Jurisdiction selector (PRESERVED)
-    st.markdown("**Jurisdiction**")
-    st.radio(
-        "Jurisdiction",
-        ["Government PSU", "Private Sector"],
-        label_visibility="collapsed",
-        key="gen_jurisdiction"
-    )
+    with st.container(border=True):
+        st.markdown('<div style="color:rgba(255,255,255,0.55);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Tone</div>', unsafe_allow_html=True)
+        st.radio("Tone", ["Formal", "Ultra-Formal"], label_visibility="collapsed", key="gen_tone")
 
-    # Compliance toggle (PRESERVED)
-    st.markdown("**Compliance Mode**")
-    st.toggle(
-        "Strict compliance only",
-        value=True,
-        help="Only include clauses with strict compliance requirements",
-        key="gen_compliance"
-    )
+        st.markdown('<div style="color:rgba(255,255,255,0.55);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin:10px 0 6px;">Jurisdiction</div>', unsafe_allow_html=True)
+        st.radio("Jurisdiction", ["Government PSU", "Private Sector"], label_visibility="collapsed", key="gen_jurisdiction")
 
-    st.markdown("---")
+        st.markdown('<div style="height:4px"></div>', unsafe_allow_html=True)
+        st.toggle("Strict Compliance Mode", value=True, key="gen_compliance")
 
-    # Extra settings (PRESERVED)
-    st.markdown("**📊 Citation Level**")
-    st.select_slider(
-        "Citation",
-        options=["Minimal", "Standard", "Detailed"],
-        value="Standard",
-        label_visibility="collapsed",
-        key="gen_citation"
-    )
+    st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
+    st.markdown('<div class="pane-label">Ã°Å¸â€œÅ  Output Settings</div>', unsafe_allow_html=True)
 
-    st.markdown("**🔍 Content Depth**")
-    st.select_slider(
-        "Depth",
-        options=["Concise", "Standard", "Comprehensive"],
-        value="Standard",
-        label_visibility="collapsed",
-        key="gen_depth"
-    )
+    with st.container(border=True):
+        st.select_slider("Citation Level", options=["Minimal", "Standard", "Detailed"], value="Standard", key="gen_citation")
+        st.select_slider("Content Depth", options=["Concise", "Standard", "Comprehensive"], value="Standard", key="gen_depth")
 
-    st.markdown("---")
+    st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
+    st.markdown('<div class="pane-label">Ã°Å¸Å¡â‚¬ Bulk Actions</div>', unsafe_allow_html=True)
+    st.button("Ã¢Å¡Â¡ Generate All Sections", use_container_width=True, type="primary", on_click=handle_bulk_generation)
 
-    # Bulk actions (PRESERVED)
-    st.markdown("### Bulk Actions")
-    st.button("Generate All Sections", use_container_width=True, type="primary", on_click=handle_bulk_generation)
+    st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
+    st.markdown('<div class="pane-label">Ã¢ËœÂÃ¯Â¸Â Cloud Save</div>', unsafe_allow_html=True)
 
-    st.markdown("<br>", unsafe_allow_html=True)
+    with st.container(border=True):
+        category_options = [
+            "Any", "Infrastructure", "IT & Technology", "Construction",
+            "Supply & Procurement", "Healthcare", "Education",
+            "Transport & Logistics", "Energy & Utilities"
+        ]
+        selected_category = st.selectbox("Category", options=category_options, index=0)
+        project_name_input = st.text_input("Project Name", value="New Tender")
 
-    # Save to Supabase DB (PRESERVED)
-    st.markdown("### Cloud Save")
-    
-    category_options = [
-        "Any", "Infrastructure", "IT & Technology", "Construction", 
-        "Supply & Procurement", "Healthcare", "Education", 
-        "Transport & Logistics", "Energy & Utilities"
-    ]
-    
-    selected_category = st.selectbox(
-        "Category",
-        options=category_options,
-        index=0,
-        help="Select the category for this tender"
-    )
+        if st.button("Ã°Å¸â€™Â¾ Save to Cloud DB", use_container_width=True):
+            current_user = st.session_state.get("user")
+            current_user_id = getattr(current_user, 'id', None) or (current_user.get('id') if isinstance(current_user, dict) else None)
 
-    project_name_input = st.text_input("Project Name", value="New Tender", help="Name for this tender project")
-
-    if st.button("Save to Cloud DB", use_container_width=True, help="Save all generated sections to Supabase"):
-        current_user = st.session_state.get("user")
-        current_user_id = getattr(current_user, 'id', None) or (current_user.get('id') if isinstance(current_user, dict) else None)
-
-        if not current_user_id:
-            st.warning("You must be logged in to save to the cloud.")
-        else:
-            saved_count = 0
-            with st.spinner("Saving to database..."):
-                for sec_name, sec_data in st.session_state.sections.items():
-                    content_to_save = sec_data.get('content', '')
-                    if content_to_save:
-                        pdf_bytes = create_legal_pdf(content_to_save)
-
-                        success = save_tender_to_db(
-                            user_id=current_user_id,
-                            project_name=project_name_input,
-                            content=content_to_save,
-                            section_type=sec_name,
-                            category=selected_category,
-                            pdf_bytes=pdf_bytes
-                        )
-                        if success:
-                            saved_count += 1
-
-            if saved_count > 0:
-                st.success(f"✅ Successfully saved {saved_count} sections to cloud!")
+            if not current_user_id:
+                st.warning("You must be logged in to save.")
             else:
-                st.warning("No content to save (generate sections first).")
+                saved_count = 0
+                with st.spinner("Saving..."):
+                    for sec_name, sec_data in st.session_state.sections.items():
+                        content_to_save = sec_data.get('content', '')
+                        if content_to_save:
+                            pdf_bytes = create_legal_pdf(content_to_save)
+                            success = save_tender_to_db(
+                                user_id=current_user_id,
+                                project_name=project_name_input,
+                                content=content_to_save,
+                                section_type=sec_name,
+                                category=selected_category,
+                                pdf_bytes=pdf_bytes
+                            )
+                            if success:
+                                saved_count += 1
+                if saved_count > 0:
+                    st.success(f"Ã¢Å“â€¦ {saved_count} sections saved!")
+                else:
+                    st.warning("Generate sections first.")
 
 
-# Footer (PRESERVED)
-st.markdown("---")
-st.markdown(f"""
-<div style='text-align:center; color: rgba(255,255,255,0.25); font-size: 0.85rem; padding-bottom: 30px;'>
-    <strong>Tender Generation System</strong> | Last saved: {datetime.now().strftime('%H:%M:%S')} | Auto-save enabled
+# Footer
+st.markdown("""
+<div style='text-align:center; color:rgba(255,255,255,0.2); font-size:12px; padding:24px 0 16px;
+    border-top:1px solid rgba(255,255,255,0.06); margin-top:20px;'>
+    <strong style="color:rgba(168,85,247,0.7)">TenderFlow</strong> &middot; Tender Studio &middot; AI-Powered Procurement Intelligence
 </div>
 """, unsafe_allow_html=True)
 
-
-
-# import streamlit as st
-# from datetime import datetime, timedelta
-# import time
-# # from PyPDF2 import PdfReader # Removed local processing
-# import json
-# import requests
-# import markdown2
-# from xhtml2pdf import pisa
-# from io import BytesIO
-# from utils.auth import can_access
-
-
-# if not can_access("tender_generation"):
-#     st.error("You are not authorized to access this page.")
-#     st.stop()
-
-
-# import os
-# from supabase import create_client, Client
-
-# # Visual Editor Imports
-# try:
-#     from streamlit_quill import st_quill
-#     import markdownify
-#     HAS_VISUAL_EDITOR = True
-# except ImportError:
-#     HAS_VISUAL_EDITOR = False
-
-# API_BASE_URL = "http://localhost:8000"
-
-# # Initialize Supabase Client (Accessing env vars or session)
-# url = os.environ.get("SUPABASE_URL")
-# key = os.environ.get("SUPABASE_KEY")
-# if url and key:
-#     supabase: Client = create_client(url, key)
-    
-#     # Session Retrieval
-#     # Prioritize existing session in state (from Login page)
-#     current_session = st.session_state.get("sb_session")
-    
-#     # Try to refresh/get from client if no state, or just to check
-#     try:
-#         client_session = supabase.auth.get_session()
-#         if client_session:
-#             st.session_state.sb_session = client_session
-#             current_session = client_session
-#     except Exception as e:
-#         print(f"Session Error: {e}")
-    
-#     if current_session:
-#         user_id = current_session.user.id
-#         # Restore session to client if needed for subsequent calls
-#         # supabase.auth.set_session(current_session.access_token, current_session.refresh_token)
-#     else:
-#         user_id = None
-# else:
-#     user_id = None
-
-# def save_tender_to_db(user_id, project_name, content, section_type, pdf_bytes=None):
-#     """
-#     Saves a generated tender section to Supabase.
-#     If pdf_bytes is provided, uploads it to storage and saves the URL.
-#     """
-#     if not user_id:
-#         return False
-    
-#     try:
-#         # 1. Upload PDF if provided
-#         pdf_url = None
-#         if pdf_bytes:
-#             try:
-#                 # Unique filename: user_id/project_name_section_timestamp.pdf
-#                 # Sanitize filenames
-#                 safe_proj = "".join(c for c in project_name if c.isalnum() or c in (' ', '-', '_')).strip().replace(' ', '_')
-#                 safe_sec = "".join(c for c in section_type if c.isalnum() or c in (' ', '-', '_')).strip().replace(' ', '_')
-#                 timestamp = int(time.time())
-#                 file_path = f"{user_id}/{safe_proj}_{safe_sec}_{timestamp}.pdf"
-                
-#                 # Upload
-#                 supabase.storage.from_("generated-tenders").upload(
-#                     file_path,
-#                     pdf_bytes.getvalue() if hasattr(pdf_bytes, 'getvalue') else pdf_bytes,
-#                     {"content-type": "application/pdf", "upsert": "true"}
-#                 )
-                
-#                 # Get Public URL
-#                 pdf_url = supabase.storage.from_("generated-tenders").get_public_url(file_path)
-#             except Exception as e:
-#                 print(f"PDF Upload Error: {e}")
-#                 # We continue saving the DB record even if PDF upload fails, but log it.
-
-#         # 2. Insert DB Record
-#         data = {
-#             "user_id": user_id,
-#             "project_name": project_name,
-#             "content": content,
-#             "section_type": section_type,
-#             "created_at": datetime.now().isoformat()
-#         }
-        
-#         if pdf_url:
-#             data["pdf_url"] = pdf_url
-
-#         supabase.table("generated_tenders").insert(data).execute()
-#         return True
-#     except Exception as e:
-#         print(f"DB Save Error: {e}")
-#         return False
-
-# def get_company_context(user_id: str, section_type: str = None) -> str:
-#     """
-#     Fetches comprehensive company information for the given user_id.
-#     Matches the actual database schema from information collection pages.
-    
-#     Args:
-#         user_id: The user's UUID
-#         section_type: Optional section type to filter relevant fields
-    
-#     Returns:
-#         Formatted string with company context, sensitive data hashed
-#     """
-#     import hashlib
-    
-#     if not user_id:
-#         print(f"[DEBUG] get_company_context: No user_id provided")
-#         return ""
-    
-#     # CRITICAL: Use authenticated Supabase client with user's session
-#     sb_session = st.session_state.get("sb_session")
-#     if not sb_session:
-#         print(f"[DEBUG] get_company_context: No sb_session found")
-#         return ""
-    
-#     # Create authenticated client
-#     auth_supabase = create_client(url, key)
-#     auth_supabase.postgrest.auth(sb_session.access_token)
-    
-#     context_parts = []
-    
-#     def hash_sensitive(value: str, show_last: int = 4) -> str:
-#         """Hash sensitive data, showing only last N characters"""
-#         if not value or value == 'N/A':
-#             return 'N/A'
-#         if len(value) <= show_last:
-#             return '*' * len(value)
-#         return '*' * (len(value) - show_last) + value[-show_last:]
-    
-#     try:
-#         # 1. Company Information (from informationCollection_1.py)
-#         # Table: company_information, primary key: id = user_id
-#         print(f"[DEBUG] Fetching company_information for user_id: {user_id}")
-#         response = auth_supabase.table("company_information").select("*").eq("id", user_id).maybe_single().execute()
-#         print(f"[DEBUG] company_information response: {response.data if response else 'None'}")
-        
-#         if response and response.data:
-#             data = response.data
-#             # Core company info (always include)
-#             if data.get('company_name'):
-#                 context_parts.append(f"Company Name: {data.get('company_name')}")
-#             if data.get('org_type'):
-#                 context_parts.append(f"Organization Type: {data.get('org_type')}")
-#             if data.get('reg_address'):
-#                 context_parts.append(f"Registered Address: {data.get('reg_address')}")
-#             if data.get('office_address'):
-#                 context_parts.append(f"Office Address: {data.get('office_address')}")
-#             if data.get('authorized_signatory'):
-#                 context_parts.append(f"Authorized Signatory: {data.get('authorized_signatory')}")
-#             if data.get('designation'):
-#                 context_parts.append(f"Signatory Designation: {data.get('designation')}")
-#             if data.get('email'):
-#                 context_parts.append(f"Contact Email: {data.get('email')}")
-#             if data.get('phone_number'):
-#                 context_parts.append(f"Contact Phone: {data.get('phone_number')}")
-        
-#         # 2. Business Compliance (from informationCollection_2.py)
-#         # Table: business_compliance, foreign key: user_id
-#         print(f"[DEBUG] Fetching business_compliance for user_id: {user_id}")
-#         response = auth_supabase.table("business_compliance").select("*").eq("user_id", user_id).maybe_single().execute()
-#         print(f"[DEBUG] business_compliance response: {response.data if response else 'None'}")
-        
-#         if response and response.data:
-#             data = response.data
-#             # GST - show partially (important for compliance sections)
-#             if data.get('gst_number'):
-#                 gst = data.get('gst_number')
-#                 context_parts.append(f"GST Number: {gst[:2]}****{gst[-4:] if len(gst) > 6 else gst}")
-#             # PAN - hash more heavily (sensitive)
-#             if data.get('pan_number'):
-#                 context_parts.append(f"PAN Number: {hash_sensitive(data.get('pan_number'), 4)}")
-#             # Bank details - heavily hashed
-#             if data.get('bank_account_number'):
-#                 context_parts.append(f"Bank Account: {hash_sensitive(data.get('bank_account_number'), 4)}")
-#             if data.get('ifsc_code'):
-#                 ifsc = data.get('ifsc_code')
-#                 context_parts.append(f"IFSC Code: {ifsc[:4]}******" if len(ifsc) > 4 else ifsc)
-        
-#         # 3. Financials (from informationCollection_3.py)
-#         # Table: financials, foreign key: user_id
-#         print(f"[DEBUG] Fetching financials for user_id: {user_id}")
-#         response = auth_supabase.table("financials").select("*").eq("user_id", user_id).maybe_single().execute()
-#         print(f"[DEBUG] financials response: {response.data if response else 'None'}")
-        
-#         if response and response.data:
-#             data = response.data
-#             if data.get('avg_annual_turnover'):
-#                 context_parts.append(f"Average Annual Turnover: {data.get('avg_annual_turnover')}")
-#             if data.get('fy_wise_turnover'):
-#                 context_parts.append(f"FY-wise Turnover: {data.get('fy_wise_turnover')}")
-        
-#         # 4. Experience Records (from informationCollection_4.py)
-#         # Table: experience_records, foreign key: user_id (multiple records possible)
-#         print(f"[DEBUG] Fetching experience_records for user_id: {user_id}")
-#         response = auth_supabase.table("experience_records").select("project_name, client_name, client_type, work_category, contract_value, completion_status").eq("user_id", user_id).execute()
-#         print(f"[DEBUG] experience_records response: {response.data if response else 'None'}")
-        
-#         if response and response.data and len(response.data) > 0:
-#             exp_summary = []
-#             for exp in response.data[:5]:  # Limit to 5 most recent
-#                 exp_str = f"{exp.get('project_name', 'N/A')} ({exp.get('client_type', '')}, {exp.get('contract_value', 'N/A')})"
-#                 exp_summary.append(exp_str)
-#             if exp_summary:
-#                 context_parts.append(f"Past Projects: {'; '.join(exp_summary)}")
-
-#     except Exception as e:
-#         print(f"[DEBUG] Error fetching company context: {e}")
-#         import traceback
-#         print(f"[DEBUG] Traceback: {traceback.format_exc()}")
-#         return ""
-    
-#     result = "; ".join(context_parts) if context_parts else ""
-#     print(f"[DEBUG] Final company context ({len(result)} chars): {result[:200]}...")
-#     return result
-
-# # Page configuration
-# st.set_page_config(
-#     page_title="Automated Tender Generation",
-#     page_icon="📄",
-#     layout="wide",
-#     initial_sidebar_state="collapsed"
-# )
-
-# # Custom CSS
-# st.markdown("""
-#     <style>
-#     /* Main container padding fix */
-#     .section-header {
-#         font-size: 1.5rem;
-#         font-weight: bold;
-#         color: #e2e8f0; /* Lighter color for dark mode */
-#         margin-bottom: 2rem; /* More space below */
-#         padding-bottom: 0.8rem;
-#         border-bottom: 3px solid #3b82f6;
-#         margin-top: 2rem; /* Ensure space from top bar */
-#     }
-    
-#     /* Top Bar Styling */
-#     .top-bar {
-#         background-color: #1e293b;
-#         padding: 20px 25px;
-#         border-radius: 8px;
-#         margin-bottom: 30px;
-#         border: 1px solid #334155;
-#         display: flex;
-#         flex-direction: column;
-#         gap: 8px;
-#         margin-top: 0px; /* Fixed overlap issue */
-#         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-#     }
-#     .top-bar-title {
-#         color: white;
-#         font-size: 1.4rem;
-#         font-weight: bold;
-#         line-height: 1.2;
-#     }
-#     .top-bar-info {
-#         color: #94a3b8;
-#         font-size: 0.9rem;
-#     }
-#     .status-badge {
-#         display: inline-block;
-#         padding: 4px 10px;
-#         border-radius: 4px;
-#         font-size: 0.8rem;
-#         font-weight: bold;
-#         width: fit-content;
-#     }
-#     .status-ready {
-#         background-color: #065f46;
-#         color: #34d399;
-#     }
-
-#     /* Control Panel Styling - Clean Look */
-#     .control-section {
-#         margin-bottom: 15px;
-#         padding: 5px 0px; /* Removed box padding */
-#         background-color: transparent; /* Removed dark box */
-#         border: none;
-#     }
-#     .control-label {
-#         font-weight: 700;
-#         font-size: 0.95rem;
-#         margin-bottom: 8px;
-#         color: #f1f5f9; /* Bright white text */
-#         display: flex;
-#         align-items: center;
-#         gap: 8px;
-#         text-transform: uppercase;
-#         letter-spacing: 0.05em;
-#     }
-    
-#     /* Streamlit UI Tweaks */
-#     div[data-testid="stVerticalBlock"] {
-#         gap: 0.5rem;
-#     }
-    
-#     /* Ensure content within columns doesn't force scrollbars */
-#     section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] {
-#         overflow: visible;
-#     }
-    
-#     /* Legal preview containment */
-#     .legal-preview {
-#         max-width: 100% !important;
-#         overflow-x: auto !important;
-#         word-wrap: break-word !important;
-#     }
-#     .legal-preview table {
-#         max-width: 100% !important;
-#         overflow-x: auto !important;
-#         display: block;
-#     }
-#     /* Editable preview styling */
-#     .legal-preview-editable {
-#         outline: 2px dashed #3b82f6;
-#         cursor: text;
-#     }
-#     .legal-preview-editable:focus {
-#         outline: 2px solid #3b82f6;
-#     }
-    
-#     /* Streamlit UI Cleanups */
-#     div[data-testid="stExpanderr"] {
-#         border-radius: 8px;
-#     }
-#     h3 {
-#         padding-top: 10px;
-#     }
-#     </style>
-#     """, unsafe_allow_html=True)
-
-# # Initialize session state
-# if 'sections' not in st.session_state:
-#     st.session_state.sections = {
-#         'Eligibility Response': {'status': '⚠', 'content': '', 'clauses': 0},
-#         'Technical Proposal': {'status': '⚠', 'content': '', 'clauses': 0},
-#         'Financial Statements': {'status': '❌', 'content': '', 'clauses': 0},
-#         'Declarations & Forms': {'status': '✅', 'content': '', 'clauses': 0},
-#         'Annexures': {'status': '❌', 'content': '', 'clauses': 0}
-#     }
-
-# if 'current_section' not in st.session_state:
-#     st.session_state.current_section = 'Eligibility Response'
-
-# if 'tender_config' not in st.session_state:
-#     st.session_state.tender_config = {
-#         'name': 'IT Infrastructure Modernization Project',
-#         'authority': 'Central Public Works Department',
-#         'deadline': (datetime.now() + timedelta(days=30)).strftime('%d %B %Y'),
-#         'status': 'Ready for Generation'
-#     }
-
-# if 'pdf_uploaded' not in st.session_state:
-#     st.session_state.pdf_uploaded = False
-
-# if 'current_filename' not in st.session_state:
-#     st.session_state.current_filename = None
-
-# # Top Bar
-# st.markdown(f"""
-#     <div class="top-bar">
-#         <div class="top-bar-title">📄 {st.session_state.tender_config['name']}</div>
-#         <div class="top-bar-info">
-#             <strong>Authority:</strong> {st.session_state.tender_config['authority']} &nbsp;&nbsp;|&nbsp;&nbsp;
-#             <strong>Submission Deadline:</strong> {st.session_state.tender_config['deadline']}
-#         </div>
-#         <span class="status-badge status-ready">{st.session_state.tender_config['status']}</span>
-#     </div>
-# """, unsafe_allow_html=True)
-
-# # Three column layout: Left Panel | Main Workspace | Right Panel
-# left_panel, main_workspace, right_panel = st.columns([1.5, 4, 1.8])
-
-# # LEFT PANEL - Section Navigator
-# with left_panel:
-#     st.markdown("### 📑 Section Navigator")
-    
-#     # Upload section
-#     with st.expander("📤 Upload Tender Document", expanded=not st.session_state.pdf_uploaded):
-#         uploaded_file = st.file_uploader(
-#             "Upload PDF",
-#             type=['pdf'],
-#             label_visibility="collapsed"
-#         )
-        
-#         # Add parsing mode toggle
-#         use_hq_parsing = st.checkbox(
-#             "Enable High Quality Parsing (Slower, Cloud-based)",
-#             value=False,
-#             help="Uses LlamaParse Vision to better extract tables and scanned text. Requires valid API Key."
-#         )
-        
-#         if uploaded_file and not st.session_state.pdf_uploaded:
-#             try:
-#                 with st.spinner("Analyzing document structure..."):
-#                     files = {"file": (uploaded_file.name, uploaded_file, "application/pdf")}
-#                     data = {"parsing_mode": "High-Quality" if use_hq_parsing else "Fast"}
-                    
-#                     # Call Backend API
-#                     response = requests.post(f"{API_BASE_URL}/upload-tender", files=files, data=data)
-                    
-#                     if response.status_code == 200:
-#                         st.session_state.pdf_uploaded = True
-#                         st.session_state.current_filename = uploaded_file.name
-                        
-#                         # Auto-update section statuses
-#                         st.session_state.sections['Eligibility Response']['status'] = '✅'
-#                         st.session_state.sections['Technical Proposal']['status'] = '✅'
-#                         st.session_state.sections['Financial Statements']['status'] = '✅'
-#                         st.session_state.sections['Declarations & Forms']['status'] = '✅'
-#                         st.session_state.sections['Annexures']['status'] = '✅'
-                        
-#                         # Populate pseudo-clause counts for visual feedback
-#                         st.session_state.sections['Eligibility Response']['clauses'] = 12
-#                         st.session_state.sections['Technical Proposal']['clauses'] = 8
-#                         st.session_state.sections['Financial Statements']['clauses'] = 5
-#                         st.session_state.sections['Declarations & Forms']['clauses'] = 4
-#                         st.session_state.sections['Annexures']['clauses'] = 3
-                        
-#                         mode_msg = "High Quality (Vision)" if use_hq_parsing else "Fast (Local)"
-#                         st.success(f"✅ Document Analyzed & Indexed! Mode: {mode_msg}")
-#                         st.rerun()
-#                     else:
-#                         st.error(f"Analysis failed: {response.text}")
-
-#             except Exception as e:
-#                 st.error(f"Connection Error: {str(e)}")
-    
-#     st.markdown("---")
-    
-#     # Section navigation
-#     for section_name, section_data in st.session_state.sections.items():
-#         status_icon = section_data["status"]
-
-#         if status_icon == "✅":
-#             status_text = "Ready"
-#             status_color = "#10b981"
-#         elif status_icon == "⚠":
-#             status_text = "Needs Review"
-#             status_color = "#f59e0b"
-#         else:
-#             status_text = "Missing Data"
-#             status_color = "#ef4444"
-
-#         is_active = section_name == st.session_state.current_section
-
-#         # ONE container per section (important)
-#         with st.container():
-#             if st.button(
-#                 f"{status_icon} {section_name}",
-#                 key=f"nav_{section_name}",
-#                 use_container_width=True,
-#                 type="primary" if is_active else "secondary",
-#             ):
-#                 st.session_state.current_section = section_name
-
-#             # Status text with proper spacing
-#             st.markdown(
-#                 f"""
-#                 <div style="
-#                     text-align: center;
-#                     margin-top: 2px;
-#                     margin-bottom: 15px;
-#                     font-size: 13px;
-#                     font-weight: 600;
-#                     color: {status_color};
-#                     letter-spacing: 0.5px;
-#                 ">
-#                     {status_text}
-#                 </div>
-#                 """,
-#                 unsafe_allow_html=True,
-#             )
-
-
-# # MAIN WORKSPACE
-# with main_workspace:
-#     current = st.session_state.current_section
-#     section_data = st.session_state.sections[current]
-    
-#     st.markdown(f'<div class="section-header">{current}</div>', unsafe_allow_html=True)
-
-#     # --- 1. SESSION & AUTH GUARD ---
-#     if not st.session_state.get("authenticated", False):
-#         # Allow dev/preview without crashing if not coming from login, 
-#         # but realistically should redirect. For now, check session.
-#         pass
-
-#     # --- DIAGNOSTICS SIDEBAR ---
-#     with st.sidebar:
-#         with st.expander("🛠️ System Diagnostics", expanded=False):
-#             user = st.session_state.get("user")
-#             sb_session = st.session_state.get("sb_session")
-#             st.write(f"**Authenticated:** {st.session_state.get('authenticated')}")
-#             st.write(f"**User Object:** {'Found' if user else 'Missing'}")
-#             if user:
-#                 # Try both attribute and dict access
-#                 uid = getattr(user, 'id', None) or (user.get('id') if isinstance(user, dict) else None)
-#                 st.write(f"**User ID:** `{uid}`")
-#             st.write(f"**Session Token:** {'Found' if sb_session else 'Missing'}")
-            
-#             if st.button("Force Refetch Context"):
-#                 uid = getattr(user, 'id', None) or (user.get('id') if isinstance(user, dict) else None) if user else None
-#                 if uid:
-#                     ctx = get_company_context(uid)
-#                     st.code(ctx if ctx else "Empty Context Returned")
-#                 else:
-#                     st.warning("No User ID found")
-
-#     # --- ACTION CALLBACKS ---
-#     def handle_regeneration():
-#         """Callback to handle generation BEFORE widget rendering"""
-#         if not st.session_state.pdf_uploaded:
-#             st.error("Please upload a document first.")
-#             return
-
-#         try:
-#             # Get values from Session State (populated by Right Panel widgets)
-#             # Default to "Formal" and True if keys are missing (first run)
-#             tone_val = st.session_state.get("gen_tone", "Formal")
-#             comp_val = st.session_state.get("gen_compliance", True)
-            
-#             # Fetch company context from Supabase
-#             user = st.session_state.get("user")
-#             # Robust user_id extraction (handles both object and dict formats)
-#             user_id = getattr(user, 'id', None) or (user.get('id') if isinstance(user, dict) else None)
-            
-#             company_context = ""
-#             if user_id:
-#                 st.toast(f"🔍 Fetching company data...")
-#                 company_context = get_company_context(user_id)
-#                 if company_context:
-#                     st.toast(f"✅ Context loaded ({len(company_context)} chars)")
-            
-#             print(f"[FRONTEND DEBUG] Sending payload to {API_BASE_URL}/generate-section")
-#             print(f"[FRONTEND DEBUG] Company Context length: {len(company_context)}")
-
-#             payload = {
-#                 "filename": st.session_state.current_filename,
-#                 "section_type": current,
-#                 "tone": tone_val,
-#                 "compliance_mode": comp_val,
-#                 "company_context": company_context
-#             }
-            
-#             # Call API
-#             gen_resp = requests.post(f"{API_BASE_URL}/generate-section", data=payload)
-            
-#             if gen_resp.status_code == 200:
-#                 data = gen_resp.json()
-#                 st.session_state.sections[current]['content'] = data['content']
-#                 # Update the text_area key so it picks up the new value on re-render
-#                 st.session_state[f"content_{current}"] = data['content']
-#                 st.success("Content Drafted!")
-#             else:
-#                  st.error(f"Generation failed: {gen_resp.text}")
-#         except Exception as e:
-#             st.error(f"API Error: {str(e)}")
-
-#     # --- HELPER FUNCTIONS & CALLBACKS ---
-#     from io import BytesIO
-#     from reportlab.pdfgen import canvas
-#     from reportlab.lib.pagesizes import letter
-
-#     def create_legal_pdf(markdown_content):
-#         """
-#         Creates a professional, legal-grade PDF from Markdown content.
-#         Uses markdown2 to convert to HTML, then xhtml2pdf (pisa) to generate PDF.
-#         """
-#         # CSS for professional legal document styling
-#         css_styles = """
-#         <style>
-#             @page {
-#                 size: A4;
-#                 margin: 2.5cm 2cm 2.5cm 2cm;
-#             }
-#             body {
-#                 font-family: 'Times New Roman', Times, serif;
-#                 font-size: 12pt;
-#                 line-height: 1.6;
-#                 text-align: justify;
-#                 color: #1a1a1a;
-#             }
-#             h1 {
-#                 font-size: 18pt;
-#                 font-weight: bold;
-#                 text-align: center;
-#                 margin-bottom: 20px;
-#                 text-transform: uppercase;
-#                 border-bottom: 2px solid #333;
-#                 padding-bottom: 10px;
-#             }
-#             h2 {
-#                 font-size: 14pt;
-#                 font-weight: bold;
-#                 margin-top: 20px;
-#                 margin-bottom: 10px;
-#                 color: #2c3e50;
-#             }
-#             h3 {
-#                 font-size: 12pt;
-#                 font-weight: bold;
-#                 margin-top: 15px;
-#                 margin-bottom: 8px;
-#                 color: #34495e;
-#             }
-#             p {
-#                 margin-bottom: 10px;
-#                 text-indent: 0;
-#             }
-#             table {
-#                 width: 100%;
-#                 border-collapse: collapse;
-#                 margin: 15px 0;
-#                 font-size: 10pt;
-#             }
-#             th {
-#                 background-color: #2c3e50;
-#                 color: white;
-#                 font-weight: bold;
-#                 padding: 10px 8px;
-#                 text-align: left;
-#                 border: 1px solid #2c3e50;
-#             }
-#             td {
-#                 padding: 8px;
-#                 border: 1px solid #bdc3c7;
-#                 vertical-align: top;
-#             }
-#             tr:nth-child(even) {
-#                 background-color: #f9f9f9;
-#             }
-#             ul, ol {
-#                 margin-left: 20px;
-#                 margin-bottom: 10px;
-#             }
-#             li {
-#                 margin-bottom: 5px;
-#             }
-#             strong {
-#                 font-weight: bold;
-#             }
-#             .header {
-#                 text-align: center;
-#                 margin-bottom: 30px;
-#             }
-#             .footer {
-#                 position: fixed;
-#                 bottom: 1cm;
-#                 left: 2cm;
-#                 right: 2cm;
-#                 text-align: center;
-#                 font-size: 9pt;
-#                 color: #7f8c8d;
-#                 border-top: 1px solid #bdc3c7;
-#                 padding-top: 10px;
-#             }
-#         </style>
-#         """
-        
-#         # Convert Markdown to HTML
-#         html_content = markdown2.markdown(
-#             markdown_content,
-#             extras=["tables", "fenced-code-blocks", "header-ids"]
-#         )
-        
-#         # Wrap in full HTML document
-#         full_html = f"""
-#         <!DOCTYPE html>
-#         <html>
-#         <head>
-#             <meta charset="UTF-8">
-#             {css_styles}
-#         </head>
-#         <body>
-#             {html_content}
-#         </body>
-#         </html>
-#         """
-        
-#         # Generate PDF
-#         pdf_buffer = BytesIO()
-#         pisa_status = pisa.CreatePDF(full_html, dest=pdf_buffer)
-        
-#         if pisa_status.err:
-#             # Fallback to simple text if conversion fails
-#             pdf_buffer = BytesIO()
-#             pdf_buffer.write(markdown_content.encode('utf-8'))
-        
-#         pdf_buffer.seek(0)
-#         return pdf_buffer
-
-#     # Legacy function for backward compatibility
-#     def create_pdf(text_content):
-#         return create_legal_pdf(text_content)
-
-#     def handle_mark_reviewed():
-#         st.session_state.sections[current]['status'] = '✅'
-#         st.success("Section marked as reviewed!")
-
-#     def handle_bulk_generation():
-#         if not st.session_state.pdf_uploaded:
-#             st.error("Please upload a document first.")
-#             return
-            
-#         progress_bar = st.progress(0)
-#         status_text = st.empty()
-        
-#         sections_to_gen = [k for k in st.session_state.sections.keys()]
-#         total = len(sections_to_gen)
-        
-#         for i, section_name in enumerate(sections_to_gen):
-#             status_text.text(f"Generating {section_name}...")
-            
-#             # Fetch company context (efficiently fetch once if possible, but here inside loop is fine or move out)
-#             # Actually better to fetch once outside loop for bulk
-#             # But adhering to the previous pattern for simplicity
-#             user = st.session_state.get("user")
-#             user_id = getattr(user, 'id', None) or (user.get('id') if isinstance(user, dict) else None)
-#             company_context = get_company_context(user_id) if user_id else ""
-            
-#             payload = {
-#                 "filename": st.session_state.current_filename,
-#                 "section_type": section_name,
-#                 "tone": st.session_state.get("gen_tone", "Formal"),
-#                 "compliance_mode": st.session_state.get("gen_compliance", True),
-#                 "company_context": company_context
-#             }
-#             try:
-#                 resp = requests.post(f"{API_BASE_URL}/generate-section", data=payload)
-#                 if resp.status_code == 200:
-#                     data = resp.json()
-#                     st.session_state.sections[section_name]['content'] = data['content']
-#                     st.session_state[f"content_{section_name}"] = data['content']
-#             except Exception as e:
-#                 st.error(f"Failed {section_name}: {e}")
-#             progress_bar.progress((i + 1) / total)
-#         status_text.text("Bulk Generation Complete!")
-#         st.success("All sections generated successfully.")
-
-#     def handle_export_complete_docx():
-#         full_doc = f"TENDER RESPONSE FOR {st.session_state.current_filename}\n\n"
-#         for sec_name, sec_data in st.session_state.sections.items():
-#             full_doc += f"--- {sec_name.upper()} ---\n\n"
-#             full_doc += (sec_data['content'] or "[No Content Generated]\n")
-#             full_doc += "\n\n"
-#         return full_doc
-
-#     # Clause information
-#     if section_data['clauses'] > 0:
-#         st.markdown(f"""
-#             <div class="clause-info">
-#                 <strong>📋 Generated from {section_data['clauses']} clauses</strong><br>
-#                 <small>Clauses 2.1-2.5, 3.2, 4.1-4.7 from tender document</small>
-#             </div>
-#         """, unsafe_allow_html=True)
-#     else:
-#         st.info("🔄 Upload a tender document to generate this section")
-    
-#     # Generated content area
-#     if section_data['clauses'] > 0:
-#         # Default content logic
-#         default_text = "Click 'Generate all Sections' to draft this proposal section using AI."
-        
-#         # Edit Toggle placed prominently
-#         col_space, col_edit, col_save = st.columns([0.75, 0.12, 0.13])
-#         with col_edit:
-#             is_editing = st.checkbox("✍️ Edit", key=f"edit_mode_{current}", help="Edit directly in the legal preview")
-        
-#         if f"edited_content_{current}" not in st.session_state:
-#             st.session_state[f"edited_content_{current}"] = section_data['content'] or default_text
-
-#         # Toggle structure
-#         if is_editing:
-#             # EDIT MODE
-#             new_content = st.text_area(
-#                 "Edit Content",
-#                 value=st.session_state[f"edited_content_{current}"],
-#                 height=600,
-#                 label_visibility="collapsed",
-#                 key=f"editor_{current}"
-#             )
-#             st.session_state[f"edited_content_{current}"] = new_content
-            
-#             # Save Button (Commented out as duplicate)
-#             # if st.button("💾 Save Changes", type="primary", key=f"save_{current}"):
-#             #     st.session_state.sections[current]['content'] = new_content
-#             #     st.session_state[f"content_{current}"] = new_content
-#             #     st.session_state[f"edit_mode_{current}"] = False # Exit edit mode
-#             #     st.success("Changes saved!")
-#             #     st.rerun()
-
-#         else:
-#             # PREVIEW MODE
-#             # Use current content (committed)
-#             display_content = st.session_state.sections[current]['content'] or default_text
-            
-#             # Convert markdown to HTML for display
-#             # Removed 'fenced-code-blocks' to correct "code snippet" issue
-#             html_content = markdown2.markdown(
-#                 display_content,
-#                 extras=["tables", "header-ids"]
-#             )
-            
-#             st.markdown(f"""
-# <style>
-#     .legal-preview table {{
-#         width: 100%;
-#         max-width: 100%;
-#         border: 1px solid black;
-#         border-collapse: collapse;
-#         margin: 15px 0;
-#         display: table;
-#         table-layout: fixed;
-#     }}
-#     .legal-preview th {{
-#         background-color: #2c3e50;
-#         color: white;
-#         font-weight: bold;
-#         padding: 10px;
-#         border: 1px solid black;
-#         text-align: left;
-#         word-wrap: break-word;
-#     }}
-#     .legal-preview td {{
-#         padding: 8px;
-#         border: 1px solid black;
-#         vertical-align: top;
-#         word-wrap: break-word;
-#     }}
-#     .legal-preview h3 {{
-#         font-weight: bold;
-#         margin-top: 20px;
-#         border-bottom: 2px solid #333;
-#         padding-bottom: 5px;
-#     }}
-#     .legal-preview h4 {{
-#         font-weight: bold;
-#         margin-top: 15px;
-#         color: #2c3e50;
-#     }}
-#     /* Scrollable Container Styling */
-#     .preview-scroll-container {{
-#         height: 800px;
-#         overflow-y: auto;
-#         border: 1px solid #30363D;
-#         border-radius: 8px;
-#         padding: 20px;
-#         background-color: #0D1117; /* Dark background frame */
-#         box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
-#     }}
-#     /* Custom Scrollbar */
-#     .preview-scroll-container::-webkit-scrollbar {{
-#         width: 10px;
-#         height: 10px;
-#     }}
-#     .preview-scroll-container::-webkit-scrollbar-track {{
-#         background: #0D1117;
-#     }}
-#     .preview-scroll-container::-webkit-scrollbar-thumb {{
-#         background: #30363D;
-#         border-radius: 5px;
-#     }}
-#     .preview-scroll-container::-webkit-scrollbar-thumb:hover {{
-#         background: #58a6ff;
-#     }}
-# </style>
-
-# <div class="preview-scroll-container">
-#     <div class="legal-preview" style="
-#         background-color: white;
-#         padding: 40px; 
-#         box-sizing: border-box;
-#         width: 100%;
-#         max-width: 100%;
-#         border-radius: 4px;
-#         box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-#         font-family: 'Times New Roman', Times, serif;
-#         font-size: 12pt;
-#         line-height: 1.6;
-#         color: #1a1a1a;
-#         min-height: 800px; /* Ensure paper has height */
-#         text-align: justify;
-#         border: 1px solid #ccc;
-#     ">
-#         {html_content}
-#     </div>
-# </div>
-# """, unsafe_allow_html=True)
-        
-#         # CLEARING DIV to prevent float overlap issues
-#         st.markdown('<div style="clear: both; margin-bottom: 20px;"></div>', unsafe_allow_html=True)
-#         st.divider()
-
-#         # Show save button when editing
-#         with col_save:
-#             if is_editing:
-#                 if st.button("💾 Save", key=f"save_edit_{current}", help="Save your edits"):
-#                     st.success("Changes saved!")
-#                     st.rerun()
-        
-#         # Action buttons
-#         col1, col2, padding_col = st.columns([1.5, 1.5, 3])
-        
-#         with col1:
-#             st.button("🔄 Regenerate Section", use_container_width=True, type="primary", on_click=handle_regeneration)
-            
-#         with col2:
-#             # Replaced with Export Complete Tender (PDF)
-#             full_text = handle_export_complete_docx()
-#             full_pdf = create_legal_pdf(full_text)
-            
-#             st.download_button(
-#                 "💾 Export Complete Tender",
-#                 data=full_pdf,
-#                 file_name=f"Full_Tender_Response_{st.session_state.current_filename}.pdf",
-#                 mime="application/pdf",
-#                 use_container_width=True
-#             )
-
-# # RIGHT PANEL - Controls
-# with right_panel:
-#     st.markdown("### ⚙️ Generation Controls")
-    
-#     # ... (Tone/Jurisdiction/Compliance controls remain same) ...
-#     # Tone selector
-#     st.markdown('<div class="control-section">', unsafe_allow_html=True)
-#     st.markdown('<div class="control-label">📝 Tone Style</div>', unsafe_allow_html=True)
-#     tone = st.radio(
-#         "Tone",
-#         ["Formal", "Ultra-Formal"],
-#         label_visibility="collapsed",
-#         key="gen_tone"
-#     )
-#     st.markdown('</div>', unsafe_allow_html=True)
-    
-#     # Jurisdiction style
-#     st.markdown('<div class="control-section">', unsafe_allow_html=True)
-#     st.markdown('<div class="control-label">🏛️ Jurisdiction</div>', unsafe_allow_html=True)
-#     jurisdiction = st.radio(
-#         "Jurisdiction",
-#         ["Government PSU", "Private Sector"],
-#         label_visibility="collapsed",
-#         key="gen_jurisdiction"
-#     )
-#     st.markdown('</div>', unsafe_allow_html=True)
-    
-#     # Strict compliance toggle
-#     st.markdown('<div class="control-section">', unsafe_allow_html=True)
-#     st.markdown('<div class="control-label">⚖️ Compliance Mode</div>', unsafe_allow_html=True)
-#     strict_compliance = st.toggle(
-#         "Strict compliance only",
-#         value=True,
-#         help="Only include clauses with strict compliance requirements",
-#         key="gen_compliance"
-#     )
-#     st.markdown('</div>', unsafe_allow_html=True)
-    
-#     st.markdown("---")
-    
-#     # Additional settings
-#     st.markdown('<div class="control-section">', unsafe_allow_html=True)
-#     st.markdown('<div class="control-label">📊 Citation Level</div>', unsafe_allow_html=True)
-#     citation_level = st.select_slider(
-#         "Citation",
-#         options=["Minimal", "Standard", "Detailed"],
-#         value="Standard",
-#         label_visibility="collapsed",
-#         key="gen_citation"
-#     )
-#     st.markdown('</div>', unsafe_allow_html=True)
-    
-#     st.markdown('<div class="control-section">', unsafe_allow_html=True)
-#     st.markdown('<div class="control-label">🔍 Content Depth</div>', unsafe_allow_html=True)
-#     content_depth = st.select_slider(
-#         "Depth",
-#         options=["Concise", "Standard", "Comprehensive"],
-#         value="Standard",
-#         label_visibility="collapsed",
-#         key="gen_depth"
-#     )
-#     st.markdown('</div>', unsafe_allow_html=True)
-    
-#     st.markdown("---")
-    
-#     # Bulk actions
-#     st.markdown("### 🚀 Bulk Actions")
-#     st.markdown('<div style="margin-bottom: 15px;"></div>', unsafe_allow_html=True) 
-    
-#     st.button("⚡ Generate All Sections", use_container_width=True, type="primary", on_click=handle_bulk_generation)
-#     st.markdown('<div style="margin-bottom: 10px;"></div>', unsafe_allow_html=True)
-    
-#     # Save to Supabase DB Controls
-#     project_name_input = st.text_input("Project Name", value="New Tender", help="Name for this tender project")
-    
-#     if st.button("💾 Save to Cloud DB", use_container_width=True, help="Save all generated sections to Supabase"):
-#         # Robust user check using session_state
-#         current_user = st.session_state.get("user")
-#         current_user_id = getattr(current_user, 'id', None) or (current_user.get('id') if isinstance(current_user, dict) else None)
-        
-#         if not current_user_id:
-#             st.warning("⚠️ You must be logged in to save to the cloud.")
-#         else:
-#             saved_count = 0
-#             with st.spinner("Saving to database..."):
-#                 for sec_name, sec_data in st.session_state.sections.items():
-#                     content_to_save = sec_data.get('content', '')
-#                     if content_to_save:
-#                         # Generate PDF on the fly
-#                         pdf_bytes = create_legal_pdf(content_to_save)
-                        
-#                         success = save_tender_to_db(
-#                             user_id=current_user_id,
-#                             project_name=project_name_input,
-#                             content=content_to_save,
-#                             section_type=sec_name,
-#                             pdf_bytes=pdf_bytes
-#                         )
-#                         if success:
-#                             saved_count += 1
-            
-#             if saved_count > 0:
-#                 st.success(f"✅ Successfully saved {saved_count} sections to cloud!")
-#             else:
-#                 st.warning("No content to save (generate sections first).")
-    
-#     st.markdown('</div>', unsafe_allow_html=True)
-
-# # Footer info
-# st.markdown("---")
-# st.markdown("""
-#     <div style='text-align: center; color: #6b7280; font-size: 0.85rem; padding-bottom: 30px;'>
-#         <strong>Tender Generation System</strong> | Last saved: {time} | Auto-save enabled
-#     </div>
-# """.format(time=datetime.now().strftime('%H:%M:%S')), unsafe_allow_html=True)
-
-# import streamlit as st
-# from datetime import datetime, timedelta
-# import time
-# import requests
-# import markdown2
-# from xhtml2pdf import pisa
-# from io import BytesIO
-# import os
-# import base64
-# from pathlib import Path
-# from supabase import create_client, Client
-# from utils.auth import can_access
-
-# def get_base64_of_bin_file(path):
-#     if os.path.exists(path):
-#         with open(path, "rb") as f:
-#             return base64.b64encode(f.read()).decode()
-#     return None
-
-# # UI CONSTANTS (YOUR THEME)
-# THEME_PURPLE = "#a855f7"
-# THEME_INDIGO = "#1a1c4b"
-# THEME_DARK = "#0f111a"
-# THEME_WHITE = "#ffffff"
-# BG_GRADIENT = "radial-gradient(circle at 20% 30%, #1a1c4b 0%, #0f111a 100%)"
-
-# #  ACCESS CONTROL 
-# if not can_access("tender_generation"):
-#     st.markdown(f'<div style="color: {THEME_PURPLE}; padding: 20px; border: 1px solid {THEME_PURPLE}; border-radius: 10px;">You are not authorized to access this page.</div>', unsafe_allow_html=True)
-#     st.stop()
-
-# #  BACKEND CONFIG 
-# API_BASE_URL = "http://localhost:8000"
-# url = os.environ.get("SUPABASE_URL")
-# key = os.environ.get("SUPABASE_KEY")
-
-# st.set_page_config(page_title="TenderGen", layout="wide", initial_sidebar_state="collapsed")
-
-# st.markdown(f"""
-#     <style>
-#     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700&display=swap');
-    
-#     /* Global Background & Text */
-#     .stApp {{
-#         background: {BG_GRADIENT} !important;
-#         font-family: 'Plus Jakarta Sans', sans-serif;
-#         color: {THEME_WHITE};
-#     }}
-
-#     header, footer {{ visibility: hidden; }}
-
-#     /* HEADER NAV CONTAINER */
-#         .header-nav {{
-#             background: linear-gradient(
-#                 135deg,
-#                 rgba(255,255,255,0.08),
-#                 rgba(255,255,255,0.02)
-#             );
-#             backdrop-filter: blur(10px);
-#             border: 1px solid rgba(255,255,255,0.12);
-#             border-radius: 16px;
-#             padding: 12px 18px;
-#             margin-bottom: 22px;
-#         }}
-      
-#         .block-container{{
-#             margin-top: -70px;
-#         }}
-
-#     /* Remove Streamlit Red from all default components */
-#     .stAlert {{ background-color: rgba(168, 85, 247, 0.1); border: 1px solid {THEME_PURPLE}; color: white; }}
-#     button[kind="primary"] {{ background-color: {THEME_PURPLE} !important; border: none !important; color: white !important; }}
-#     button[kind="secondary"] {{ background-color: rgba(255,255,255,0.05) !important; color: white !important; border: 1px solid rgba(255,255,255,0.1) !important; }}
-    
-#     /* Progress Bar Theme */
-#     div[data-baseweb="progress-bar"] > div > div {{ background-color: {THEME_PURPLE} !important; }}
-
-#     /* Section Header */
-#     .section-title {{
-#         font-size: 2.5rem;
-#         font-weight: 800;
-#         background: white;
-#         -webkit-background-clip: text;
-#         -webkit-text-fill-color: transparent;
-#         margin-bottom: 5px;
-#     }}
-
-#     /* Custom Navigation Cards */
-#     .nav-card {{
-#         background: rgba(255, 255, 255, 0.03);
-#         border: 1px solid rgba(168, 85, 247, 0.15);
-#         border-radius: 12px;
-#         padding: 15px;
-#         margin-bottom: 10px;
-#         transition: all 0.3s ease;
-#         cursor: pointer;
-#     }}
-#     .nav-card-active {{
-#         background: rgba(168, 85, 247, 0.2);
-#         border: 1px solid {THEME_PURPLE};
-#         box-shadow: 0 0 15px rgba(168, 85, 247, 0.3);
-#     }}
-
-#     /* Legal Document Preview (The "Paper") */
-#     .document-paper {{
-#         background: #ffffff;
-#         color: #1a1a1a;
-#         padding: 50px;
-#         border-radius: 2px;
-#         min-height: 1000px;
-#         font-family: 'Times New Roman', Times, serif;
-#         box-shadow: 0 20px 40px rgba(0,0,0,0.4);
-#         line-height: 1.6;
-#     }}
-    
-#     /* Override for standard text area when editing */
-#     .stTextArea textarea {{
-#         background: rgba(0,0,0,0.2) !important;
-#         color: white !important;
-#         border: 1px solid {THEME_PURPLE} !important;
-#     }}
-#     </style>
-# """, unsafe_allow_html=True)
-
-# #  INITIALIZE SESSION STATE 
-# if 'sections' not in st.session_state:
-#     st.session_state.sections = {
-#         'Eligibility Response': {'status': '⬩', 'content': '', 'clauses': 12},
-#         'Technical Proposal': {'status': '⬩', 'content': '', 'clauses': 8},
-#         'Financial Statements': {'status': '⬩', 'content': '', 'clauses': 5},
-#         'Declarations & Forms': {'status': '✦', 'content': '', 'clauses': 4},
-#         'Annexures': {'status': '⬩', 'content': '', 'clauses': 3}
-#     }
-# if 'current_section' not in st.session_state:
-#     st.session_state.current_section = 'Eligibility Response'
-
-# # HEADER NAVIGATION
-# left, center = st.columns([3, 6])
-
-# with left:
-#     logo_path = Path(__file__).resolve().parents[1] / "assets" / "logo.png"
-#     logo = get_base64_of_bin_file(logo_path)
-
-#     if logo:
-#         st.markdown(f"""
-#             <div style="display:flex; align-items:center;">
-#                 <img src="data:image/png;base64,{logo}" width="200">
-#             </div>
-#         """, unsafe_allow_html=True)
-
-# with center:
-#     header_cols = st.columns([3, 0.4, 0.4, 0.4, 0.4, 0.4])
-
-#     with header_cols[1]:
-#         if st.button("⊞", key="h_dash", help="Dashboard"):
-#             st.switch_page("app.py")
-
-#     with header_cols[2]:
-#         if can_access("tender_generation"):
-#             if st.button("⎘", key="h_gen", help="Tender Generation"):
-#                 st.switch_page("pages/tenderGeneration.py")
-#         else:
-#             st.button("⎘", key="h_gen_disabled", disabled=True, help="Access restricted")
-
-
-#     with header_cols[3]:
-#         if can_access("tender_analysis"):
-#             if st.button("◈", key="h_anl", help="Tender Analysis"):
-#                 st.switch_page("pages/tenderAnalyser.py")
-#         else:
-#             st.button("◈", key="h_anl_disabled", disabled=True)
-
-#     with header_cols[4]:
-#         if can_access("bid_generation"):
-#             if st.button("✦", key="h_bid", help="Bid Generation"):
-#                 st.switch_page("pages/bidGeneration.py")
-#         else:
-#             st.button("✦", key="h_bid_disabled", disabled=True)
-
-#     with header_cols[5]:
-#         if can_access("risk_analysis"):
-#             if st.button("⬈", key="h_risk", help="Risk Analysis"):
-#                 st.switch_page("pages/riskAnalysis.py")
-#         else:
-#             st.button("⬈", key="h_risk_disabled", disabled=True)
-
-
-# # st.markdown("<div> <hr> </div>", unsafe_allow_html=True)
-
-# # Top Banner
-# st.markdown(f"""
-#     <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 30px; border-bottom: 1px solid rgba(168, 85, 247, 0.3); padding-bottom: 20px;">
-#         <div>
-#             <h1 class="section-title">Tender Studio</h1>
-#             <p style="color: rgba(255,255,255,0.6); margin: 0;">AI-Powered Clause Generation & Response Drafting</p>
-#         </div>
-#         <div style="text-align: right;">
-#             <span style="font-weight: 700; color: {THEME_PURPLE};">Authority:</span> <span>CPWD Modernization</span>
-#         </div>
-#     </div>
-# """, unsafe_allow_html=True)
-
-# left_pane, center_pane, right_pane = st.columns([1, 3.5, 1], gap="large")
-
-# #  LEFT PANE: NAVIGATION 
-# with left_pane:
-#     st.markdown("<br><br>", unsafe_allow_html=True)
-#     st.markdown("### Source")
-#     with st.container(border=True):
-#             st.file_uploader("Upload RFP", type=['pdf'], label_visibility="collapsed")
-#             st.markdown(f"<small style='color: {THEME_PURPLE}'>Fast Local Parsing Enabled</small>", unsafe_allow_html=True)
-
-#     st.markdown(f"### Sections")
-#     for sec_name, sec_data in st.session_state.sections.items():
-#         is_active = sec_name == st.session_state.current_section
-        
-#         if st.button(f"{sec_data['status']} {sec_name}", key=f"nav_{sec_name}", use_container_width=True, type="primary" if is_active else "secondary"):
-#             st.session_state.current_section = sec_name
-#             st.rerun()
-
-
-# #CENTER PANE: THE WORKSPACE
-# with center_pane:
-#     current = st.session_state.current_section
-#     sec_data = st.session_state.sections[current]
-    
-#     col_title, col_toggle = st.columns([3, 1])
-#     with col_title:
-#         st.markdown(f"## {current}")
-#     with col_toggle:
-#         edit_mode = st.toggle("Editor", value=False)
-
-#     if sec_data['content']:
-#         if edit_mode:
-#             new_text = st.text_area("Content Editor", value=sec_data['content'], height=800, label_visibility="collapsed")
-#             if st.button("💾Commit Changes", use_container_width=True):
-#                 st.session_state.sections[current]['content'] = new_text
-#                 st.success("Changes saved to session")
-#         else:
-#             html_preview = markdown2.markdown(sec_data['content'], extras=["tables"])
-#             st.markdown(f"""
-#                 <div class="document-paper">
-#                     {html_preview}
-#                 </div>
-#             """, unsafe_allow_html=True)
-#     else:
-#         st.markdown(f"""
-#             <div style="height: 600px; display: flex; align-items: center; justify-content: center; border: 1px solid rgba(168, 85, 247, 0.2); border-radius: 20px; background: rgba(168, 85, 247, 0.02);">
-#                 <div style="text-align: center;">
-#                     <h2 style="color: {THEME_PURPLE}; opacity: 0.5;">Empty Section</h2>
-#                     <p style="color: rgba(255,255,255,0.4);">Use the 'Generate' tool on the right to start drafting.</p>
-#                 </div>
-#             </div>
-#         """, unsafe_allow_html=True)
-
-# # RIGHT PANE: ACTIONS 
-# with right_pane:
-#     st.markdown("### AI Actions")
-    
-#     with st.container(border=True):
-#         st.markdown(f"**Parameters**")
-#         st.select_slider("Tone", options=["Formal", "Technical", "Sales"], key="tone_slider")
-#         st.checkbox("Include Citations", value=True)
-        
-#         st.markdown("---")
-        
-#         if st.button("Draft Section", use_container_width=True, type="primary"):
-#             with st.spinner("Thinking..."):
-#                 time.sleep(1)
-#                 st.session_state.sections[current]['content'] = f"# {current}\n\nThis is a generated draft based on the uploaded RFP clauses. It follows the **Formal** tone and includes compliance check-marks."
-#                 st.rerun()
-
-#     st.markdown("<br>", unsafe_allow_html=True)
-#     st.markdown("### Export")
-#     if sec_data['content']:
-#         st.button("Export to PDF", use_container_width=True)
-#         st.button("Word Document", use_container_width=True)
-#     else:
-#         st.button("Export Disabled", disabled=True, use_container_width=True)
-
-# # --- BACKEND LOGIC (PRESERVED) ---
-# # All your get_company_context, create_legal_pdf, and Supabase code 
-# # should be pasted below or kept in your utils folder.
-
-# import streamlit as st
-# from datetime import datetime, timedelta
-# import time
-# # from PyPDF2 import PdfReader # Removed local processing
-# import json
-# import requests
-# import markdown2
-# from xhtml2pdf import pisa
-# from io import BytesIO
-# from utils.auth import can_access
-
-
-# if not can_access("tender_generation"):
-#     st.error("You are not authorized to access this page.")
-#     st.stop()
-
-
-# import os
-# from supabase import create_client, Client
-
-# # Visual Editor Imports
-# try:
-#     from streamlit_quill import st_quill
-#     import markdownify
-#     HAS_VISUAL_EDITOR = True
-# except ImportError:
-#     HAS_VISUAL_EDITOR = False
-
-# API_BASE_URL = "http://localhost:8000"
-
-# # Initialize Supabase Client (Accessing env vars or session)
-# url = os.environ.get("SUPABASE_URL")
-# key = os.environ.get("SUPABASE_KEY")
-# if url and key:
-#     supabase: Client = create_client(url, key)
-    
-#     # Session Retrieval
-#     # Prioritize existing session in state (from Login page)
-#     current_session = st.session_state.get("sb_session")
-    
-#     # Try to refresh/get from client if no state, or just to check
-#     try:
-#         client_session = supabase.auth.get_session()
-#         if client_session:
-#             st.session_state.sb_session = client_session
-#             current_session = client_session
-#     except Exception as e:
-#         print(f"Session Error: {e}")
-    
-#     if current_session:
-#         user_id = current_session.user.id
-#         # Restore session to client if needed for subsequent calls
-#         # supabase.auth.set_session(current_session.access_token, current_session.refresh_token)
-#     else:
-#         user_id = None
-# else:
-#     user_id = None
-
-# def save_tender_to_db(user_id, project_name, content, section_type, pdf_bytes=None):
-#     """
-#     Saves a generated tender section to Supabase.
-#     If pdf_bytes is provided, uploads it to storage and saves the URL.
-#     """
-#     if not user_id:
-#         return False
-    
-#     try:
-#         # 1. Upload PDF if provided
-#         pdf_url = None
-#         if pdf_bytes:
-#             try:
-#                 # Unique filename: user_id/project_name_section_timestamp.pdf
-#                 # Sanitize filenames
-#                 safe_proj = "".join(c for c in project_name if c.isalnum() or c in (' ', '-', '_')).strip().replace(' ', '_')
-#                 safe_sec = "".join(c for c in section_type if c.isalnum() or c in (' ', '-', '_')).strip().replace(' ', '_')
-#                 timestamp = int(time.time())
-#                 file_path = f"{user_id}/{safe_proj}_{safe_sec}_{timestamp}.pdf"
-                
-#                 # Upload
-#                 supabase.storage.from_("generated-tenders").upload(
-#                     file_path,
-#                     pdf_bytes.getvalue() if hasattr(pdf_bytes, 'getvalue') else pdf_bytes,
-#                     {"content-type": "application/pdf", "upsert": "true"}
-#                 )
-                
-#                 # Get Public URL
-#                 pdf_url = supabase.storage.from_("generated-tenders").get_public_url(file_path)
-#             except Exception as e:
-#                 print(f"PDF Upload Error: {e}")
-#                 # We continue saving the DB record even if PDF upload fails, but log it.
-
-#         # 2. Insert DB Record
-#         data = {
-#             "user_id": user_id,
-#             "project_name": project_name,
-#             "content": content,
-#             "section_type": section_type,
-#             "created_at": datetime.now().isoformat()
-#         }
-        
-#         if pdf_url:
-#             data["pdf_url"] = pdf_url
-
-#         supabase.table("generated_tenders").insert(data).execute()
-#         return True
-#     except Exception as e:
-#         print(f"DB Save Error: {e}")
-#         return False
-
-# def get_company_context(user_id: str, section_type: str = None) -> str:
-#     """
-#     Fetches comprehensive company information for the given user_id.
-#     Matches the actual database schema from information collection pages.
-    
-#     Args:
-#         user_id: The user's UUID
-#         section_type: Optional section type to filter relevant fields
-    
-#     Returns:
-#         Formatted string with company context, sensitive data hashed
-#     """
-#     import hashlib
-    
-#     if not user_id:
-#         print(f"[DEBUG] get_company_context: No user_id provided")
-#         return ""
-    
-#     # CRITICAL: Use authenticated Supabase client with user's session
-#     sb_session = st.session_state.get("sb_session")
-#     if not sb_session:
-#         print(f"[DEBUG] get_company_context: No sb_session found")
-#         return ""
-    
-#     # Create authenticated client
-#     auth_supabase = create_client(url, key)
-#     auth_supabase.postgrest.auth(sb_session.access_token)
-    
-#     context_parts = []
-    
-#     def hash_sensitive(value: str, show_last: int = 4) -> str:
-#         """Hash sensitive data, showing only last N characters"""
-#         if not value or value == 'N/A':
-#             return 'N/A'
-#         if len(value) <= show_last:
-#             return '*' * len(value)
-#         return '*' * (len(value) - show_last) + value[-show_last:]
-    
-#     try:
-#         # 1. Company Information (from informationCollection_1.py)
-#         # Table: company_information, primary key: id = user_id
-#         print(f"[DEBUG] Fetching company_information for user_id: {user_id}")
-#         response = auth_supabase.table("company_information").select("*").eq("id", user_id).maybe_single().execute()
-#         print(f"[DEBUG] company_information response: {response.data if response else 'None'}")
-        
-#         if response and response.data:
-#             data = response.data
-#             # Core company info (always include)
-#             if data.get('company_name'):
-#                 context_parts.append(f"Company Name: {data.get('company_name')}")
-#             if data.get('org_type'):
-#                 context_parts.append(f"Organization Type: {data.get('org_type')}")
-#             if data.get('reg_address'):
-#                 context_parts.append(f"Registered Address: {data.get('reg_address')}")
-#             if data.get('office_address'):
-#                 context_parts.append(f"Office Address: {data.get('office_address')}")
-#             if data.get('authorized_signatory'):
-#                 context_parts.append(f"Authorized Signatory: {data.get('authorized_signatory')}")
-#             if data.get('designation'):
-#                 context_parts.append(f"Signatory Designation: {data.get('designation')}")
-#             if data.get('email'):
-#                 context_parts.append(f"Contact Email: {data.get('email')}")
-#             if data.get('phone_number'):
-#                 context_parts.append(f"Contact Phone: {data.get('phone_number')}")
-        
-#         # 2. Business Compliance (from informationCollection_2.py)
-#         # Table: business_compliance, foreign key: user_id
-#         print(f"[DEBUG] Fetching business_compliance for user_id: {user_id}")
-#         response = auth_supabase.table("business_compliance").select("*").eq("user_id", user_id).maybe_single().execute()
-#         print(f"[DEBUG] business_compliance response: {response.data if response else 'None'}")
-        
-#         if response and response.data:
-#             data = response.data
-#             # GST - show partially (important for compliance sections)
-#             if data.get('gst_number'):
-#                 gst = data.get('gst_number')
-#                 context_parts.append(f"GST Number: {gst[:2]}****{gst[-4:] if len(gst) > 6 else gst}")
-#             # PAN - hash more heavily (sensitive)
-#             if data.get('pan_number'):
-#                 context_parts.append(f"PAN Number: {hash_sensitive(data.get('pan_number'), 4)}")
-#             # Bank details - heavily hashed
-#             if data.get('bank_account_number'):
-#                 context_parts.append(f"Bank Account: {hash_sensitive(data.get('bank_account_number'), 4)}")
-#             if data.get('ifsc_code'):
-#                 ifsc = data.get('ifsc_code')
-#                 context_parts.append(f"IFSC Code: {ifsc[:4]}******" if len(ifsc) > 4 else ifsc)
-        
-#         # 3. Financials (from informationCollection_3.py)
-#         # Table: financials, foreign key: user_id
-#         print(f"[DEBUG] Fetching financials for user_id: {user_id}")
-#         response = auth_supabase.table("financials").select("*").eq("user_id", user_id).maybe_single().execute()
-#         print(f"[DEBUG] financials response: {response.data if response else 'None'}")
-        
-#         if response and response.data:
-#             data = response.data
-#             if data.get('avg_annual_turnover'):
-#                 context_parts.append(f"Average Annual Turnover: {data.get('avg_annual_turnover')}")
-#             if data.get('fy_wise_turnover'):
-#                 context_parts.append(f"FY-wise Turnover: {data.get('fy_wise_turnover')}")
-        
-#         # 4. Experience Records (from informationCollection_4.py)
-#         # Table: experience_records, foreign key: user_id (multiple records possible)
-#         print(f"[DEBUG] Fetching experience_records for user_id: {user_id}")
-#         response = auth_supabase.table("experience_records").select("project_name, client_name, client_type, work_category, contract_value, completion_status").eq("user_id", user_id).execute()
-#         print(f"[DEBUG] experience_records response: {response.data if response else 'None'}")
-        
-#         if response and response.data and len(response.data) > 0:
-#             exp_summary = []
-#             for exp in response.data[:5]:  # Limit to 5 most recent
-#                 exp_str = f"{exp.get('project_name', 'N/A')} ({exp.get('client_type', '')}, {exp.get('contract_value', 'N/A')})"
-#                 exp_summary.append(exp_str)
-#             if exp_summary:
-#                 context_parts.append(f"Past Projects: {'; '.join(exp_summary)}")
-
-#     except Exception as e:
-#         print(f"[DEBUG] Error fetching company context: {e}")
-#         import traceback
-#         print(f"[DEBUG] Traceback: {traceback.format_exc()}")
-#         return ""
-    
-#     result = "; ".join(context_parts) if context_parts else ""
-#     print(f"[DEBUG] Final company context ({len(result)} chars): {result[:200]}...")
-#     return result
-
-# # Page configuration
-# st.set_page_config(
-#     page_title="Automated Tender Generation",
-#     page_icon="📄",
-#     layout="wide",
-#     initial_sidebar_state="collapsed"
-# )
-
-# # Custom CSS
-# st.markdown("""
-#     <style>
-#     /* Main container padding fix */
-#     .section-header {
-#         font-size: 1.5rem;
-#         font-weight: bold;
-#         color: #e2e8f0; /* Lighter color for dark mode */
-#         margin-bottom: 2rem; /* More space below */
-#         padding-bottom: 0.8rem;
-#         border-bottom: 3px solid #3b82f6;
-#         margin-top: 2rem; /* Ensure space from top bar */
-#     }
-    
-#     /* Top Bar Styling */
-#     .top-bar {
-#         background-color: #1e293b;
-#         padding: 20px 25px;
-#         border-radius: 8px;
-#         margin-bottom: 30px;
-#         border: 1px solid #334155;
-#         display: flex;
-#         flex-direction: column;
-#         gap: 8px;
-#         margin-top: 0px; /* Fixed overlap issue */
-#         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-#     }
-#     .top-bar-title {
-#         color: white;
-#         font-size: 1.4rem;
-#         font-weight: bold;
-#         line-height: 1.2;
-#     }
-#     .top-bar-info {
-#         color: #94a3b8;
-#         font-size: 0.9rem;
-#     }
-#     .status-badge {
-#         display: inline-block;
-#         padding: 4px 10px;
-#         border-radius: 4px;
-#         font-size: 0.8rem;
-#         font-weight: bold;
-#         width: fit-content;
-#     }
-#     .status-ready {
-#         background-color: #065f46;
-#         color: #34d399;
-#     }
-
-#     /* Control Panel Styling - Clean Look */
-#     .control-section {
-#         margin-bottom: 15px;
-#         padding: 5px 0px; /* Removed box padding */
-#         background-color: transparent; /* Removed dark box */
-#         border: none;
-#     }
-#     .control-label {
-#         font-weight: 700;
-#         font-size: 0.95rem;
-#         margin-bottom: 8px;
-#         color: #f1f5f9; /* Bright white text */
-#         display: flex;
-#         align-items: center;
-#         gap: 8px;
-#         text-transform: uppercase;
-#         letter-spacing: 0.05em;
-#     }
-    
-#     /* Streamlit UI Tweaks */
-#     div[data-testid="stVerticalBlock"] {
-#         gap: 0.5rem;
-#     }
-    
-#     /* Ensure content within columns doesn't force scrollbars */
-#     section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] {
-#         overflow: visible;
-#     }
-    
-#     /* Legal preview containment */
-#     .legal-preview {
-#         max-width: 100% !important;
-#         overflow-x: auto !important;
-#         word-wrap: break-word !important;
-#     }
-#     .legal-preview table {
-#         max-width: 100% !important;
-#         overflow-x: auto !important;
-#         display: block;
-#     }
-#     /* Editable preview styling */
-#     .legal-preview-editable {
-#         outline: 2px dashed #3b82f6;
-#         cursor: text;
-#     }
-#     .legal-preview-editable:focus {
-#         outline: 2px solid #3b82f6;
-#     }
-    
-#     /* Streamlit UI Cleanups */
-#     div[data-testid="stExpanderr"] {
-#         border-radius: 8px;
-#     }
-#     h3 {
-#         padding-top: 10px;
-#     }
-#     </style>
-#     """, unsafe_allow_html=True)
-
-# # Initialize session state
-# if 'sections' not in st.session_state:
-#     st.session_state.sections = {
-#         'Eligibility Response': {'status': '⚠', 'content': '', 'clauses': 0},
-#         'Technical Proposal': {'status': '⚠', 'content': '', 'clauses': 0},
-#         'Financial Statements': {'status': '❌', 'content': '', 'clauses': 0},
-#         'Declarations & Forms': {'status': '✅', 'content': '', 'clauses': 0},
-#         'Annexures': {'status': '❌', 'content': '', 'clauses': 0}
-#     }
-
-# if 'current_section' not in st.session_state:
-#     st.session_state.current_section = 'Eligibility Response'
-
-# if 'tender_config' not in st.session_state:
-#     st.session_state.tender_config = {
-#         'name': 'IT Infrastructure Modernization Project',
-#         'authority': 'Central Public Works Department',
-#         'deadline': (datetime.now() + timedelta(days=30)).strftime('%d %B %Y'),
-#         'status': 'Ready for Generation'
-#     }
-
-# if 'pdf_uploaded' not in st.session_state:
-#     st.session_state.pdf_uploaded = False
-
-# if 'current_filename' not in st.session_state:
-#     st.session_state.current_filename = None
-
-# # Top Bar
-# st.markdown(f"""
-#     <div class="top-bar">
-#         <div class="top-bar-title">📄 {st.session_state.tender_config['name']}</div>
-#         <div class="top-bar-info">
-#             <strong>Authority:</strong> {st.session_state.tender_config['authority']} &nbsp;&nbsp;|&nbsp;&nbsp;
-#             <strong>Submission Deadline:</strong> {st.session_state.tender_config['deadline']}
-#         </div>
-#         <span class="status-badge status-ready">{st.session_state.tender_config['status']}</span>
-#     </div>
-# """, unsafe_allow_html=True)
-
-# # Three column layout: Left Panel | Main Workspace | Right Panel
-# left_panel, main_workspace, right_panel = st.columns([1.5, 4, 1.8])
-
-# # LEFT PANEL - Section Navigator
-# with left_panel:
-#     st.markdown("### 📑 Section Navigator")
-    
-#     # Upload section
-#     with st.expander("📤 Upload Tender Document", expanded=not st.session_state.pdf_uploaded):
-#         uploaded_file = st.file_uploader(
-#             "Upload PDF",
-#             type=['pdf'],
-#             label_visibility="collapsed"
-#         )
-        
-#         # Add parsing mode toggle
-#         use_hq_parsing = st.checkbox(
-#             "Enable High Quality Parsing (Slower, Cloud-based)",
-#             value=False,
-#             help="Uses LlamaParse Vision to better extract tables and scanned text. Requires valid API Key."
-#         )
-        
-#         if uploaded_file and not st.session_state.pdf_uploaded:
-#             try:
-#                 with st.spinner("Analyzing document structure..."):
-#                     files = {"file": (uploaded_file.name, uploaded_file, "application/pdf")}
-#                     data = {"parsing_mode": "High-Quality" if use_hq_parsing else "Fast"}
-                    
-#                     # Call Backend API
-#                     response = requests.post(f"{API_BASE_URL}/upload-tender", files=files, data=data)
-                    
-#                     if response.status_code == 200:
-#                         st.session_state.pdf_uploaded = True
-#                         st.session_state.current_filename = uploaded_file.name
-                        
-#                         # Auto-update section statuses
-#                         st.session_state.sections['Eligibility Response']['status'] = '✅'
-#                         st.session_state.sections['Technical Proposal']['status'] = '✅'
-#                         st.session_state.sections['Financial Statements']['status'] = '✅'
-#                         st.session_state.sections['Declarations & Forms']['status'] = '✅'
-#                         st.session_state.sections['Annexures']['status'] = '✅'
-                        
-#                         # Populate pseudo-clause counts for visual feedback
-#                         st.session_state.sections['Eligibility Response']['clauses'] = 12
-#                         st.session_state.sections['Technical Proposal']['clauses'] = 8
-#                         st.session_state.sections['Financial Statements']['clauses'] = 5
-#                         st.session_state.sections['Declarations & Forms']['clauses'] = 4
-#                         st.session_state.sections['Annexures']['clauses'] = 3
-                        
-#                         mode_msg = "High Quality (Vision)" if use_hq_parsing else "Fast (Local)"
-#                         st.success(f"✅ Document Analyzed & Indexed! Mode: {mode_msg}")
-#                         st.rerun()
-#                     else:
-#                         st.error(f"Analysis failed: {response.text}")
-
-#             except Exception as e:
-#                 st.error(f"Connection Error: {str(e)}")
-    
-#     st.markdown("---")
-    
-#     # Section navigation
-#     for section_name, section_data in st.session_state.sections.items():
-#         status_icon = section_data["status"]
-
-#         if status_icon == "✅":
-#             status_text = "Ready"
-#             status_color = "#10b981"
-#         elif status_icon == "⚠":
-#             status_text = "Needs Review"
-#             status_color = "#f59e0b"
-#         else:
-#             status_text = "Missing Data"
-#             status_color = "#ef4444"
-
-#         is_active = section_name == st.session_state.current_section
-
-#         # ONE container per section (important)
-#         with st.container():
-#             if st.button(
-#                 f"{status_icon} {section_name}",
-#                 key=f"nav_{section_name}",
-#                 use_container_width=True,
-#                 type="primary" if is_active else "secondary",
-#             ):
-#                 st.session_state.current_section = section_name
-
-#             # Status text with proper spacing
-#             st.markdown(
-#                 f"""
-#                 <div style="
-#                     text-align: center;
-#                     margin-top: 2px;
-#                     margin-bottom: 15px;
-#                     font-size: 13px;
-#                     font-weight: 600;
-#                     color: {status_color};
-#                     letter-spacing: 0.5px;
-#                 ">
-#                     {status_text}
-#                 </div>
-#                 """,
-#                 unsafe_allow_html=True,
-#             )
-
-
-# # MAIN WORKSPACE
-# with main_workspace:
-#     current = st.session_state.current_section
-#     section_data = st.session_state.sections[current]
-    
-#     st.markdown(f'<div class="section-header">{current}</div>', unsafe_allow_html=True)
-
-#     # --- 1. SESSION & AUTH GUARD ---
-#     if not st.session_state.get("authenticated", False):
-#         # Allow dev/preview without crashing if not coming from login, 
-#         # but realistically should redirect. For now, check session.
-#         pass
-
-#     # --- DIAGNOSTICS SIDEBAR ---
-#     with st.sidebar:
-#         with st.expander("🛠️ System Diagnostics", expanded=False):
-#             user = st.session_state.get("user")
-#             sb_session = st.session_state.get("sb_session")
-#             st.write(f"**Authenticated:** {st.session_state.get('authenticated')}")
-#             st.write(f"**User Object:** {'Found' if user else 'Missing'}")
-#             if user:
-#                 # Try both attribute and dict access
-#                 uid = getattr(user, 'id', None) or (user.get('id') if isinstance(user, dict) else None)
-#                 st.write(f"**User ID:** `{uid}`")
-#             st.write(f"**Session Token:** {'Found' if sb_session else 'Missing'}")
-            
-#             if st.button("Force Refetch Context"):
-#                 uid = getattr(user, 'id', None) or (user.get('id') if isinstance(user, dict) else None) if user else None
-#                 if uid:
-#                     ctx = get_company_context(uid)
-#                     st.code(ctx if ctx else "Empty Context Returned")
-#                 else:
-#                     st.warning("No User ID found")
-
-#     # --- ACTION CALLBACKS ---
-#     def handle_regeneration():
-#         """Callback to handle generation BEFORE widget rendering"""
-#         if not st.session_state.pdf_uploaded:
-#             st.error("Please upload a document first.")
-#             return
-
-#         try:
-#             # Get values from Session State (populated by Right Panel widgets)
-#             # Default to "Formal" and True if keys are missing (first run)
-#             tone_val = st.session_state.get("gen_tone", "Formal")
-#             comp_val = st.session_state.get("gen_compliance", True)
-            
-#             # Fetch company context from Supabase
-#             user = st.session_state.get("user")
-#             # Robust user_id extraction (handles both object and dict formats)
-#             user_id = getattr(user, 'id', None) or (user.get('id') if isinstance(user, dict) else None)
-            
-#             company_context = ""
-#             if user_id:
-#                 st.toast(f"🔍 Fetching company data...")
-#                 company_context = get_company_context(user_id)
-#                 if company_context:
-#                     st.toast(f"✅ Context loaded ({len(company_context)} chars)")
-            
-#             print(f"[FRONTEND DEBUG] Sending payload to {API_BASE_URL}/generate-section")
-#             print(f"[FRONTEND DEBUG] Company Context length: {len(company_context)}")
-
-#             payload = {
-#                 "filename": st.session_state.current_filename,
-#                 "section_type": current,
-#                 "tone": tone_val,
-#                 "compliance_mode": comp_val,
-#                 "company_context": company_context
-#             }
-            
-#             # Call API
-#             gen_resp = requests.post(f"{API_BASE_URL}/generate-section", data=payload)
-            
-#             if gen_resp.status_code == 200:
-#                 data = gen_resp.json()
-#                 st.session_state.sections[current]['content'] = data['content']
-#                 # Update the text_area key so it picks up the new value on re-render
-#                 st.session_state[f"content_{current}"] = data['content']
-#                 st.success("Content Drafted!")
-#             else:
-#                  st.error(f"Generation failed: {gen_resp.text}")
-#         except Exception as e:
-#             st.error(f"API Error: {str(e)}")
-
-#     # --- HELPER FUNCTIONS & CALLBACKS ---
-#     from io import BytesIO
-#     from reportlab.pdfgen import canvas
-#     from reportlab.lib.pagesizes import letter
-
-#     def create_legal_pdf(markdown_content):
-#         """
-#         Creates a professional, legal-grade PDF from Markdown content.
-#         Uses markdown2 to convert to HTML, then xhtml2pdf (pisa) to generate PDF.
-#         """
-#         # CSS for professional legal document styling
-#         css_styles = """
-#         <style>
-#             @page {
-#                 size: A4;
-#                 margin: 2.5cm 2cm 2.5cm 2cm;
-#             }
-#             body {
-#                 font-family: 'Times New Roman', Times, serif;
-#                 font-size: 12pt;
-#                 line-height: 1.6;
-#                 text-align: justify;
-#                 color: #1a1a1a;
-#             }
-#             h1 {
-#                 font-size: 18pt;
-#                 font-weight: bold;
-#                 text-align: center;
-#                 margin-bottom: 20px;
-#                 text-transform: uppercase;
-#                 border-bottom: 2px solid #333;
-#                 padding-bottom: 10px;
-#             }
-#             h2 {
-#                 font-size: 14pt;
-#                 font-weight: bold;
-#                 margin-top: 20px;
-#                 margin-bottom: 10px;
-#                 color: #2c3e50;
-#             }
-#             h3 {
-#                 font-size: 12pt;
-#                 font-weight: bold;
-#                 margin-top: 15px;
-#                 margin-bottom: 8px;
-#                 color: #34495e;
-#             }
-#             p {
-#                 margin-bottom: 10px;
-#                 text-indent: 0;
-#             }
-#             table {
-#                 width: 100%;
-#                 border-collapse: collapse;
-#                 margin: 15px 0;
-#                 font-size: 10pt;
-#             }
-#             th {
-#                 background-color: #2c3e50;
-#                 color: white;
-#                 font-weight: bold;
-#                 padding: 10px 8px;
-#                 text-align: left;
-#                 border: 1px solid #2c3e50;
-#             }
-#             td {
-#                 padding: 8px;
-#                 border: 1px solid #bdc3c7;
-#                 vertical-align: top;
-#             }
-#             tr:nth-child(even) {
-#                 background-color: #f9f9f9;
-#             }
-#             ul, ol {
-#                 margin-left: 20px;
-#                 margin-bottom: 10px;
-#             }
-#             li {
-#                 margin-bottom: 5px;
-#             }
-#             strong {
-#                 font-weight: bold;
-#             }
-#             .header {
-#                 text-align: center;
-#                 margin-bottom: 30px;
-#             }
-#             .footer {
-#                 position: fixed;
-#                 bottom: 1cm;
-#                 left: 2cm;
-#                 right: 2cm;
-#                 text-align: center;
-#                 font-size: 9pt;
-#                 color: #7f8c8d;
-#                 border-top: 1px solid #bdc3c7;
-#                 padding-top: 10px;
-#             }
-#         </style>
-#         """
-        
-#         # Convert Markdown to HTML
-#         html_content = markdown2.markdown(
-#             markdown_content,
-#             extras=["tables", "fenced-code-blocks", "header-ids"]
-#         )
-        
-#         # Wrap in full HTML document
-#         full_html = f"""
-#         <!DOCTYPE html>
-#         <html>
-#         <head>
-#             <meta charset="UTF-8">
-#             {css_styles}
-#         </head>
-#         <body>
-#             {html_content}
-#         </body>
-#         </html>
-#         """
-        
-#         # Generate PDF
-#         pdf_buffer = BytesIO()
-#         pisa_status = pisa.CreatePDF(full_html, dest=pdf_buffer)
-        
-#         if pisa_status.err:
-#             # Fallback to simple text if conversion fails
-#             pdf_buffer = BytesIO()
-#             pdf_buffer.write(markdown_content.encode('utf-8'))
-        
-#         pdf_buffer.seek(0)
-#         return pdf_buffer
-
-#     # Legacy function for backward compatibility
-#     def create_pdf(text_content):
-#         return create_legal_pdf(text_content)
-
-#     def handle_mark_reviewed():
-#         st.session_state.sections[current]['status'] = '✅'
-#         st.success("Section marked as reviewed!")
-
-#     def handle_bulk_generation():
-#         if not st.session_state.pdf_uploaded:
-#             st.error("Please upload a document first.")
-#             return
-            
-#         progress_bar = st.progress(0)
-#         status_text = st.empty()
-        
-#         sections_to_gen = [k for k in st.session_state.sections.keys()]
-#         total = len(sections_to_gen)
-        
-#         for i, section_name in enumerate(sections_to_gen):
-#             status_text.text(f"Generating {section_name}...")
-            
-#             # Fetch company context (efficiently fetch once if possible, but here inside loop is fine or move out)
-#             # Actually better to fetch once outside loop for bulk
-#             # But adhering to the previous pattern for simplicity
-#             user = st.session_state.get("user")
-#             user_id = getattr(user, 'id', None) or (user.get('id') if isinstance(user, dict) else None)
-#             company_context = get_company_context(user_id) if user_id else ""
-            
-#             payload = {
-#                 "filename": st.session_state.current_filename,
-#                 "section_type": section_name,
-#                 "tone": st.session_state.get("gen_tone", "Formal"),
-#                 "compliance_mode": st.session_state.get("gen_compliance", True),
-#                 "company_context": company_context
-#             }
-#             try:
-#                 resp = requests.post(f"{API_BASE_URL}/generate-section", data=payload)
-#                 if resp.status_code == 200:
-#                     data = resp.json()
-#                     st.session_state.sections[section_name]['content'] = data['content']
-#                     st.session_state[f"content_{section_name}"] = data['content']
-#             except Exception as e:
-#                 st.error(f"Failed {section_name}: {e}")
-#             progress_bar.progress((i + 1) / total)
-#         status_text.text("Bulk Generation Complete!")
-#         st.success("All sections generated successfully.")
-
-#     def handle_export_complete_docx():
-#         full_doc = f"TENDER RESPONSE FOR {st.session_state.current_filename}\n\n"
-#         for sec_name, sec_data in st.session_state.sections.items():
-#             full_doc += f"--- {sec_name.upper()} ---\n\n"
-#             full_doc += (sec_data['content'] or "[No Content Generated]\n")
-#             full_doc += "\n\n"
-#         return full_doc
-
-#     # Clause information
-#     if section_data['clauses'] > 0:
-#         st.markdown(f"""
-#             <div class="clause-info">
-#                 <strong>📋 Generated from {section_data['clauses']} clauses</strong><br>
-#                 <small>Clauses 2.1-2.5, 3.2, 4.1-4.7 from tender document</small>
-#             </div>
-#         """, unsafe_allow_html=True)
-#     else:
-#         st.info("🔄 Upload a tender document to generate this section")
-    
-#     # Generated content area
-#     if section_data['clauses'] > 0:
-#         # Default content logic
-#         default_text = "Click 'Generate all Sections' to draft this proposal section using AI."
-        
-#         # Edit Toggle placed prominently
-#         col_space, col_edit, col_save = st.columns([0.75, 0.12, 0.13])
-#         with col_edit:
-#             is_editing = st.checkbox("✍️ Edit", key=f"edit_mode_{current}", help="Edit directly in the legal preview")
-        
-#         if f"edited_content_{current}" not in st.session_state:
-#             st.session_state[f"edited_content_{current}"] = section_data['content'] or default_text
-
-#         # Toggle structure
-#         if is_editing:
-#             # EDIT MODE
-#             new_content = st.text_area(
-#                 "Edit Content",
-#                 value=st.session_state[f"edited_content_{current}"],
-#                 height=600,
-#                 label_visibility="collapsed",
-#                 key=f"editor_{current}"
-#             )
-#             st.session_state[f"edited_content_{current}"] = new_content
-            
-#             # Save Button (Commented out as duplicate)
-#             # if st.button("💾 Save Changes", type="primary", key=f"save_{current}"):
-#             #     st.session_state.sections[current]['content'] = new_content
-#             #     st.session_state[f"content_{current}"] = new_content
-#             #     st.session_state[f"edit_mode_{current}"] = False # Exit edit mode
-#             #     st.success("Changes saved!")
-#             #     st.rerun()
-
-#         else:
-#             # PREVIEW MODE
-#             # Use current content (committed)
-#             display_content = st.session_state.sections[current]['content'] or default_text
-            
-#             # Convert markdown to HTML for display
-#             # Removed 'fenced-code-blocks' to correct "code snippet" issue
-#             html_content = markdown2.markdown(
-#                 display_content,
-#                 extras=["tables", "header-ids"]
-#             )
-            
-#             st.markdown(f"""
-# <style>
-#     .legal-preview table {{
-#         width: 100%;
-#         max-width: 100%;
-#         border: 1px solid black;
-#         border-collapse: collapse;
-#         margin: 15px 0;
-#         display: table;
-#         table-layout: fixed;
-#     }}
-#     .legal-preview th {{
-#         background-color: #2c3e50;
-#         color: white;
-#         font-weight: bold;
-#         padding: 10px;
-#         border: 1px solid black;
-#         text-align: left;
-#         word-wrap: break-word;
-#     }}
-#     .legal-preview td {{
-#         padding: 8px;
-#         border: 1px solid black;
-#         vertical-align: top;
-#         word-wrap: break-word;
-#     }}
-#     .legal-preview h3 {{
-#         font-weight: bold;
-#         margin-top: 20px;
-#         border-bottom: 2px solid #333;
-#         padding-bottom: 5px;
-#     }}
-#     .legal-preview h4 {{
-#         font-weight: bold;
-#         margin-top: 15px;
-#         color: #2c3e50;
-#     }}
-#     /* Scrollable Container Styling */
-#     .preview-scroll-container {{
-#         height: 800px;
-#         overflow-y: auto;
-#         border: 1px solid #30363D;
-#         border-radius: 8px;
-#         padding: 20px;
-#         background-color: #0D1117; /* Dark background frame */
-#         box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
-#     }}
-#     /* Custom Scrollbar */
-#     .preview-scroll-container::-webkit-scrollbar {{
-#         width: 10px;
-#         height: 10px;
-#     }}
-#     .preview-scroll-container::-webkit-scrollbar-track {{
-#         background: #0D1117;
-#     }}
-#     .preview-scroll-container::-webkit-scrollbar-thumb {{
-#         background: #30363D;
-#         border-radius: 5px;
-#     }}
-#     .preview-scroll-container::-webkit-scrollbar-thumb:hover {{
-#         background: #58a6ff;
-#     }}
-# </style>
-
-# <div class="preview-scroll-container">
-#     <div class="legal-preview" style="
-#         background-color: white;
-#         padding: 40px; 
-#         box-sizing: border-box;
-#         width: 100%;
-#         max-width: 100%;
-#         border-radius: 4px;
-#         box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-#         font-family: 'Times New Roman', Times, serif;
-#         font-size: 12pt;
-#         line-height: 1.6;
-#         color: #1a1a1a;
-#         min-height: 800px; /* Ensure paper has height */
-#         text-align: justify;
-#         border: 1px solid #ccc;
-#     ">
-#         {html_content}
-#     </div>
-# </div>
-# """, unsafe_allow_html=True)
-        
-#         # CLEARING DIV to prevent float overlap issues
-#         st.markdown('<div style="clear: both; margin-bottom: 20px;"></div>', unsafe_allow_html=True)
-#         st.divider()
-
-#         # Show save button when editing
-#         with col_save:
-#             if is_editing:
-#                 if st.button("💾 Save", key=f"save_edit_{current}", help="Save your edits"):
-#                     st.success("Changes saved!")
-#                     st.rerun()
-        
-#         # Action buttons
-#         col1, col2, padding_col = st.columns([1.5, 1.5, 3])
-        
-#         with col1:
-#             st.button("🔄 Regenerate Section", use_container_width=True, type="primary", on_click=handle_regeneration)
-            
-#         with col2:
-#             # Replaced with Export Complete Tender (PDF)
-#             full_text = handle_export_complete_docx()
-#             full_pdf = create_legal_pdf(full_text)
-            
-#             st.download_button(
-#                 "💾 Export Complete Tender",
-#                 data=full_pdf,
-#                 file_name=f"Full_Tender_Response_{st.session_state.current_filename}.pdf",
-#                 mime="application/pdf",
-#                 use_container_width=True
-#             )
-
-# # RIGHT PANEL - Controls
-# with right_panel:
-#     st.markdown("### ⚙️ Generation Controls")
-    
-#     # ... (Tone/Jurisdiction/Compliance controls remain same) ...
-#     # Tone selector
-#     st.markdown('<div class="control-section">', unsafe_allow_html=True)
-#     st.markdown('<div class="control-label">📝 Tone Style</div>', unsafe_allow_html=True)
-#     tone = st.radio(
-#         "Tone",
-#         ["Formal", "Ultra-Formal"],
-#         label_visibility="collapsed",
-#         key="gen_tone"
-#     )
-#     st.markdown('</div>', unsafe_allow_html=True)
-    
-#     # Jurisdiction style
-#     st.markdown('<div class="control-section">', unsafe_allow_html=True)
-#     st.markdown('<div class="control-label">🏛️ Jurisdiction</div>', unsafe_allow_html=True)
-#     jurisdiction = st.radio(
-#         "Jurisdiction",
-#         ["Government PSU", "Private Sector"],
-#         label_visibility="collapsed",
-#         key="gen_jurisdiction"
-#     )
-#     st.markdown('</div>', unsafe_allow_html=True)
-    
-#     # Strict compliance toggle
-#     st.markdown('<div class="control-section">', unsafe_allow_html=True)
-#     st.markdown('<div class="control-label">⚖️ Compliance Mode</div>', unsafe_allow_html=True)
-#     strict_compliance = st.toggle(
-#         "Strict compliance only",
-#         value=True,
-#         help="Only include clauses with strict compliance requirements",
-#         key="gen_compliance"
-#     )
-#     st.markdown('</div>', unsafe_allow_html=True)
-    
-#     st.markdown("---")
-    
-#     # Additional settings
-#     st.markdown('<div class="control-section">', unsafe_allow_html=True)
-#     st.markdown('<div class="control-label">📊 Citation Level</div>', unsafe_allow_html=True)
-#     citation_level = st.select_slider(
-#         "Citation",
-#         options=["Minimal", "Standard", "Detailed"],
-#         value="Standard",
-#         label_visibility="collapsed",
-#         key="gen_citation"
-#     )
-#     st.markdown('</div>', unsafe_allow_html=True)
-    
-#     st.markdown('<div class="control-section">', unsafe_allow_html=True)
-#     st.markdown('<div class="control-label">🔍 Content Depth</div>', unsafe_allow_html=True)
-#     content_depth = st.select_slider(
-#         "Depth",
-#         options=["Concise", "Standard", "Comprehensive"],
-#         value="Standard",
-#         label_visibility="collapsed",
-#         key="gen_depth"
-#     )
-#     st.markdown('</div>', unsafe_allow_html=True)
-    
-#     st.markdown("---")
-    
-#     # Bulk actions
-#     st.markdown("### 🚀 Bulk Actions")
-#     st.markdown('<div style="margin-bottom: 15px;"></div>', unsafe_allow_html=True) 
-    
-#     st.button("⚡ Generate All Sections", use_container_width=True, type="primary", on_click=handle_bulk_generation)
-#     st.markdown('<div style="margin-bottom: 10px;"></div>', unsafe_allow_html=True)
-    
-#     # Save to Supabase DB Controls
-#     project_name_input = st.text_input("Project Name", value="New Tender", help="Name for this tender project")
-    
-#     if st.button("💾 Save to Cloud DB", use_container_width=True, help="Save all generated sections to Supabase"):
-#         # Robust user check using session_state
-#         current_user = st.session_state.get("user")
-#         current_user_id = getattr(current_user, 'id', None) or (current_user.get('id') if isinstance(current_user, dict) else None)
-        
-#         if not current_user_id:
-#             st.warning("⚠️ You must be logged in to save to the cloud.")
-#         else:
-#             saved_count = 0
-#             with st.spinner("Saving to database..."):
-#                 for sec_name, sec_data in st.session_state.sections.items():
-#                     content_to_save = sec_data.get('content', '')
-#                     if content_to_save:
-#                         # Generate PDF on the fly
-#                         pdf_bytes = create_legal_pdf(content_to_save)
-                        
-#                         success = save_tender_to_db(
-#                             user_id=current_user_id,
-#                             project_name=project_name_input,
-#                             content=content_to_save,
-#                             section_type=sec_name,
-#                             pdf_bytes=pdf_bytes
-#                         )
-#                         if success:
-#                             saved_count += 1
-            
-#             if saved_count > 0:
-#                 st.success(f"✅ Successfully saved {saved_count} sections to cloud!")
-#             else:
-#                 st.warning("No content to save (generate sections first).")
-    
-#     st.markdown('</div>', unsafe_allow_html=True)
-
-# # Footer info
-# st.markdown("---")
-# st.markdown("""
-#     <div style='text-align: center; color: #6b7280; font-size: 0.85rem; padding-bottom: 30px;'>
-#         <strong>Tender Generation System</strong> | Last saved: {time} | Auto-save enabled
-#     </div>
-# """.format(time=datetime.now().strftime('%H:%M:%S')), unsafe_allow_html=True)
-
-# import streamlit as st
-# from datetime import datetime, timedelta
-# import time
-# import requests
-# import markdown2
-# from xhtml2pdf import pisa
-# from io import BytesIO
-# import os
-# import base64
-# from pathlib import Path
-# from supabase import create_client, Client
-# from utils.auth import can_access
-
-# def get_base64_of_bin_file(path):
-#     if os.path.exists(path):
-#         with open(path, "rb") as f:
-#             return base64.b64encode(f.read()).decode()
-#     return None
-
-# # UI CONSTANTS (YOUR THEME)
-# THEME_PURPLE = "#a855f7"
-# THEME_INDIGO = "#1a1c4b"
-# THEME_DARK = "#0f111a"
-# THEME_WHITE = "#ffffff"
-# BG_GRADIENT = "radial-gradient(circle at 20% 30%, #1a1c4b 0%, #0f111a 100%)"
-
-# #  ACCESS CONTROL 
-# if not can_access("tender_generation"):
-#     st.markdown(f'<div style="color: {THEME_PURPLE}; padding: 20px; border: 1px solid {THEME_PURPLE}; border-radius: 10px;">You are not authorized to access this page.</div>', unsafe_allow_html=True)
-#     st.stop()
-
-# #  BACKEND CONFIG 
-# API_BASE_URL = "http://localhost:8000"
-# url = os.environ.get("SUPABASE_URL")
-# key = os.environ.get("SUPABASE_KEY")
-
-# st.set_page_config(page_title="TenderGen", layout="wide", initial_sidebar_state="collapsed")
-
-# st.markdown(f"""
-#     <style>
-#     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700&display=swap');
-    
-#     /* Global Background & Text */
-#     .stApp {{
-#         background: {BG_GRADIENT} !important;
-#         font-family: 'Plus Jakarta Sans', sans-serif;
-#         color: {THEME_WHITE};
-#     }}
-
-#     header, footer {{ visibility: hidden; }}
-
-#     /* HEADER NAV CONTAINER */
-#         .header-nav {{
-#             background: linear-gradient(
-#                 135deg,
-#                 rgba(255,255,255,0.08),
-#                 rgba(255,255,255,0.02)
-#             );
-#             backdrop-filter: blur(10px);
-#             border: 1px solid rgba(255,255,255,0.12);
-#             border-radius: 16px;
-#             padding: 12px 18px;
-#             margin-bottom: 22px;
-#         }}
-      
-#         .block-container{{
-#             margin-top: -70px;
-#         }}
-
-#     /* Remove Streamlit Red from all default components */
-#     .stAlert {{ background-color: rgba(168, 85, 247, 0.1); border: 1px solid {THEME_PURPLE}; color: white; }}
-#     button[kind="primary"] {{ background-color: {THEME_PURPLE} !important; border: none !important; color: white !important; }}
-#     button[kind="secondary"] {{ background-color: rgba(255,255,255,0.05) !important; color: white !important; border: 1px solid rgba(255,255,255,0.1) !important; }}
-    
-#     /* Progress Bar Theme */
-#     div[data-baseweb="progress-bar"] > div > div {{ background-color: {THEME_PURPLE} !important; }}
-
-#     /* Section Header */
-#     .section-title {{
-#         font-size: 2.5rem;
-#         font-weight: 800;
-#         background: white;
-#         -webkit-background-clip: text;
-#         -webkit-text-fill-color: transparent;
-#         margin-bottom: 5px;
-#     }}
-
-#     /* Custom Navigation Cards */
-#     .nav-card {{
-#         background: rgba(255, 255, 255, 0.03);
-#         border: 1px solid rgba(168, 85, 247, 0.15);
-#         border-radius: 12px;
-#         padding: 15px;
-#         margin-bottom: 10px;
-#         transition: all 0.3s ease;
-#         cursor: pointer;
-#     }}
-#     .nav-card-active {{
-#         background: rgba(168, 85, 247, 0.2);
-#         border: 1px solid {THEME_PURPLE};
-#         box-shadow: 0 0 15px rgba(168, 85, 247, 0.3);
-#     }}
-
-#     /* Legal Document Preview (The "Paper") */
-#     .document-paper {{
-#         background: #ffffff;
-#         color: #1a1a1a;
-#         padding: 50px;
-#         border-radius: 2px;
-#         min-height: 1000px;
-#         font-family: 'Times New Roman', Times, serif;
-#         box-shadow: 0 20px 40px rgba(0,0,0,0.4);
-#         line-height: 1.6;
-#     }}
-    
-#     /* Override for standard text area when editing */
-#     .stTextArea textarea {{
-#         background: rgba(0,0,0,0.2) !important;
-#         color: white !important;
-#         border: 1px solid {THEME_PURPLE} !important;
-#     }}
-#     </style>
-# """, unsafe_allow_html=True)
-
-# #  INITIALIZE SESSION STATE 
-# if 'sections' not in st.session_state:
-#     st.session_state.sections = {
-#         'Eligibility Response': {'status': '⬩', 'content': '', 'clauses': 12},
-#         'Technical Proposal': {'status': '⬩', 'content': '', 'clauses': 8},
-#         'Financial Statements': {'status': '⬩', 'content': '', 'clauses': 5},
-#         'Declarations & Forms': {'status': '✦', 'content': '', 'clauses': 4},
-#         'Annexures': {'status': '⬩', 'content': '', 'clauses': 3}
-#     }
-# if 'current_section' not in st.session_state:
-#     st.session_state.current_section = 'Eligibility Response'
-
-# # HEADER NAVIGATION
-# left, center = st.columns([3, 6])
-
-# with left:
-#     logo_path = Path(__file__).resolve().parents[1] / "assets" / "logo.png"
-#     logo = get_base64_of_bin_file(logo_path)
-
-#     if logo:
-#         st.markdown(f"""
-#             <div style="display:flex; align-items:center;">
-#                 <img src="data:image/png;base64,{logo}" width="200">
-#             </div>
-#         """, unsafe_allow_html=True)
-
-# with center:
-#     header_cols = st.columns([3, 0.4, 0.4, 0.4, 0.4, 0.4])
-
-#     with header_cols[1]:
-#         if st.button("⊞", key="h_dash", help="Dashboard"):
-#             st.switch_page("app.py")
-
-#     with header_cols[2]:
-#         if can_access("tender_generation"):
-#             if st.button("⎘", key="h_gen", help="Tender Generation"):
-#                 st.switch_page("pages/tenderGeneration.py")
-#         else:
-#             st.button("⎘", key="h_gen_disabled", disabled=True, help="Access restricted")
-
-
-#     with header_cols[3]:
-#         if can_access("tender_analysis"):
-#             if st.button("◈", key="h_anl", help="Tender Analysis"):
-#                 st.switch_page("pages/tenderAnalyser.py")
-#         else:
-#             st.button("◈", key="h_anl_disabled", disabled=True)
-
-#     with header_cols[4]:
-#         if can_access("bid_generation"):
-#             if st.button("✦", key="h_bid", help="Bid Generation"):
-#                 st.switch_page("pages/bidGeneration.py")
-#         else:
-#             st.button("✦", key="h_bid_disabled", disabled=True)
-
-#     with header_cols[5]:
-#         if can_access("risk_analysis"):
-#             if st.button("⬈", key="h_risk", help="Risk Analysis"):
-#                 st.switch_page("pages/riskAnalysis.py")
-#         else:
-#             st.button("⬈", key="h_risk_disabled", disabled=True)
-
-
-# # st.markdown("<div> <hr> </div>", unsafe_allow_html=True)
-
-# # Top Banner
-# st.markdown(f"""
-#     <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 30px; border-bottom: 1px solid rgba(168, 85, 247, 0.3); padding-bottom: 20px;">
-#         <div>
-#             <h1 class="section-title">Tender Studio</h1>
-#             <p style="color: rgba(255,255,255,0.6); margin: 0;">AI-Powered Clause Generation & Response Drafting</p>
-#         </div>
-#         <div style="text-align: right;">
-#             <span style="font-weight: 700; color: {THEME_PURPLE};">Authority:</span> <span>CPWD Modernization</span>
-#         </div>
-#     </div>
-# """, unsafe_allow_html=True)
-
-# left_pane, center_pane, right_pane = st.columns([1, 3.5, 1], gap="large")
-
-# #  LEFT PANE: NAVIGATION 
-# with left_pane:
-#     st.markdown("<br><br>", unsafe_allow_html=True)
-#     st.markdown("### Source")
-#     with st.container(border=True):
-#             st.file_uploader("Upload RFP", type=['pdf'], label_visibility="collapsed")
-#             st.markdown(f"<small style='color: {THEME_PURPLE}'>Fast Local Parsing Enabled</small>", unsafe_allow_html=True)
-
-#     st.markdown(f"### Sections")
-#     for sec_name, sec_data in st.session_state.sections.items():
-#         is_active = sec_name == st.session_state.current_section
-        
-#         if st.button(f"{sec_data['status']} {sec_name}", key=f"nav_{sec_name}", use_container_width=True, type="primary" if is_active else "secondary"):
-#             st.session_state.current_section = sec_name
-#             st.rerun()
-
-
-# #CENTER PANE: THE WORKSPACE
-# with center_pane:
-#     current = st.session_state.current_section
-#     sec_data = st.session_state.sections[current]
-    
-#     col_title, col_toggle = st.columns([3, 1])
-#     with col_title:
-#         st.markdown(f"## {current}")
-#     with col_toggle:
-#         edit_mode = st.toggle("Editor", value=False)
-
-#     if sec_data['content']:
-#         if edit_mode:
-#             new_text = st.text_area("Content Editor", value=sec_data['content'], height=800, label_visibility="collapsed")
-#             if st.button("💾Commit Changes", use_container_width=True):
-#                 st.session_state.sections[current]['content'] = new_text
-#                 st.success("Changes saved to session")
-#         else:
-#             html_preview = markdown2.markdown(sec_data['content'], extras=["tables"])
-#             st.markdown(f"""
-#                 <div class="document-paper">
-#                     {html_preview}
-#                 </div>
-#             """, unsafe_allow_html=True)
-#     else:
-#         st.markdown(f"""
-#             <div style="height: 600px; display: flex; align-items: center; justify-content: center; border: 1px solid rgba(168, 85, 247, 0.2); border-radius: 20px; background: rgba(168, 85, 247, 0.02);">
-#                 <div style="text-align: center;">
-#                     <h2 style="color: {THEME_PURPLE}; opacity: 0.5;">Empty Section</h2>
-#                     <p style="color: rgba(255,255,255,0.4);">Use the 'Generate' tool on the right to start drafting.</p>
-#                 </div>
-#             </div>
-#         """, unsafe_allow_html=True)
-
-# # RIGHT PANE: ACTIONS 
-# with right_pane:
-#     st.markdown("### AI Actions")
-    
-#     with st.container(border=True):
-#         st.markdown(f"**Parameters**")
-#         st.select_slider("Tone", options=["Formal", "Technical", "Sales"], key="tone_slider")
-#         st.checkbox("Include Citations", value=True)
-        
-#         st.markdown("---")
-        
-#         if st.button("Draft Section", use_container_width=True, type="primary"):
-#             with st.spinner("Thinking..."):
-#                 time.sleep(1)
-#                 st.session_state.sections[current]['content'] = f"# {current}\n\nThis is a generated draft based on the uploaded RFP clauses. It follows the **Formal** tone and includes compliance check-marks."
-#                 st.rerun()
-
-#     st.markdown("<br>", unsafe_allow_html=True)
-#     st.markdown("### Export")
-#     if sec_data['content']:
-#         st.button("Export to PDF", use_container_width=True)
-#         st.button("Word Document", use_container_width=True)
-#     else:
-#         st.button("Export Disabled", disabled=True, use_container_width=True)
-
-# # --- BACKEND LOGIC (PRESERVED) ---
-# # All your get_company_context, create_legal_pdf, and Supabase code 
-# # should be pasted below or kept in your utils folder.

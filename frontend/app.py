@@ -35,7 +35,7 @@ if not st.session_state.get("authenticated"):
 
 # Logged in but onboarding not finished → resume onboarding
 if not st.session_state.get("onboarding_complete", False):
-    st.switch_page("pages/informationCollection.py")
+    st.switch_page("pages/informationCollection_1.py")
     st.stop()
 
 # Fully onboarded → dashboard

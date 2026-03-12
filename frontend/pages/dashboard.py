@@ -88,75 +88,136 @@ def get_base64_of_bin_file(path):
 # GLOBAL CSS
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap');
+
+:root{
+    --bg1: #1a1c4b;
+    --bg2: #0f111a;
+    --card: rgba(24, 24, 27, 0.5);
+    --border: rgba(255, 255, 255, 0.10);
+    --borderDark: rgba(255, 255, 255, 0.05);
+    --text: #F4F4F5;
+    --muted: rgba(244, 244, 245, 0.65);
+    --accent: #A855F7;
+    --accentGlow: rgba(168, 85, 247, 0.15);
+}
 
 html, body, [class*="css"] {
-    font-family: 'Inter', sans-serif;
+    font-family: 'Inter', sans-serif !important;
 }
 
 header, footer { visibility:hidden; }
               
 div.block-container {
     padding-top: 0.8rem !important; 
+    padding-bottom: 2rem !important;
 }
 
-
 .stApp {
-    background: radial-gradient(circle at 20% 30%, #1a1c4b 0%, #0f111a 100%);
+    background: radial-gradient(circle at 20% 30%, var(--bg1) 0%, var(--bg2) 100%) !important;
+    color: var(--text) !important;
 }
 
 /* HEADER */
 .header-title {
-    font-size: 22px;
-    font-weight: 600;
-    color: #f8fafc;
+    font-size: 24px;
+    font-weight: 700;
+    color: #ffffff;
+    letter-spacing: -0.02em;
 }
 
 /* HEADER NAV CONTAINER */
 .header-nav {
-    background: linear-gradient(
-        135deg,
-        rgba(255,255,255,0.08),
-        rgba(255,255,255,0.02)
-    );
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255,255,255,0.12);
+    background: linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--border);
     border-radius: 16px;
-    padding: 12px 12px;
+    padding: 12px 16px;
     margin-bottom: 22px;
 }
 
 /* KPI CARDS */
 .kpi-card {
-    background: linear-gradient(
-        135deg,
-        rgba(255,255,255,0.08),
-        rgba(255,255,255,0.02)
-    );
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255,255,255,0.12);
+    background: linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.01));
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--border);
     border-radius: 16px;
-    padding: 18px 22px;
+    padding: 22px 24px;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    position: relative;
+    overflow: hidden;
+}
+
+.kpi-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    opacity: 0.5;
 }
 
 .kpi-title {
     font-size: 13px;
-    color: #cbd5f5;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 600;
+    color: var(--muted);
+    margin-bottom: 8px;
 }
 
 .kpi-value {
-    font-size: 26px;
+    font-size: 32px;
     font-weight: 700;
     color: #ffffff;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: -0.03em;
 }
 
 /* SECTION TITLES */
 .section-title {
-    color: #e5e7eb;
-    font-size: 18px;
-    font-weight: 600;
-    margin: 22px 0 12px;
+    color: #ffffff;
+    font-size: 19px;
+    font-weight: 700;
+    margin: 32px 0 16px;
+    letter-spacing: -0.01em;
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
+
+/* NATIVE LIST CONTAINERS */
+.list-container {
+    background: var(--card);
+    border: 1px solid var(--borderDark);
+    border-radius: 16px;
+    padding: 20px;
+    height: 320px;
+    overflow-y: auto;
+    box-shadow: inset 0 2px 20px rgba(0,0,0,0.2);
+}
+
+.list-container::-webkit-scrollbar { width: 6px; }
+.list-container::-webkit-scrollbar-track { background: transparent; }
+.list-container::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 10px; }
+.list-container::-webkit-scrollbar-thumb:hover { background: rgba(168,85,247,0.5); }
+
+.list-row {
+    margin-bottom: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 14px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 10px;
+    transition: background 0.2s;
+}
+.list-row:hover { background: rgba(255,255,255,0.07); border-color: rgba(168,85,247,0.3); }
+
+.list-name { font-weight: 600; font-size: 14px; color: #e4e4e7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.list-tag { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #a1a1aa; background: rgba(255,255,255,0.06); padding: 4px 10px; border-radius: 20px; }
+.list-amount { font-family: 'JetBrains Mono', monospace; font-weight: 700; color: #a855f7; font-size: 14px; }
 
 /* NOTIFICATION BANNER */
 .notification-container {
@@ -594,20 +655,17 @@ else:
 
         activity_df["Month_Label"] = activity_df["Month"].dt.strftime("%b %Y")
 
-        fig = px.line(
-            activity_df,
-            x="Month_Label",
-            y=["Bids_Submitted", "Bids_Won"],
-            markers=True
-        )
+        fig.update_traces(line=dict(color="#a855f7", width=3), marker=dict(size=8, color="#d8b4fe"))
 
         fig.update_layout(
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(0,0,0,0)",
-            font_color="white",
-            legend_title_text=""
+            font_color="#a1a1aa",
+            legend_title_text="",
+            margin=dict(l=0, r=0, t=20, b=0),
+            xaxis=dict(showgrid=False, zeroline=False),
+            yaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.05)", zeroline=False)
         )
-
         st.plotly_chart(fig, use_container_width=True)
 
 
@@ -653,65 +711,23 @@ with col1:
     if not final_list:
         st.info(f"No tenders found for category: {selected_cat}")
     else:
-        # Build HTML rows
-        # Format: "1. ProjectName (Category)" - No Value
-        html_cat_rows = ""
+        # Build HTML rows for st.markdown (No iframes)
+        html_cat_rows = '<div class="list-container">'
         for i, item in enumerate(final_list[:8], 1): # Limit to 8
             name = item.get("project_name", "Unknown")
             cat = item.get("category")
             
             html_cat_rows += f"""
-            <div style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
-                <span style="font-weight: 500; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 70%;" title="{name}"><b>{i}.</b> {name}</span>
-                <span style="font-size: 12px; color: #a1a1aa; background: rgba(255,255,255,0.05); padding: 2px 8px; border-radius: 6px; white-space: nowrap;">{cat}</span>
+            <div class="list-row">
+                <span class="list-name" title="{name}">
+                    <span style="color:rgba(255,255,255,0.3);margin-right:8px;">{i:02d}</span>{name}
+                </span>
+                <span class="list-tag">{cat}</span>
             </div>
             """
+        html_cat_rows += '</div>'
 
-        components.html(
-            f"""
-            <style>
-                /* Custom Scrollbar */
-                ::-webkit-scrollbar {{
-                    width: 6px;
-                    height: 6px;
-                }}
-                ::-webkit-scrollbar-track {{
-                    background: transparent;
-                }}
-                ::-webkit-scrollbar-thumb {{
-                    background: rgba(255, 255, 255, 0.2);
-                    border-radius: 3px;
-                }}
-                ::-webkit-scrollbar-thumb:hover {{
-                    background: rgba(255, 255, 255, 0.3);
-                }}
-            </style>
-            <div style="
-                width: 100%;
-                background: linear-gradient(
-                    135deg,
-                    rgba(255,255,255,0.08),
-                    rgba(255,255,255,0.02)
-                );
-                backdrop-filter: blur(10px);
-                border: 1px solid rgba(255,255,255,0.12);
-                border-radius: 16px;
-                padding: 16px 20px;
-                color: white;
-                font-family: Inter, sans-serif;
-                box-sizing: border-box; 
-                height: 300px;
-                overflow-y: auto;
-                overflow-x: hidden;
-            ">
-                <div style="line-height: 1.6;">
-                    {html_cat_rows}
-                </div>
-            </div>
-            """,
-            height=300,
-            scrolling=False 
-        )
+        st.markdown(html_cat_rows, unsafe_allow_html=True)
 
 with col2:
     st.markdown("<div class='section-title'>&nbsp;&nbsp;&nbsp;&nbsp;Top 5 Highest Bids</div>", unsafe_allow_html=True)
@@ -738,46 +754,27 @@ with col2:
     if not top_bids:
         st.info("No bids available")
     else:
-        html_rows = ""
+        html_rows = '<div class="list-container">'
         for i, bid in enumerate(top_bids, 1):
             project_name = bid.get('project_name', 'Unnamed Project')
-            category = bid.get('category', '')
+            category = bid.get('category', '') or 'General'
             bid_amount = bid.get('final_bid_amount', 0) or 0
-            # final_bid_amount is stored in Lakhs, convert to Crores for display
-            amount_cr = bid_amount / 100  # Lakhs to Crores
+            amount_cr = bid_amount / 100 
+            
             html_rows += f"""
-            <div style="margin-bottom: 10px;">
-                <b>{i}.</b> {project_name} — ₹{amount_cr:.2f} Cr
-                <span style="color: rgba(255,255,255,0.5); font-size: 0.85rem;">({category})</span>
+            <div class="list-row">
+                <div style="display:flex; flex-direction:column; gap:2px; max-width:65%;">
+                    <span class="list-name" title="{project_name}">
+                        <span style="color:rgba(255,255,255,0.3);margin-right:8px;">{i:02d}</span>{project_name}
+                    </span>
+                    <span style="font-size:11px; color:#71717a; padding-left:24px;">{category}</span>
+                </div>
+                <div class="list-amount">₹{amount_cr:.2f} <span style="font-size:10px;color:#71717a">Cr</span></div>
             </div>
             """
+        html_rows += '</div>'
 
-        components.html(
-            f"""
-            <div style="
-                width: 100%;
-                background: linear-gradient(
-                    135deg,
-                    rgba(255,255,255,0.08),
-                    rgba(255,255,255,0.02)
-                );
-                backdrop-filter: blur(10px);
-                border: 1px solid rgba(255,255,255,0.12);
-                border-radius: 16px;
-                padding: 16px 20px;
-                color: white;
-                font-family: Inter, sans-serif;
-                box-sizing: border-box;
-                height: 300px;
-                overflow-y: hidden;
-            ">
-                <div style="line-height: 1.8; font-size: 15px;">
-                    {html_rows}
-                </div>
-            </div>
-            """,
-            height=300
-        )
+        st.markdown(html_rows, unsafe_allow_html=True)
 
 
 # REGULATORY & BID DOCUMENTATION (Scrollable Container)

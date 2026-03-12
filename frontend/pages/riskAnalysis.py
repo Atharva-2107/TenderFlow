@@ -1,18 +1,25 @@
 import streamlit as st
 import plotly.graph_objects as go
-import random
 import sys
 from pathlib import Path
 import base64
 import os
 
-# Ensure project root is in sys.path FIRST
-ROOT_DIR = Path(__file__).resolve().parents[2]
-if str(ROOT_DIR) not in sys.path:
-    sys.path.insert(0, str(ROOT_DIR))
+# --- Page config MUST be the very first Streamlit call ---
+st.set_page_config(
+    page_title="TenderFlow | Risk Intelligence",
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
 
-# Correct import because utils is inside frontend
-from frontend.utils.auth import can_access
+# Ensure the frontend root is in sys.path so utils/ resolves correctly
+FRONTEND_DIR = Path(__file__).resolve().parents[1]
+ROOT_DIR = Path(__file__).resolve().parents[2]
+for p in [str(FRONTEND_DIR), str(ROOT_DIR)]:
+    if p not in sys.path:
+        sys.path.insert(0, p)
+
+from utils.auth import can_access
 from backend.risk_engine import analyze_pdf
 
 def get_base64_of_bin_file(path):

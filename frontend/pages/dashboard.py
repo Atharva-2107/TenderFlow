@@ -655,6 +655,13 @@ else:
 
         activity_df["Month_Label"] = activity_df["Month"].dt.strftime("%b %Y")
 
+        fig = px.line(
+            activity_df,
+            x="Month_Label",
+            y=["Bids_Submitted", "Bids_Won"],
+            markers=True
+        )
+
         fig.update_traces(line=dict(color="#a855f7", width=3), marker=dict(size=8, color="#d8b4fe"))
 
         fig.update_layout(

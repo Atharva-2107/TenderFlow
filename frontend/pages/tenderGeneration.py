@@ -292,210 +292,357 @@ def create_pdf(text_content):
 # PAGE CONFIG (PRESERVED)
 st.set_page_config(
     page_title="Automated Tender Generation",
-    page_icon="ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã¢â‚¬Å¾",
+    page_icon="📝",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
 
-# CSS
+# CSS — Premium Glassmorphism Design System
 st.markdown(f"""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&display=swap');
 
+/* ── Global ─────────────────────────────────────────── */
 .stApp {{
-    background: radial-gradient(circle at 20% 30%, #1a1c4b 0%, #0f111a 100%) !important;
-    font-family: 'Plus Jakarta Sans', sans-serif;
+    background: radial-gradient(ellipse 120% 80% at 18% 25%, #1e1b4b 0%, #0c0a1d 55%, #030014 100%) !important;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     color: {THEME_WHITE};
 }}
-
 header, footer {{ visibility: hidden; }}
-
 .block-container {{
-    padding-top: 0.5rem !important;
+    padding-top: 0.4rem !important;
     max-width: 100% !important;
 }}
+/* Custom Scrollbar */
+::-webkit-scrollbar {{ width: 5px; }}
+::-webkit-scrollbar-track {{ background: transparent; }}
+::-webkit-scrollbar-thumb {{ background: rgba(168,85,247,0.35); border-radius: 10px; }}
+::-webkit-scrollbar-thumb:hover {{ background: rgba(168,85,247,0.6); }}
 
-/* Alerts */
+/* ── Alerts ──────────────────────────────────────────── */
 .stAlert {{
-    background: rgba(168, 85, 247, 0.08);
-    border: 1px solid rgba(168,85,247,0.25);
-    border-radius: 12px;
-    color: white;
+    background: rgba(168,85,247,0.07) !important;
+    border: 1px solid rgba(168,85,247,0.22) !important;
+    border-radius: 14px !important;
+    color: white !important;
+    backdrop-filter: blur(8px);
 }}
 
-/* Buttons */
+/* ── Primary Buttons ─────────────────────────────────── */
 button[kind="primary"] {{
-    background: linear-gradient(135deg, #7c3aed, #a855f7) !important;
+    background: linear-gradient(135deg, #7c3aed 0%, #a855f7 50%, #c084fc 100%) !important;
     border: none !important;
     color: white !important;
-    border-radius: 10px !important;
+    border-radius: 12px !important;
     font-weight: 700 !important;
-    letter-spacing: 0.3px !important;
-    transition: opacity 0.15s !important;
+    font-family: 'Inter', sans-serif !important;
+    letter-spacing: 0.2px !important;
+    transition: all 0.25s cubic-bezier(.4,0,.2,1) !important;
+    box-shadow: 0 4px 15px rgba(124,58,237,0.25) !important;
+    padding: 8px 16px !important;
 }}
-
 button[kind="primary"]:hover {{
-    opacity: 0.88 !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 6px 25px rgba(124,58,237,0.4) !important;
 }}
 
+/* ── Secondary Buttons ───────────────────────────────── */
 button[kind="secondary"] {{
-    background: rgba(255,255,255,0.06) !important;
-    color: rgba(255,255,255,0.85) !important;
-    border: 1px solid rgba(255,255,255,0.12) !important;
-    border-radius: 10px !important;
+    background: rgba(255,255,255,0.04) !important;
+    color: rgba(255,255,255,0.82) !important;
+    border: 1px solid rgba(255,255,255,0.10) !important;
+    border-radius: 12px !important;
     font-weight: 600 !important;
+    font-family: 'Inter', sans-serif !important;
+    transition: all 0.25s cubic-bezier(.4,0,.2,1) !important;
+    padding: 8px 16px !important;
 }}
-
 button[kind="secondary"]:hover {{
-    background: rgba(255,255,255,0.10) !important;
+    background: rgba(168,85,247,0.10) !important;
+    border-color: rgba(168,85,247,0.30) !important;
+    color: white !important;
 }}
 
-/* Section Navigation Buttons */
+/* ── Section Nav Buttons ─────────────────────────────── */
 div[data-testid="stVerticalBlock"] > div > div[data-testid="stVerticalBlock"] button {{
     text-align: left !important;
     justify-content: flex-start !important;
+    font-size: 13px !important;
 }}
 
-/* Progress Bar */
+/* ── Progress Bar ────────────────────────────────────── */
 div[data-baseweb="progress-bar"] > div > div {{
-    background: linear-gradient(90deg, #7c3aed, #a855f7) !important;
+    background: linear-gradient(90deg, #7c3aed, #a855f7, #c084fc) !important;
+    border-radius: 20px !important;
 }}
 
-/* Text Areas */
+/* ── Text Areas ──────────────────────────────────────── */
 .stTextArea textarea {{
-    background: rgba(255,255,255,0.04) !important;
-    color: white !important;
-    border: 1px solid rgba(168,85,247,0.35) !important;
-    border-radius: 12px !important;
-    font-family: 'Plus Jakarta Sans', sans-serif !important;
-    font-size: 14px !important;
-    line-height: 1.7 !important;
+    background: rgba(255,255,255,0.03) !important;
+    color: rgba(255,255,255,0.92) !important;
+    border: 1px solid rgba(168,85,247,0.25) !important;
+    border-radius: 14px !important;
+    font-family: 'Inter', sans-serif !important;
+    font-size: 13.5px !important;
+    line-height: 1.75 !important;
+    padding: 20px !important;
+}}
+.stTextArea textarea:focus {{
+    border-color: rgba(168,85,247,0.55) !important;
+    box-shadow: 0 0 0 2px rgba(168,85,247,0.12) !important;
 }}
 
-/* File Uploader */
+/* ── File Uploader ───────────────────────────────────── */
 [data-testid="stFileUploadDropzone"] {{
-    background: rgba(168,85,247,0.06) !important;
-    border: 2px dashed rgba(168,85,247,0.35) !important;
-    border-radius: 12px !important;
-    color: rgba(255,255,255,0.7) !important;
+    background: rgba(168,85,247,0.04) !important;
+    border: 2px dashed rgba(168,85,247,0.30) !important;
+    border-radius: 14px !important;
+    color: rgba(255,255,255,0.65) !important;
+    transition: all 0.2s ease !important;
+}}
+[data-testid="stFileUploadDropzone"]:hover {{
+    background: rgba(168,85,247,0.08) !important;
+    border-color: rgba(168,85,247,0.50) !important;
 }}
 
-/* Checkboxes & Toggles */
+/* ── Checkboxes & Toggles ────────────────────────────── */
 [data-testid="stCheckbox"] label,
 [data-testid="stToggle"] label {{
-    color: rgba(255,255,255,0.8) !important;
-    font-size: 13px !important;
+    color: rgba(255,255,255,0.78) !important;
+    font-size: 12.5px !important;
+    font-weight: 500 !important;
 }}
-
-/* Radio */
 .stRadio label {{
-    color: rgba(255,255,255,0.75) !important;
-    font-size: 13px !important;
+    color: rgba(255,255,255,0.72) !important;
+    font-size: 12.5px !important;
+    font-weight: 500 !important;
 }}
-
-/* Select Slider */
 [data-testid="stSlider"] div {{
-    color: rgba(255,255,255,0.8) !important;
+    color: rgba(255,255,255,0.78) !important;
 }}
 
-/* Select Box */
+/* ── Input Labels ────────────────────────────────────── */
 .stSelectbox label, .stTextInput label {{
-    color: rgba(255,255,255,0.55) !important;
-    font-size: 12px !important;
-    font-weight: 600 !important;
+    color: rgba(255,255,255,0.50) !important;
+    font-size: 10.5px !important;
+    font-weight: 700 !important;
     text-transform: uppercase;
-    letter-spacing: 0.8px;
+    letter-spacing: 1px;
 }}
 
-/* Download Button */
+/* ── Download Button ─────────────────────────────────── */
 [data-testid="stDownloadButton"] > button {{
-    background: rgba(255,255,255,0.06) !important;
-    border: 1px solid rgba(255,255,255,0.12) !important;
-    color: rgba(255,255,255,0.85) !important;
-    border-radius: 10px !important;
+    background: linear-gradient(135deg, rgba(168,85,247,0.15), rgba(168,85,247,0.08)) !important;
+    border: 1px solid rgba(168,85,247,0.28) !important;
+    color: rgba(255,255,255,0.9) !important;
+    border-radius: 12px !important;
+    font-weight: 700 !important;
+    transition: all 0.2s ease !important;
+}}
+[data-testid="stDownloadButton"] > button:hover {{
+    background: linear-gradient(135deg, rgba(168,85,247,0.25), rgba(168,85,247,0.15)) !important;
+    border-color: rgba(168,85,247,0.50) !important;
 }}
 
-/* Section Title */
+/* ── Page Title ──────────────────────────────────────── */
 .section-title {{
-    font-size: 2.2rem;
-    font-weight: 800;
-    background: linear-gradient(135deg, #ffffff, #d8b4fe);
+    font-size: 2.6rem;
+    font-weight: 900;
+    background: linear-gradient(135deg, #ffffff 0%, #e9d5ff 40%, #c084fc 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
-    margin-bottom: 2px;
+    margin-bottom: 0;
+    letter-spacing: -0.5px;
+    line-height: 1.1;
 }}
 
-/* Document Paper */
+/* ── Document Paper ──────────────────────────────────── */
 .document-paper {{
-    background: rgba(255,255,255,0.02);
-    border: 1px solid rgba(255,255,255,0.07);
-    color: rgba(255,255,255,0.92);
-    padding: 40px 48px;
-    border-radius: 16px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.035) 0%, rgba(255,255,255,0.015) 100%);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: rgba(255,255,255,0.90);
+    padding: 44px 52px;
+    border-radius: 20px;
     min-height: 700px;
-    font-family: 'Plus Jakarta Sans', sans-serif;
-    line-height: 1.8;
-    font-size: 14px;
+    font-family: 'Inter', sans-serif;
+    line-height: 1.85;
+    font-size: 13.5px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+    position: relative;
 }}
-
-.document-paper h1, .document-paper h2, .document-paper h3 {{
+.document-paper::before {{
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #7c3aed, #a855f7, #c084fc, #a855f7, #7c3aed);
+    border-radius: 20px 20px 0 0;
+}}
+.document-paper h1 {{
     color: white;
-    margin-top: 1.4em;
+    margin-top: 1.6em;
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: -0.3px;
 }}
-
+.document-paper h2 {{
+    color: #e9d5ff;
+    margin-top: 1.4em;
+    font-size: 17px;
+    font-weight: 700;
+}}
+.document-paper h3 {{
+    color: #c4b5fd;
+    margin-top: 1.2em;
+    font-size: 15px;
+    font-weight: 600;
+}}
 .document-paper table {{
     width: 100%;
     border-collapse: collapse;
-    margin: 16px 0;
+    margin: 20px 0;
+    border-radius: 12px;
+    overflow: hidden;
 }}
-
 .document-paper th {{
-    background: rgba(168,85,247,0.2);
-    color: white;
-    padding: 10px 12px;
+    background: rgba(124,58,237,0.22);
+    color: #e9d5ff;
+    padding: 12px 14px;
     text-align: left;
-    font-size: 12px;
+    font-size: 11px;
+    font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.8px;
-    border: 1px solid rgba(168,85,247,0.25);
+    border: 1px solid rgba(124,58,237,0.20);
 }}
-
 .document-paper td {{
-    color: rgba(255,255,255,0.8);
-    padding: 9px 12px;
-    border: 1px solid rgba(255,255,255,0.07);
-    font-size: 13px;
+    color: rgba(255,255,255,0.78);
+    padding: 11px 14px;
+    border: 1px solid rgba(255,255,255,0.06);
+    font-size: 12.5px;
+    line-height: 1.5;
 }}
-
 .document-paper tr:nth-child(even) td {{
     background: rgba(255,255,255,0.02);
 }}
-
-/* Pane Cards */
-.pane-section {{
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 14px;
-    padding: 16px;
-    margin-bottom: 14px;
-}}
-
-.pane-label {{
-    color: rgba(255,255,255,0.4);
-    font-size: 10px;
+.document-paper strong {{
+    color: #e9d5ff;
     font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 1.5px;
-    margin-bottom: 10px;
+}}
+.document-paper ul, .document-paper ol {{
+    padding-left: 20px;
+    margin: 10px 0;
+}}
+.document-paper li {{
+    margin-bottom: 6px;
 }}
 
-/* Eligibility Outline */
+/* ── Pane Labels ─────────────────────────────────────── */
+.pane-label {{
+    color: rgba(168,85,247,0.65);
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}}
+
+/* ── Upload Success ──────────────────────────────────── */
+.upload-success {{
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: rgba(34,197,94,0.08);
+    border: 1px solid rgba(34,197,94,0.22);
+    border-radius: 10px;
+    margin-top: 8px;
+}}
+.upload-success-dot {{
+    width: 7px; height: 7px;
+    background: #22c55e;
+    border-radius: 50%;
+    animation: pulse-green 2s infinite;
+}}
+@keyframes pulse-green {{
+    0%, 100% {{ opacity: 1; }}
+    50% {{ opacity: 0.4; }}
+}}
+
+/* ── Section Indicator ───────────────────────────────── */
 .eligibility-outline {{
-    border: 1.5px dashed rgba(168, 85, 247, 0.45);
-    border-radius: 12px;
+    border: 1.5px solid rgba(168,85,247,0.35);
+    border-radius: 14px;
     padding: 8px;
-    background: rgba(168, 85, 247, 0.04);
+    background: rgba(168,85,247,0.06);
+    box-shadow: 0 0 20px rgba(168,85,247,0.08);
+}}
+
+/* ── Containers ──────────────────────────────────────── */
+[data-testid="stVerticalBlockBorderWrapper"] {{
+    border-color: rgba(255,255,255,0.07) !important;
+    border-radius: 16px !important;
+    background: rgba(255,255,255,0.02) !important;
+}}
+
+/* ── Banner ──────────────────────────────────────────── */
+.banner-wrap {{
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin: 10px 0 20px 0;
+    padding: 24px 28px;
+    background: linear-gradient(135deg, rgba(124,58,237,0.12) 0%, rgba(168,85,247,0.06) 50%, rgba(255,255,255,0.02) 100%);
+    border: 1px solid rgba(168,85,247,0.18);
+    border-radius: 20px;
+    backdrop-filter: blur(10px);
+    position: relative;
+    overflow: hidden;
+}}
+.banner-wrap::before {{
+    content: '';
+    position: absolute;
+    top: -50%; right: -20%;
+    width: 300px; height: 300px;
+    background: radial-gradient(circle, rgba(168,85,247,0.12) 0%, transparent 70%);
+    pointer-events: none;
+}}
+.banner-authority {{
+    text-align: right;
+    position: relative;
+    z-index: 1;
+}}
+.banner-badge {{
+    display: inline-block;
+    margin-top: 8px;
+    padding: 6px 16px;
+    border: 1px solid rgba(168,85,247,0.35);
+    border-radius: 100px;
+    background: rgba(168,85,247,0.12);
+    color: #c084fc;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}}
+
+/* ── Toolbar ─────────────────────────────────────────── */
+.toolbar-title {{
+    color: white;
+    font-size: 24px;
+    font-weight: 800;
+    margin: 0;
+    letter-spacing: -0.3px;
+}}
+.toolbar-sub {{
+    color: rgba(255,255,255,0.35);
+    font-size: 12px;
+    margin: 4px 0 0 0;
+    font-weight: 500;
 }}
 </style>
 """, unsafe_allow_html=True)
@@ -504,11 +651,11 @@ div[data-baseweb="progress-bar"] > div > div {{
 # SESSION STATE (PRESERVED)
 if 'sections' not in st.session_state:
     st.session_state.sections = {
-        'Eligibility Response': {'status': 'Ã¢Å¡Â ', 'content': '', 'clauses': 0},
-        'Technical Proposal': {'status': 'Ã¢Å¡Â ', 'content': '', 'clauses': 0},
-        'Financial Statements': {'status': 'Ã¢ÂÅ’', 'content': '', 'clauses': 0},
-        'Declarations & Forms': {'status': 'Ã¢Å“â€¦', 'content': '', 'clauses': 0},
-        'Annexures': {'status': 'Ã¢ÂÅ’', 'content': '', 'clauses': 0}
+        'Eligibility Response': {'status': '⚠️', 'content': '', 'clauses': 0},
+        'Technical Proposal': {'status': '⚠️', 'content': '', 'clauses': 0},
+        'Financial Statements': {'status': '❌', 'content': '', 'clauses': 0},
+        'Declarations & Forms': {'status': '✔️', 'content': '', 'clauses': 0},
+        'Annexures': {'status': '❌', 'content': '', 'clauses': 0}
     }
 
 if 'current_section' not in st.session_state:
@@ -541,65 +688,48 @@ with left:
 with center:
     nav_cols = st.columns([3, 0.5, 0.5, 0.5, 0.5, 0.5])
     with nav_cols[1]:
-        if st.button("Ã¢Å Å¾", key="h_dash", help="Dashboard"):
+        if st.button("⊞", key="h_dash", help="Dashboard"):
             st.switch_page("app.py")
     with nav_cols[2]:
         if can_access("tender_generation"):
-            if st.button("Ã¢Å½Ëœ", key="h_gen", help="Tender Generation"):
+            if st.button("⎘", key="h_gen", help="Tender Generation"):
                 st.switch_page("pages/tenderGeneration.py")
         else:
-            st.button("Ã¢Å½Ëœ", key="h_gen_disabled", disabled=True, help="Access restricted")
+            st.button("⎘", key="h_gen_disabled", disabled=True, help="Access restricted")
     with nav_cols[3]:
         if can_access("tender_analysis"):
-            if st.button("Ã¢â€”Ë†", key="h_anl", help="Tender Analysis"):
+            if st.button("◈", key="h_anl", help="Tender Analysis"):
                 st.switch_page("pages/tenderAnalyser.py")
         else:
-            st.button("Ã¢â€”Ë†", key="h_anl_disabled", disabled=True)
+            st.button("◈", key="h_anl_disabled", disabled=True)
     with nav_cols[4]:
         if can_access("bid_generation"):
-            if st.button("Ã¢Å“Â¦", key="h_bid", help="Bid Generation"):
+            if st.button("✦", key="h_bid", help="Bid Generation"):
                 st.switch_page("pages/bidGeneration.py")
         else:
-            st.button("Ã¢Å“Â¦", key="h_bid_disabled", disabled=True)
+            st.button("✦", key="h_bid_disabled", disabled=True)
     with nav_cols[5]:
         if can_access("risk_analysis"):
-            if st.button("Ã¢Â¬Ë†", key="h_risk", help="Risk Analysis"):
+            if st.button("⬈", key="h_risk", help="Risk Analysis"):
                 st.switch_page("pages/riskAnalysis.py")
         else:
-            st.button("Ã¢Â¬Ë†", key="h_risk_disabled", disabled=True)
+            st.button("⬈", key="h_risk_disabled", disabled=True)
 
 
 # TOP BANNER
 st.markdown(f"""
-<div style="
-    display:flex;
-    justify-content:space-between;
-    align-items:flex-end;
-    margin: 14px 0 22px 0;
-    padding-bottom: 16px;
-    border-bottom: 1px solid rgba(168,85,247,0.25);
-">
-    <div>
+<div class="banner-wrap">
+    <div style="position:relative;z-index:1;">
         <h1 class="section-title">Tender Studio</h1>
-        <p style="color:rgba(255,255,255,0.5);margin:2px 0 0 0;font-size:13px;">AI-Powered Clause Generation &amp; Response Drafting</p>
-        <p style="color:rgba(255,255,255,0.3);margin:4px 0 0 0;font-size:12px;">
-            <strong style="color:rgba(168,85,247,0.8)">Deadline:</strong> {st.session_state.tender_config['deadline']}
+        <p style="color:rgba(255,255,255,0.45);margin:6px 0 0 0;font-size:13px;font-weight:500;">AI-Powered Clause Generation &amp; Response Drafting</p>
+        <p style="color:rgba(255,255,255,0.30);margin:6px 0 0 0;font-size:12px;">
+            <span style="color:#c084fc;font-weight:700;">Deadline:</span>&nbsp; {st.session_state.tender_config['deadline']}
         </p>
     </div>
-    <div style="text-align:right;">
-        <div style="color:rgba(255,255,255,0.4);font-size:11px;text-transform:uppercase;letter-spacing:1px;">Authority</div>
-        <div style="color:white;font-size:15px;font-weight:600;margin-top:2px;">{st.session_state.tender_config['authority']}</div>
-        <div style="
-            display:inline-block;
-            margin-top:6px;
-            padding:5px 12px;
-            border:1px solid rgba(168,85,247,0.35);
-            border-radius:100px;
-            background:rgba(168,85,247,0.1);
-            color:rgba(168,85,247,0.9);
-            font-size:12px;
-            font-weight:700;
-        ">{st.session_state.tender_config['status']}</div>
+    <div class="banner-authority">
+        <div style="color:rgba(255,255,255,0.40);font-size:10px;text-transform:uppercase;letter-spacing:1.5px;font-weight:700;">Issuing Authority</div>
+        <div style="color:white;font-size:15px;font-weight:700;margin-top:4px;">{st.session_state.tender_config['authority']}</div>
+        <div class="banner-badge">{st.session_state.tender_config['status']}</div>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -622,10 +752,10 @@ def handle_regeneration():
 
         company_context = ""
         if user_id_local:
-            st.toast("ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ‚Â Fetching company data...")
+            st.toast("👤 Fetching company data...")
             company_context = get_company_context(user_id_local)
             if company_context:
-                st.toast(f"ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Context loaded ({len(company_context)} chars)")
+                st.toast(f"✔️ Context loaded ({len(company_context)} chars)")
 
         payload = {
             "filename": st.session_state.current_filename,
@@ -702,10 +832,10 @@ def handle_export_complete_docx():
 # 3-PANE LAYOUT (UI from 2nd code, data/logic from 1st)
 left_pane, center_pane, right_pane = st.columns([1, 3.5, 1], gap="large")
 
-# Ã¢â€â‚¬Ã¢â€â‚¬ LEFT PANE Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+# ── LEFT PANE ────────────────────────────────────────────────
 with left_pane:
     # Upload Section
-    st.markdown('<div class="pane-label">Ã°Å¸â€œÂ¤ Source Document</div>', unsafe_allow_html=True)
+    st.markdown('<div class="pane-label">📤 Source Document</div>', unsafe_allow_html=True)
     with st.container(border=True):
         uploaded_file = st.file_uploader("Upload RFP / Tender PDF", type=['pdf'], label_visibility="collapsed")
 
@@ -724,7 +854,7 @@ with left_pane:
                 for sec_name in st.session_state.sections:
                     st.session_state.sections[sec_name]['content'] = ''
                     st.session_state.sections[sec_name]['clauses'] = 0
-                    st.session_state.sections[sec_name]['status'] = 'Ã¢Å¡Â '
+                    st.session_state.sections[sec_name]['status'] = '⚠️'
                     if f"edited_content_{sec_name}" in st.session_state:
                         del st.session_state[f"edited_content_{sec_name}"]
 
@@ -769,7 +899,11 @@ with left_pane:
                 st.error(f"Error: {str(e)}")
 
     if st.session_state.pdf_uploaded:
-        st.markdown(f'<div style="color:#86efac;font-size:11px;margin-top:4px;">📄 {st.session_state.current_filename}</div>', unsafe_allow_html=True)
+        st.markdown(f"""
+        <div class="upload-success">
+            <div class="upload-success-dot"></div>
+            <span style="color:#86efac;font-size:12px;font-weight:600;">{st.session_state.current_filename}</span>
+        </div>""", unsafe_allow_html=True)
 
     st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
 
@@ -808,8 +942,8 @@ with center_pane:
     with toolbar_left:
         st.markdown(f"""
         <div style="margin-bottom:8px;">
-            <h2 style="color:white;font-size:22px;font-weight:700;margin:0;">{current}</h2>
-            <p style="color:rgba(255,255,255,0.35);font-size:12px;margin:3px 0 0 0;">
+            <h2 class="toolbar-title">{current}</h2>
+            <p class="toolbar-sub">
                 {'📋 Generated from ' + str(section_data['clauses']) + ' clauses' if section_data['clauses'] > 0 else '⬆ Upload a tender document to enable AI generation'}
             </p>
         </div>""", unsafe_allow_html=True)
@@ -836,7 +970,7 @@ with center_pane:
 
         save_col1, save_col2 = st.columns([3, 1])
         with save_col2:
-            if st.button("Ã°Å¸â€™Â¾ Save Edits", key=f"save_edit_{current}", use_container_width=True, type="primary"):
+            if st.button("💾 Save Edits", key=f"save_edit_{current}", use_container_width=True, type="primary"):
                 st.session_state.sections[current]['content'] = new_content
                 st.session_state[f"content_{current}"] = new_content
                 st.success("Saved!")
@@ -851,12 +985,12 @@ with center_pane:
     # Action row
     act1, act2 = st.columns(2)
     with act1:
-        st.button("Ã°Å¸â€â€ž Regenerate Section", use_container_width=True, type="primary", on_click=handle_regeneration)
+        st.button("🔄 Regenerate Section", use_container_width=True, type="primary", on_click=handle_regeneration)
     with act2:
         full_text = handle_export_complete_docx()
         full_pdf = create_legal_pdf(full_text)
         st.download_button(
-            "Ã°Å¸â€œÂ¥ Export Complete Tender PDF",
+            "📥 Export Complete Tender PDF",
             data=full_pdf,
             file_name=f"TenderResponse_{st.session_state.current_filename or 'Draft'}.pdf",
             mime="application/pdf",
@@ -865,10 +999,10 @@ with center_pane:
 
 
 
-# Ã¢â€â‚¬Ã¢â€â‚¬ RIGHT PANE Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+# ── RIGHT PANE ───────────────────────────────────────────────
 with right_pane:
 
-    st.markdown('<div class="pane-label">Ã¢Å¡â„¢Ã¯Â¸Â Generation Controls</div>', unsafe_allow_html=True)
+    st.markdown('<div class="pane-label">⚙️ Generation Controls</div>', unsafe_allow_html=True)
 
     with st.container(border=True):
         st.markdown('<div style="color:rgba(255,255,255,0.55);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Tone</div>', unsafe_allow_html=True)
@@ -881,18 +1015,18 @@ with right_pane:
         st.toggle("Strict Compliance Mode", value=True, key="gen_compliance")
 
     st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
-    st.markdown('<div class="pane-label">Ã°Å¸â€œÅ  Output Settings</div>', unsafe_allow_html=True)
+    st.markdown('<div class="pane-label">📊 Output Settings</div>', unsafe_allow_html=True)
 
     with st.container(border=True):
         st.select_slider("Citation Level", options=["Minimal", "Standard", "Detailed"], value="Standard", key="gen_citation")
         st.select_slider("Content Depth", options=["Concise", "Standard", "Comprehensive"], value="Standard", key="gen_depth")
 
     st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
-    st.markdown('<div class="pane-label">Ã°Å¸Å¡â‚¬ Bulk Actions</div>', unsafe_allow_html=True)
-    st.button("Ã¢Å¡Â¡ Generate All Sections", use_container_width=True, type="primary", on_click=handle_bulk_generation)
+    st.markdown('<div class="pane-label">🚀 Bulk Actions</div>', unsafe_allow_html=True)
+    st.button("⚡ Generate All Sections", use_container_width=True, type="primary", on_click=handle_bulk_generation)
 
     st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
-    st.markdown('<div class="pane-label">Ã¢ËœÂÃ¯Â¸Â Cloud Save</div>', unsafe_allow_html=True)
+    st.markdown('<div class="pane-label">☁️ Cloud Save</div>', unsafe_allow_html=True)
 
     with st.container(border=True):
         category_options = [
@@ -903,7 +1037,7 @@ with right_pane:
         selected_category = st.selectbox("Category", options=category_options, index=0)
         project_name_input = st.text_input("Project Name", value="New Tender")
 
-        if st.button("Ã°Å¸â€™Â¾ Save to Cloud DB", use_container_width=True):
+        if st.button("💾 Save to Cloud DB", use_container_width=True):
             current_user = st.session_state.get("user")
             current_user_id = getattr(current_user, 'id', None) or (current_user.get('id') if isinstance(current_user, dict) else None)
 
@@ -927,7 +1061,7 @@ with right_pane:
                             if success:
                                 saved_count += 1
                 if saved_count > 0:
-                    st.success(f"Ã¢Å“â€¦ {saved_count} sections saved!")
+                    st.success(f"✔️ {saved_count} sections saved!")
                 else:
                     st.warning("Generate sections first.")
 

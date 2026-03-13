@@ -7,6 +7,7 @@ import json
 import xgboost as xgb
 import re
 import os
+from typing import Optional
 from PyPDF2 import PdfReader
 from supabase import create_client
 from dotenv import load_dotenv
@@ -125,12 +126,23 @@ model, FEATURE_COLUMNS = load_model()
 
 # --- 3. HELPERS (Original Logic) ---
 def format_inr(number):
-    """Formats a number into Indian System (Lakhs/Crores)"""
+    """Formats a number into Indian System (Lakhs/Crores). Safe for all values."""
     try:
+        number = float(number)
+        if number < 0:
+            return "-" + format_inr(-number)
         s, *d = str(f"{number:.2f}").partition(".")
-        r = ",".join([s[x-2:x] for x in range(-3, -len(s), -2)][::-1] + [s[-3:]])
-        return "₹" + "".join([r] + d)
-    except:
+        # Indian grouping: last 3 digits, then groups of 2
+        if len(s) <= 3:
+            r = s
+        else:
+            r = s[-3:]
+            s = s[:-3]
+            while s:
+                r = s[-2:] + "," + r
+                s = s[:-2]
+        return "₹" + r + "".join(d)
+    except Exception:
         return f"₹{number:,.2f}"
     
 def safe_json_parse(text):
@@ -359,45 +371,122 @@ JSON:
 
     return priced_items
 
-def predict_win_probability(
-    prime_cost,
-    overhead_pct,
-    profit_pct,
-    estimated_budget,
-    complexity_score,
-    competitors,
-):
-    """
-    Hybrid win probability: blends ML model output with analytical formula.
-    Falls back to formula-only if model is unavailable.
-    """
+# High-risk material keywords that increase material_risk_score
+_HIGH_RISK_MATERIALS = [
+    "bitumen", "asphalt", "transformer", "cable", "switchgear", "panel",
+    "pile", "reinforcement", "rcc", "pcc", "excavation", "earthwork"
+]
 
-    # --- Analytical Formula ---
+def _compute_boq_context(boq_df: pd.DataFrame) -> dict:
+    """
+    Derive tender-specific context factors from the BOQ dataframe.
+    Returns a dict of normalized (0→1) signals.
+    """
+    if boq_df is None or boq_df.empty:
+        return {"material_risk": 0.0, "item_density": 0.0, "scope_breadth": 0.0}
+
+    task_names = " ".join(boq_df["Task"].astype(str).str.lower().tolist())
+    item_count = len(boq_df)
+
+    # Count how many high-risk material keywords appear in all task names
+    risk_hits = sum(1 for kw in _HIGH_RISK_MATERIALS if kw in task_names)
+    material_risk = min(risk_hits / max(len(_HIGH_RISK_MATERIALS), 1), 1.0)
+
+    # Item density: more items = broader scope = slightly more risk (harder to win)
+    item_density = min(item_count / 30.0, 1.0)
+
+    # Scope breadth: ratio of unique categories (material vs service vs non-billable)
+    categories = set(classify_item(t) for t in boq_df["Task"].astype(str))
+    scope_breadth = min(len(categories) / 3.0, 1.0)
+
+    return {
+        "material_risk": material_risk,
+        "item_density": item_density,
+        "scope_breadth": scope_breadth,
+    }
+
+
+def _predict_pure(
+    prime_cost: float,
+    overhead_pct: float,
+    profit_pct: float,
+    estimated_budget: float,
+    complexity_score: float,
+    competitors: int,
+    boq_context: Optional[dict] = None,
+) -> float:
+    """
+    Pure, side-effect-free win probability calculation.
+    Dynamic per tender via boq_context. Used internally by the AI optimizer loop.
+
+    Factors (weighted):
+      40% — price-to-budget ratio (bell-curve peak at 0.80 of budget)
+      18% — profit margin impact
+      17% — competitor density
+      10% — tender complexity
+       7% — material risk (high-risk materials in BOQ)
+       5% — BOQ item count (denser tender = harder to win)
+       3% — scope breadth (multi-category = marginally harder)
+    """
+    ctx = boq_context or {"material_risk": 0.0, "item_density": 0.0, "scope_breadth": 0.0}
+
+    # ── 1. Price-to-budget score (bell curve peaked at 80% of budget) ──────────
     bid_price = prime_cost * (1 + overhead_pct / 100) * (1 + profit_pct / 100)
-    price_ratio = bid_price / max(estimated_budget, 1)
+    budget_safe = max(estimated_budget, 1.0)
+    price_ratio = bid_price / budget_safe
 
-    if price_ratio <= 1:
-        price_score = 1 - (price_ratio - 0.9) * 0.8
+    if price_ratio <= 0.80:
+        # Under 80% of budget: strong but not artificially high
+        price_score = 0.82 + price_ratio * 0.225  # linear ramp 0 → 0.80 gives 0.82 → 1.00
+    elif price_ratio <= 1.0:
+        # 80% – 100% of budget: excellent zone
+        price_score = 1.0 - (price_ratio - 0.80) * 0.55  # slight decline toward limit
+    elif price_ratio <= 1.15:
+        # Just over budget: steep decline
+        price_score = max(0.0, 0.89 - (price_ratio - 1.0) * 4.0)
     else:
-        price_score = max(0, 1 - (price_ratio - 1) * 2)
-    price_score = min(max(price_score, 0), 1)
+        # Far over budget: near zero
+        price_score = max(0.0, 0.29 - (price_ratio - 1.15) * 1.5)
+    price_score = min(max(price_score, 0.0), 1.0)
 
-    profit_score = 1 - (profit_pct / 40)
-    profit_score = min(max(profit_score, 0), 1)
+    # ── 2. Profit margin score ──────────────────────────────────────────────────
+    # Logistic-style: profits above 20% drop off steeply
+    if profit_pct <= 15:
+        profit_score = 1.0 - profit_pct * 0.018
+    else:
+        profit_score = (1.0 - 15 * 0.018) - (profit_pct - 15) * 0.042
+    profit_score = min(max(profit_score, 0.0), 1.0)
 
-    competition_score = 1 / (1 + competitors * 0.35)
+    # ── 3. Competitor density score ─────────────────────────────────────────────
+    competition_score = 1.0 / (1.0 + competitors * 0.22)
 
-    complexity_norm = 1 - (complexity_score / 12)
-    complexity_norm = min(max(complexity_norm, 0), 1)
+    # ── 4. Complexity score (higher complexity = harder to win) ─────────────────
+    complexity_penalty = complexity_score / 10.0
+    complexity_score_norm = 1.0 - min(complexity_penalty, 1.0)
 
-    formula_prob = (
-        price_score * 0.45 +
-        profit_score * 0.25 +
-        competition_score * 0.20 +
-        complexity_norm * 0.10
+    # ── 5. Material risk (tender-specific) ─────────────────────────────────────
+    # High-risk materials (cables, bitumen, piles…) increase execution risk
+    material_risk_penalty = ctx["material_risk"] * 0.4   # at worst cuts this signal by 40%
+    material_score = 1.0 - material_risk_penalty
+
+    # ── 6. Item density (tender-specific) ─────────────────────────────────────
+    item_score = 1.0 - ctx["item_density"] * 0.5
+
+    # ── 7. Scope breadth (tender-specific) ─────────────────────────────────────
+    breadth_score = 1.0 - ctx["scope_breadth"] * 0.25
+
+    # ── Weighted sum ────────────────────────────────────────────────────────────
+    base_prob = (
+        price_score      * 0.40 +
+        profit_score     * 0.18 +
+        competition_score * 0.17 +
+        complexity_score_norm * 0.10 +
+        material_score   * 0.07 +
+        item_score       * 0.05 +
+        breadth_score    * 0.03
     )
 
-    # --- ML Model Prediction ---
+    # ── ML model blend ─────────────────────────────────────────────────────────
     ml_prob = None
     if model is not None and FEATURE_COLUMNS is not None:
         try:
@@ -410,7 +499,6 @@ def predict_win_probability(
                 "competitor_density": competitors
             }
             df_input = pd.DataFrame([input_data])
-            # Ensure all required features are present
             for col in FEATURE_COLUMNS:
                 if col not in df_input.columns:
                     df_input[col] = 0
@@ -419,21 +507,35 @@ def predict_win_probability(
         except Exception:
             ml_prob = None
 
-    # --- Blend: 60% ML, 40% formula (or 100% formula if ML unavailable) ---
     if ml_prob is not None:
-        raw_prob = ml_prob * 0.60 + formula_prob * 0.40
+        final_prob = ml_prob * 0.55 + base_prob * 0.45
     else:
-        raw_prob = formula_prob
+        final_prob = base_prob
 
-    # Smooth transitions to avoid jarring jumps
-    prev = st.session_state.get("last_win_prob", raw_prob)
-    smooth_prob = prev * 0.75 + raw_prob * 0.25
+    return min(max(final_prob, 0.05), 0.95)
 
-    # Clamp to realistic bounds
-    final_prob = min(max(smooth_prob, 0.08), 0.92)
 
-    st.session_state["last_win_prob"] = final_prob
-    return final_prob
+def predict_win_probability(
+    prime_cost: float,
+    overhead_pct: float,
+    profit_pct: float,
+    estimated_budget: float,
+    complexity_score: float,
+    competitors: int,
+    boq_context: Optional[dict] = None,
+) -> float:
+    """
+    Public function for the UI — calls _predict_pure (no session-state writes).
+    """
+    return _predict_pure(
+        prime_cost=prime_cost,
+        overhead_pct=overhead_pct,
+        profit_pct=profit_pct,
+        estimated_budget=estimated_budget,
+        complexity_score=complexity_score,
+        competitors=competitors,
+        boq_context=boq_context,
+    )
 
 def bid_generation_page():
     if not st.session_state.get("authenticated"):
@@ -444,305 +546,218 @@ def bid_generation_page():
         st.error("Company context missing. Please login again.")
         st.stop()
         
-    # --- MODERN STYLING (Original CSS) ---
+    # --- PREMIUM UI STYLES ---
     st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap');
 
-:root{
-    --bg1: #1a1c4b;
-    --bg2: #0f111a;
-    --card: rgba(24, 24, 27, 0.82);
-    --card2: rgba(18, 18, 22, 0.72);
-    --border: rgba(255, 255, 255, 0.10);
-    --border2: rgba(168, 85, 247, 0.22);
-    --text: #F4F4F5;
-    --muted: rgba(244, 244, 245, 0.65);
-    --muted2: rgba(244, 244, 245, 0.45);
-    --accent: #A855F7;
-    --accent2: rgba(168, 85, 247, 0.18);
-    --shadow: 0 18px 45px rgba(0,0,0,0.35);
-    --shadowSoft: 0 10px 25px rgba(0,0,0,0.25);
-    --radius: 18px;
-}
 
+/* ── Global ─────────────────────────────────────── */
 html, body, [class*="css"] {
-    font-family: 'Inter', sans-serif !important;
-    color: var(--text) !important;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
 }
-
-/* Streamlit App Background */
 .stApp {
-    background: radial-gradient(circle at 20% 30%, var(--bg1) 0%, var(--bg2) 100%) !important;
+    background: radial-gradient(ellipse 120% 80% at 18% 25%, #1e1b4b 0%, #0c0a1d 55%, #030014 100%) !important;
 }
-
-/* Hide default Streamlit header/footer */
-header { visibility: hidden; }
-footer { visibility: hidden; }
-
-/* Reduce top padding */
+header, footer { visibility: hidden; }
 div.block-container {
-    padding-top: 0.6rem !important;
-    padding-bottom: 2.2rem !important;
+    padding-top: 0.4rem !important;
+    padding-bottom: 2rem !important;
 }
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(168,85,247,0.35); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(168,85,247,0.6); }
 
-/* ====== Global Typography ====== */
-h1, h2, h3, h4 {
-    letter-spacing: -0.02em !important;
-    font-weight: 700 !important;
-    color: var(--text) !important;
-}
-
-p, label, div {
-    color: var(--text) !important;
-}
-small, .stCaption, .stMarkdown p {
-    color: var(--muted) !important;
-}
-
-/* ====== Header Nav Container ====== */
-.header-nav {
-    background: linear-gradient(
-        135deg,
-        rgba(255,255,255,0.10),
-        rgba(255,255,255,0.03)
-    );
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 12px 18px;
-    margin-bottom: 18px;
-    box-shadow: var(--shadowSoft);
-    backdrop-filter: blur(12px);
-}
-
-/* ====== Cards ====== */
-.glass-card {
-    background: transparent !important;
-    border-radius: var(--radius);
-    padding: 10px 10px;
-    border: 1px solid var(--border);
-    box-shadow: var(--shadowSoft);
-    margin-bottom: 18px;
-    position: relative;
-    overflow: hidden;
-}
-
-.glass-card:before{
-    content:"";
-    position:absolute;
-    inset:0;
-    background: radial-gradient(circle at 20% 10%, var(--accent2) 0%, transparent 55%);
-    pointer-events:none;
-}
-
-/* ====== Premium Bid Box ====== */
-.bid-box {
-    background: linear-gradient(135deg, rgba(168, 85, 247, 0.35) 0%, rgba(15, 17, 26, 0.9) 55%, rgba(168, 85, 247, 0.18) 100%);
-    border-radius: 22px;
-    padding: 28px 26px;
-    text-align: center;
-    box-shadow: 0 22px 55px rgba(168, 85, 247, 0.15);
-    border: 1px solid rgba(168, 85, 247, 0.28);
-    position: relative;
-    overflow: hidden;
-}
-
-.bid-box:after{
-    content:"";
-    position:absolute;
-    width: 420px;
-    height: 420px;
-    top: -250px;
-    left: -250px;
-    background: radial-gradient(circle, rgba(168, 85, 247, 0.35) 0%, transparent 60%);
-    filter: blur(2px);
-    pointer-events:none;
-}
-
-/* Big Price */
-.bid-price {
-    font-family: 'JetBrains Mono', monospace !important;
-    font-size: 3.1rem;
-    font-weight: 700;
-    color: #FFFFFF !important;
-    letter-spacing: -1.5px;
-    margin-top: 6px;
-    margin-bottom: 6px;
-}
-
-/* Labels */
+/* ── Label ──────────────────────────────────────── */
 .label-text {
-    color: var(--muted2) !important;
-    font-size: 0.72rem;
-    font-weight: 700;
+    color: rgba(168,85,247,0.65) !important;
+    font-size: 10px;
+    font-weight: 800;
     text-transform: uppercase;
-    letter-spacing: 0.14em;
+    letter-spacing: 2px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
 
-/* ====== Buttons (Global) ====== */
+/* ── Buttons ────────────────────────────────────── */
 .stButton>button {
     width: 100%;
     border-radius: 14px !important;
-    border: 1px solid rgba(168, 85, 247, 0.25) !important;
-    background: linear-gradient(135deg, rgba(168, 85, 247, 0.95) 0%, rgba(124, 58, 237, 0.85) 100%) !important;
+    border: none !important;
+    background: linear-gradient(135deg, #7c3aed 0%, #a855f7 50%, #c084fc 100%) !important;
     color: white !important;
     font-weight: 700 !important;
-    font-size: 0.95rem !important;
-    padding: 0.7rem 1rem !important;
-    box-shadow: 0 14px 35px rgba(168, 85, 247, 0.22) !important;
-    transition: transform 0.15s ease, box-shadow 0.15s ease, border 0.15s ease;
+    font-family: 'Inter', sans-serif !important;
+    font-size: 0.88rem !important;
+    padding: 0.65rem 1rem !important;
+    box-shadow: 0 4px 18px rgba(124,58,237,0.25) !important;
+    transition: all 0.25s cubic-bezier(.4,0,.2,1) !important;
 }
-
 .stButton>button:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 18px 40px rgba(168, 85, 247, 0.28) !important;
-    border: 1px solid rgba(168, 85, 247, 0.45) !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 8px 28px rgba(124,58,237,0.38) !important;
+}
+.stButton>button:active { transform: translateY(0px) scale(0.99) !important; }
+.stButton>button:disabled { opacity: 0.45 !important; box-shadow: none !important; }
+
+/* ── Inputs ─────────────────────────────────────── */
+.stTextInput input, .stNumberInput input, .stTextArea textarea {
+    background: rgba(255,255,255,0.04) !important;
+    border: 1px solid rgba(255,255,255,0.10) !important;
+    border-radius: 14px !important;
+    color: #f4f4f5 !important;
+}
+.stTextInput input:focus, .stNumberInput input:focus, .stTextArea textarea:focus {
+    border: 1px solid rgba(168,85,247,0.50) !important;
+    box-shadow: 0 0 0 3px rgba(168,85,247,0.12) !important;
 }
 
-.stButton>button:active {
-    transform: translateY(0px) scale(0.99);
-}
-
-/* Disabled buttons */
-.stButton>button:disabled {
-    opacity: 0.55 !important;
-    cursor: not-allowed !important;
-    box-shadow: none !important;
-}
-
-/* ====== Sliders / Inputs ====== */
+/* ── Sliders ────────────────────────────────────── */
 .stSlider label, .stSelectSlider label {
     font-weight: 600 !important;
-    color: var(--muted) !important;
+    color: rgba(244,244,245,0.55) !important;
+    font-size: 12px !important;
 }
-                
-div[data-testid="stSlider"] [data-baseweb="slider"] div[role="slider"]{
-    background-color: #FFFFFF !important;
-    border: 2px solid #FFFFFF !important;
-    box-shadow: 0 0 0 4px rgba(168, 85, 247, 0.20) !important; /* optional glow */
+div[data-testid="stSlider"] [data-baseweb="slider"] div[role="slider"] {
+    background-color: #fff !important;
+    border: 2px solid #fff !important;
+    box-shadow: 0 0 0 4px rgba(168,85,247,0.18) !important;
 }
-
-.stTextInput input, .stNumberInput input, .stTextArea textarea {
-    background: rgba(255,255,255,0.06) !important;
-    border: 1px solid rgba(255,255,255,0.10) !important;
-    border-radius: 12px !important;
-    color: var(--text) !important;
+div[data-testid="stSlider"] [data-baseweb="slider"] div > div > div {
+    background-color: #a855f7 !important;
+    border-radius: 10px;
 }
 
-.stTextInput input:focus, .stNumberInput input:focus, .stTextArea textarea:focus {
-    border: 1px solid rgba(168, 85, 247, 0.55) !important;
-    box-shadow: 0 0 0 4px rgba(168, 85, 247, 0.15) !important;
-}
-
-/* ====== Data Editor Styling ====== */
+/* ── Data Editor ────────────────────────────────── */
 div[data-testid="stDataFrame"] {
-    border-radius: var(--radius) !important;
+    border-radius: 16px !important;
     overflow: hidden !important;
-    border: 1px solid rgba(255,255,255,0.10) !important;
-    box-shadow: var(--shadowSoft);
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.25);
+}
+div[data-testid="stDataFrame"] * { font-size: 0.88rem !important; }
+
+/* ── File Uploader ──────────────────────────────── */
+[data-testid="stFileUploadDropzone"] {
+    background: rgba(168,85,247,0.04) !important;
+    border: 2px dashed rgba(168,85,247,0.30) !important;
+    border-radius: 16px !important;
+    transition: all 0.2s ease !important;
+}
+[data-testid="stFileUploadDropzone"]:hover {
+    background: rgba(168,85,247,0.08) !important;
+    border-color: rgba(168,85,247,0.50) !important;
 }
 
-div[data-testid="stDataFrame"] * {
-    font-size: 0.92rem !important;
+/* ── Containers ─────────────────────────────────── */
+[data-testid="stVerticalBlockBorderWrapper"] {
+    border-color: rgba(255,255,255,0.07) !important;
+    border-radius: 18px !important;
+    background: rgba(255,255,255,0.015) !important;
 }
 
-/* ====== Divider ====== */
+/* ── Alerts ─────────────────────────────────────── */
+.stAlert {
+    border-radius: 14px !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    background: rgba(255,255,255,0.04) !important;
+    backdrop-filter: blur(8px);
+}
+
+/* ── Divider ────────────────────────────────────── */
 hr {
     border: none !important;
     height: 1px !important;
-    background: linear-gradient(90deg, transparent, rgba(168,85,247,0.35), transparent) !important;
-    margin: 10px 0 18px 0 !important;
+    background: linear-gradient(90deg, transparent, rgba(168,85,247,0.30), transparent) !important;
+    margin: 12px 0 18px 0 !important;
 }
 
-/* Track fill (progress) */
-div[data-testid="stSlider"] [data-baseweb="slider"] div > div > div{
-    background-color: var(--accent) !important;
-    border-radius: 10px 10px;
+/* ── Select box labels ──────────────────────────── */
+.stSelectbox label {
+    color: rgba(255,255,255,0.45) !important;
+    font-size: 10.5px !important;
+    font-weight: 700 !important;
+    text-transform: uppercase;
+    letter-spacing: 1px;
 }
 
+/* ── Bid Box (Hero Card) ────────────────────────── */
+.bid-box {
+    background: linear-gradient(135deg, rgba(124,58,237,0.30) 0%, rgba(15,17,26,0.90) 55%, rgba(168,85,247,0.15) 100%);
+    border-radius: 24px;
+    padding: 32px 28px 28px;
+    text-align: center;
+    box-shadow: 0 20px 50px rgba(124,58,237,0.18);
+    border: 1px solid rgba(168,85,247,0.25);
+    position: relative;
+    overflow: hidden;
+}
+.bid-box::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #7c3aed, #a855f7, #c084fc, #a855f7, #7c3aed);
+}
+.bid-box::after {
+    content: '';
+    position: absolute;
+    width: 350px; height: 350px;
+    top: -220px; left: -200px;
+    background: radial-gradient(circle, rgba(168,85,247,0.25) 0%, transparent 65%);
+    pointer-events: none;
+}
+.bid-price {
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 2.8rem;
+    font-weight: 700;
+    color: #fff !important;
+    letter-spacing: -1.5px;
+    margin: 8px 0;
+    position: relative;
+    z-index: 1;
+}
 
-/* =========================
-   FIX 1: Right panel alignment
-   (Win chance / profit / bid / complexity)
-   ========================= */
-.tf-metric-grid{
+/* ── Metrics Grid ───────────────────────────────── */
+.tf-metric-grid {
     display: grid;
     grid-template-columns: 1fr auto;
-    gap: 10px 16px;
-    margin-top: 8px;
-    padding: 14px 14px;
-    border-radius: 16px;
-    border: 1px solid rgba(255,255,255,0.10);
-    background: rgba(255,255,255,0.04);
+    gap: 8px 18px;
+    margin-top: 12px;
+    padding: 18px;
+    border-radius: 18px;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: rgba(255,255,255,0.025);
 }
-
-.tf-metric-label{
-    font-size: 0.92rem;
+.tf-metric-label {
+    font-size: 0.82rem;
     font-weight: 600;
-    color: var(--muted) !important;
+    color: rgba(244,244,245,0.50) !important;
 }
-
-.tf-metric-value{
-    font-size: 2rem;
+.tf-metric-value {
+    font-size: 1.25rem;
     font-weight: 700;
-    color: var(--text) !important;
+    color: #f4f4f5 !important;
     font-family: 'JetBrains Mono', monospace !important;
     text-align: right;
 }
-
-.tf-metric-highlight{
+.tf-metric-highlight {
     grid-column: 1 / -1;
     text-align: center;
-    margin-top: 6px;
-    padding-top: 10px;
-    border-top: 1px solid rgba(168,85,247,0.22);
-    font-size: 1rem;
-    font-weight: 800;
-    color: var(--accent) !important;
-}
-                
-/* ====== Alerts look premium ====== */
-.stAlert {
-    border-radius: 14px !important;
-    border: 1px solid rgba(255,255,255,0.10) !important;
-    background: rgba(255,255,255,0.06) !important;
-    box-shadow: var(--shadowSoft);
+    margin-top: 8px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(168,85,247,0.18);
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #c084fc !important;
 }
 
-/* Make markdown links accent */
-a {
-    color: var(--accent) !important;
-    text-decoration: none !important;
-}
-a:hover {
-    text-decoration: underline !important;
-}
-
-/* ====== Scrollbar (subtle premium) ====== */
-::-webkit-scrollbar {
-    width: 10px;
-}
-::-webkit-scrollbar-track {
-    background: rgba(255,255,255,0.04);
-}
-::-webkit-scrollbar-thumb {
-    background: rgba(168, 85, 247, 0.35);
-    border-radius: 10px;
-}
-::-webkit-scrollbar-thumb:hover {
-    background: rgba(168, 85, 247, 0.55);
-}
-                
-/* Fix: stop HTML being displayed like code/text */
-.tf-metric-grid-wrap{
-    all: unset;
-    display: block;
-}
-
-.tf-metric-grid-wrap *{
-    white-space: normal !important;
-}
-
+a { color: #a855f7 !important; text-decoration: none !important; }
+a:hover { text-decoration: underline !important; }
 
 </style>
 """, unsafe_allow_html=True)
@@ -789,9 +804,18 @@ a:hover {
 
     # PAGE TITLE
     st.markdown("""
-    <div style="border-bottom:1px solid rgba(168,85,247,0.2);padding-bottom:14px;margin:10px 0 20px;">
-        <h1 style="color:white;font-size:24px;font-weight:800;margin:0;">Bid <span style='color:#a855f7'>Generation</span></h1>
-        <p style="color:rgba(255,255,255,0.45);margin:3px 0 0;font-size:13px;">Smart Bid Generation &amp; Optimization Engine</p>
+    <div style="
+        display:flex;justify-content:space-between;align-items:center;
+        margin:8px 0 22px;padding:22px 28px;
+        background:linear-gradient(135deg, rgba(124,58,237,0.10) 0%, rgba(168,85,247,0.05) 50%, rgba(255,255,255,0.015) 100%);
+        border:1px solid rgba(168,85,247,0.15);border-radius:22px;
+        backdrop-filter:blur(10px);position:relative;overflow:hidden;
+    ">
+        <div style="position:relative;z-index:1;">
+            <h1 style="font-size:2rem;font-weight:900;background:linear-gradient(135deg,#fff 0%,#e9d5ff 40%,#c084fc 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin:0;letter-spacing:-0.5px;">Bid Generation</h1>
+            <p style="color:rgba(255,255,255,0.42);font-size:12.5px;margin:4px 0 0;font-weight:500;">Smart Bid Optimization &amp; Win Probability Engine</p>
+        </div>
+        <div style="position:relative;z-index:1;display:inline-block;padding:6px 16px;border:1px solid rgba(168,85,247,0.30);border-radius:100px;background:rgba(168,85,247,0.10);color:#c084fc;font-size:11px;font-weight:700;letter-spacing:0.5px;">AI Powered</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -801,10 +825,10 @@ a:hover {
         _, col_mid, _ = st.columns([1, 1.6, 1])
         with col_mid:
             st.markdown("""
-            <div style="text-align:center;margin-bottom:24px;">
-                <div style="font-size:44px;margin-bottom:10px;">📂</div>
-                <h2 style="color:white;font-size:20px;font-weight:700;margin:0;">Initialize New Bid</h2>
-                <p style="color:rgba(255,255,255,0.45);font-size:13px;margin:6px 0 0;">Upload your tender PDF to begin AI-powered cost extraction</p>
+            <div style="text-align:center;margin-bottom:28px;">
+                <div style="font-size:52px;margin-bottom:12px;filter:drop-shadow(0 4px 12px rgba(168,85,247,0.3));">📂</div>
+                <h2 style="font-size:22px;font-weight:800;background:linear-gradient(135deg,#fff,#e9d5ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin:0 0 6px;">Initialize New Bid</h2>
+                <p style="color:rgba(255,255,255,0.42);font-size:13px;margin:0;">Upload your tender PDF to begin AI-powered cost extraction</p>
             </div>
             """, unsafe_allow_html=True)
             with st.container(border=True):
@@ -842,37 +866,6 @@ a:hover {
                         reader = PdfReader(uploaded_tender)
                         text = " ".join([p.extract_text() or "" for p in reader.pages])
                         
-                        def extract_boq_items(text):
-                            MATERIAL_MAP = {
-                                "excavation": "Excavation",
-                                "earthwork": "Earthwork",
-                                "pcc": "PCC Concrete",
-                                "plain cement concrete": "PCC Concrete",
-                                "rcc": "RCC Concrete",
-                                "reinforcement": "Steel Reinforcement",
-                                "steel": "Steel Reinforcement",
-                                "brick": "Brick Masonry",
-                                "plaster": "Plastering",
-                                "formwork": "Formwork",
-                                "foundation": "Foundation Work",
-                                "column": "RCC Columns",
-                                "beam": "RCC Beams",
-                                "slab": "RCC Slab",
-                                "pile": "Pile Foundation"
-                            }
-
-                            found_materials = set()
-                            text_lower = text.lower()
-
-                            for key, material in MATERIAL_MAP.items():
-                                if key in text_lower:
-                                    found_materials.add(material)
-
-                            return [
-                                {"Task": m, "Qty": 0, "Rate": 0}
-                                for m in sorted(found_materials)
-                            ]
-
                         # 1️⃣ AI extraction
                         boq_items = extract_billable_items(text)
 
@@ -891,21 +884,38 @@ a:hover {
                         st.session_state.cost_df = pd.DataFrame(boq_items)
                         
                         def extract_amount(label):
-                            # Search for the label followed by currency and digits/commas
-                            m = re.search(rf"{label}.*?₹\s?([\d,]+)", text, re.IGNORECASE)
-                            
-                            # Check if a match was found AND if group 1 actually contains text
-                            if m and m.group(1):
-                                clean_str = m.group(1).replace(",", "")
-                                try:
-                                    return float(clean_str)
-                                except ValueError:
-                                    return 0.0
-                            return 0.0  # Return 0.0 instead of None to prevent downstream math error
+                            """
+                            Extract rupee amounts from tender text. Handles:
+                            - ₹ symbol and Rs./Rs variations
+                            - Lakhs (e.g., 12,50,000 or 12.50 Lakhs)
+                            - Crores notation
+                            """
+                            # Try ₹ symbol first
+                            patterns = [
+                                rf"(?:{label})[^\n]{{0,80}}₹\s*([\d,\.]+)\s*(Lakh|Crore|lakh|crore|L|Cr)?",
+                                rf"(?:{label})[^\n]{{0,80}}Rs\.?\s*([\d,\.]+)\s*(Lakh|Crore|lakh|crore|L|Cr)?",
+                                rf"(?:{label})[^\n]{{0,80}}INR\s*([\d,\.]+)\s*(Lakh|Crore|lakh|crore|L|Cr)?",
+                                rf"([\d,\.]+)\s*(Lakh|Crore|lakh|crore|L|Cr)[^\n]{{0,60}}(?:{label})",
+                            ]
+                            for pat in patterns:
+                                m = re.search(pat, text, re.IGNORECASE)
+                                if m:
+                                    try:
+                                        val_str = m.group(1).replace(",", "")
+                                        val = float(val_str)
+                                        unit = (m.group(2) or "").lower()
+                                        if unit in ("lakh", "l"):
+                                            val *= 100000
+                                        elif unit in ("crore", "cr"):
+                                            val *= 10000000
+                                        return val
+                                    except (IndexError, ValueError):
+                                        continue
+                            return 0.0
 
                         tender_data = {
-                            "estimated_budget": extract_amount("Estimated Cost|Tender Value"),
-                            "emd": extract_amount("EMD"),
+                            "estimated_budget": extract_amount("Estimated Cost|Tender Value|Estimated Amount|Approximate Value|Total Estimated"),
+                            "emd": extract_amount("EMD|Earnest Money"),
                         }
 
                         complexity_score = compute_complexity_score(uploaded_tender)
@@ -956,23 +966,36 @@ a:hover {
         )
         edited_df["Qty"] = pd.to_numeric(edited_df["Qty"], errors="coerce").fillna(0)
         edited_df["Rate"] = pd.to_numeric(edited_df["Rate"], errors="coerce").fillna(0)
-        
-        total_prime = (edited_df['Qty'] * edited_df['Rate']).sum()
-        # edited_df["Qty"] = pd.to_numeric(edited_df["Qty"], errors="coerce").fillna(0)
-        # edited_df["Rate"] = pd.to_numeric(edited_df["Rate"], errors="coerce").fillna(0)
+        total_prime = (edited_df["Qty"] * edited_df["Rate"]).sum()
 
         st.session_state.cost_df = edited_df
-        # Original Multiplier Logic
+
+        # Compute BOQ context once per render (used for dynamic prediction)
+        boq_context = _compute_boq_context(edited_df)
+
         multiplier = st.slider("Estimated Client Budget Multiplier", 1.05, 1.8, 1.3, 0.05)
-        
-        estimated_budget = (
-            tender_data.get("estimated_budget")
-            if tender_data.get("estimated_budget") is not None
-            else total_prime * multiplier
-        )
-        
-        st.markdown(f"<div style='text-align:right;color:#A1A1AA;'>Estimated Budget: {format_inr(estimated_budget)}</div>", unsafe_allow_html=True)
-        st.markdown(f"<div style='text-align: right; color: #A855F7; font-family: JetBrains Mono; font-size: 1.2rem;'>Prime Cost: {format_inr(total_prime)}</div>", unsafe_allow_html=True)
+
+        # Use PDF-extracted budget only when it's a valid non-zero value;
+        # otherwise fall back to prime cost × multiplier so win probability isn't broken.
+        pdf_budget = tender_data.get("estimated_budget") or 0.0
+        budget_source = "PDF"
+        if pdf_budget and pdf_budget > 0:
+            estimated_budget = pdf_budget
+        else:
+            estimated_budget = max(total_prime * multiplier, 1.0)
+            budget_source = "AI-Estimated"
+
+        budget_col1, budget_col2 = st.columns(2)
+        with budget_col1:
+            st.markdown(
+                f"<div style='background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:16px 18px;text-align:center;'><div style='color:rgba(168,85,247,0.60);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;'>💰 Prime Cost</div><div style='color:#c084fc;font-family:JetBrains Mono;font-size:1.15rem;font-weight:700;'>{format_inr(total_prime)}</div></div>",
+                unsafe_allow_html=True
+            )
+        with budget_col2:
+            st.markdown(
+                f"<div style='background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:16px 18px;text-align:center;'><div style='color:rgba(168,85,247,0.60);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;'>🏦 Est. Budget <span style='color:#4ade80;font-size:9px;'>({budget_source})</span></div><div style='color:#e2e8f0;font-family:JetBrains Mono;font-size:1.15rem;font-weight:700;'>{format_inr(estimated_budget)}</div></div>",
+                unsafe_allow_html=True
+            )
 
         st.markdown('<p class="label-text">Pricing Strategy</p>', unsafe_allow_html=True)
         c_s1, c_s2 = st.columns(2)
@@ -983,106 +1006,139 @@ a:hover {
 
     with right_col:
         # DYNAMIC BID: Use user's selected values from sliders
-        live_bid = total_prime * (1 + overhead_pct/100) * (1 + profit_pct/100)
+        live_bid = total_prime * (1 + overhead_pct / 100) * (1 + profit_pct / 100)
         live_gross_profit = live_bid - total_prime
 
-        live_win_prob = predict_win_probability(
-        prime_cost=total_prime,
-        overhead_pct=overhead_pct,
-        profit_pct=profit_pct,
-        estimated_budget=estimated_budget,
-        complexity_score=st.session_state.complexity_score,
-        competitors=competitor_density,
-    )
+        # Use the pure function (no side effects) for the live display
+        live_win_prob = _predict_pure(
+            prime_cost=total_prime,
+            overhead_pct=overhead_pct,
+            profit_pct=profit_pct,
+            estimated_budget=estimated_budget,
+            complexity_score=st.session_state.complexity_score,
+            competitors=competitor_density,
+            boq_context=boq_context,
+        )
 
-        # AI OPTIMIZATION: Find best profit % for recommendation (separate from user's choice)
-        base = total_prime * (1 + overhead_pct / 100)
+        # AI OPTIMIZATION: sweep profit %, using pure function to avoid session state pollution
+        base_for_ai = total_prime * (1 + overhead_pct / 100)
         best_score = -1
         ai_recommended_profit = profit_pct
         ai_recommended_bid = live_bid
         ai_recommended_win_prob = live_win_prob
 
         for p in range(5, 31):
-            bid = base * (1 + p / 100)
-            win_prob = predict_win_probability(
+            bid_candidate = base_for_ai * (1 + p / 100)
+            wp = _predict_pure(
                 prime_cost=total_prime,
                 overhead_pct=overhead_pct,
                 profit_pct=p,
                 estimated_budget=estimated_budget,
                 complexity_score=st.session_state.complexity_score,
-                competitors=competitor_density
+                competitors=competitor_density,
+                boq_context=boq_context,
             )
-            
-            score = (win_prob * 0.7) + ((p / 30) * 0.3)
+            # Score: balance win chance (70%) with profit level (30%)
+            score = (wp * 0.70) + ((p / 30) * 0.30)
             if score > best_score:
                 best_score = score
                 ai_recommended_profit = p
-                ai_recommended_bid = bid
-                ai_recommended_win_prob = win_prob
+                ai_recommended_bid = bid_candidate
+                ai_recommended_win_prob = wp
 
         # DISPLAY: Show bid based on USER'S slider selections (dynamic)
         st.markdown(f"""
             <div class="bid-box">
-                <div class="label-text" style="color: #DDD6FE;">Final Optimized Bid</div>
+                <div style="position:relative;z-index:1;color:#DDD6FE;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:2px;">Final Optimized Bid</div>
                 <div class="bid-price">{format_inr(live_bid)}</div>
-                <div style="font-size: 0.85rem; color: #C4B5FD; opacity: 0.9;">
+                <div style="font-size:0.82rem;color:#C4B5FD;opacity:0.85;position:relative;z-index:1;">
                     Gross Profit: {format_inr(live_gross_profit)}
                 </div>
             </div>
         """, unsafe_allow_html=True)
         
-        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
 
         st.markdown('<p class="label-text">AI Win Confidence</p>', unsafe_allow_html=True)
         
         fig = go.Figure(go.Indicator(
             mode="gauge+number",
             value=live_win_prob * 100,
-            number={'suffix': "%"},
-            gauge={'axis': {'range': [0, 100]}, 'bar': {'color': "#A855F7"}}
+            number={'suffix': "%", 'font': {'size': 36, 'color': '#e9d5ff', 'family': 'JetBrains Mono'}},
+            gauge={
+                'axis': {'range': [0, 100], 'tickcolor': 'rgba(255,255,255,0.15)', 'tickwidth': 1},
+                'bar': {'color': '#a855f7', 'thickness': 0.25},
+                'bgcolor': 'rgba(255,255,255,0.03)',
+                'borderwidth': 1,
+                'bordercolor': 'rgba(255,255,255,0.08)',
+                'steps': [
+                    {'range': [0, 30], 'color': 'rgba(248,113,113,0.08)'},
+                    {'range': [30, 60], 'color': 'rgba(251,191,36,0.06)'},
+                    {'range': [60, 100], 'color': 'rgba(74,222,128,0.06)'},
+                ],
+                'threshold': {
+                    'line': {'color': '#c084fc', 'width': 2},
+                    'thickness': 0.8,
+                    'value': live_win_prob * 100
+                }
+            }
         ))
+        fig.update_layout(
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            font={'color': 'rgba(255,255,255,0.7)', 'family': 'Inter'},
+            height=220,
+            margin=dict(l=30, r=30, t=30, b=10)
+        )
         st.plotly_chart(fig, use_container_width=True)
 
-        # st.markdown(f"**Your Current Win Chance:** {live_win_prob*100:.2f}%")
-        # st.markdown(f"**Your Selected Profit:** {profit_pct}%")
-        # st.markdown(f"**AI Recommended Profit:** {ai_recommended_profit}%")
-        
-        # st.markdown(f"<div style='text-align:center; font-weight:600; color:#A855F7;'>{live_win_prob*100:.2f}% Chance of Winning</div>", unsafe_allow_html=True) 
-        # st.markdown(f"**Current Bid:** {format_inr(live_bid)}")
-        # st.markdown(f"**Complexity Score:** {complexity_score}/10")
-        
         # Dynamic Feedback based on USER'S current selection
-        if live_win_prob > 0.8:
-            st.success("✅ **Strong Positioning**")
-        elif live_win_prob > 0.5:
-            st.warning("⚖️ **Competitive Baseline**")
+        if live_win_prob >= 0.75:
+            st.success("✅ **Strong Positioning** — Your bid is competitively priced.")
+        elif live_win_prob >= 0.50:
+            st.warning("⚖️ **Competitive Baseline** — Within winning range, tighten margins to improve.")
+        elif live_win_prob >= 0.30:
+            st.error("⚠️ **Moderate Risk** — Consider reducing profit or overhead percentage.")
         else:
-            st.error("🚨 **Low Probability**")
-        
+            st.error("🚨 **Low Win Probability** — Bid is likely over budget or too aggressive.")
+
+        # Contextual metrics panel
+        price_ratio_display = live_bid / max(estimated_budget, 1)
+        st.markdown(f"""
+        <div class="tf-metric-grid">
+            <div class="tf-metric-label">Win Probability</div>
+            <div class="tf-metric-value" style="color:#a855f7">{live_win_prob*100:.1f}%</div>
+            <div class="tf-metric-label">Your Profit Margin</div>
+            <div class="tf-metric-value">{profit_pct}%</div>
+            <div class="tf-metric-label">Bid / Budget Ratio</div>
+            <div class="tf-metric-value" style="color:{'#4ade80' if price_ratio_display <= 1 else '#f87171'}">{price_ratio_display:.2f}×</div>
+            <div class="tf-metric-label">Complexity Score</div>
+            <div class="tf-metric-value">{complexity_score}/10</div>
+            <div class="tf-metric-highlight">🤖 AI Recommended Profit: {ai_recommended_profit}% — Est. Win {ai_recommended_win_prob*100:.1f}%</div>
+        </div>
+        """, unsafe_allow_html=True)
+
         # AI Suggestion comparing user's choice vs AI recommendation
         if ai_recommended_profit != profit_pct:
             profit_diff = ai_recommended_profit - profit_pct
             win_diff = (ai_recommended_win_prob - live_win_prob) * 100
-            if profit_diff < 0:
-                st.info(f"💡 **AI Suggestion:** Reducing profit to {ai_recommended_profit}% could increase win chance by ~{win_diff:.1f}%.")
-            else:
-                st.info(f"💡 **AI Suggestion:** Consider {ai_recommended_profit}% profit margin for optimal balance.")
+            direction = "Reducing" if profit_diff < 0 else "Increasing"
+            effect = "increase" if win_diff > 0 else "shift"
+            st.info(f"💡 **AI Suggestion:** {direction} profit to {ai_recommended_profit}% could {effect} win chance by ~{abs(win_diff):.1f}% (AI Recommended Bid: {format_inr(ai_recommended_bid)}).")
         else:
             st.success("✅ **Your selection matches AI recommendation!**")
 
 
         
-        btn1, btn2 = st.columns([2,2])
-
-        with btn1:
-            st.markdown('<p class="label-text">Save Strategy</p>', unsafe_allow_html=True)
+        st.markdown("<hr>", unsafe_allow_html=True)
+        st.markdown('<p class="label-text">💾 Save Strategy</p>', unsafe_allow_html=True)
 
         # ✅ Inputs side-by-side
         f1, f2 = st.columns(2, gap="medium")
 
         with f1:
             st.markdown(
-                '<span style="color: #A855F7; font-size: 0.85rem;">Project Name <span style="color: #EF4444;">*</span></span>',
+                '<span style="color:rgba(168,85,247,0.70);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;">Project Name <span style="color:#ef4444;">*</span></span>',
                 unsafe_allow_html=True
             )
             project_name_input = st.text_input(
@@ -1096,7 +1152,7 @@ a:hover {
 
         with f2:
             st.markdown(
-                '<span style="color: #A855F7; font-size: 0.85rem;">Category <span style="color: #EF4444;">*</span></span>',
+                '<span style="color:rgba(168,85,247,0.70);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;">Category <span style="color:#ef4444;">*</span></span>',
                 unsafe_allow_html=True
             )
             category_options = [
@@ -1166,8 +1222,39 @@ a:hover {
                 except Exception as e:
                     st.error(f"Save failed: {e}")
 
-        # ✅ Same push logic
+        # Same push logic
         if push_clicked:
             st.balloons()
 
-bid_generation_page()
+    # ═══════════════════════════════════════════════════════════════
+    # PAST PROPOSAL ANALYZER  —  Navigate to dedicated page
+    # ═══════════════════════════════════════════════════════════════
+    st.markdown("<hr>", unsafe_allow_html=True)
+    st.markdown("""
+    <div style="
+        margin:20px 0 18px;padding:24px 28px;
+        background:linear-gradient(135deg, rgba(124,58,237,0.10) 0%, rgba(15,17,26,0.85) 40%, rgba(168,85,247,0.06) 100%);
+        border:1px solid rgba(168,85,247,0.18);border-radius:24px;
+        position:relative;overflow:hidden;
+    ">
+        <div style="position:absolute;top:-40%;right:-10%;width:300px;height:300px;
+             background:radial-gradient(circle,rgba(168,85,247,0.12) 0%,transparent 70%);pointer-events:none;"></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;position:relative;z-index:1;flex-wrap:wrap;gap:16px;">
+            <div>
+                <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:2.5px;color:rgba(168,85,247,0.65);margin-bottom:6px;">AI-Powered Module</div>
+                <h2 style="margin:0;font-size:1.5rem;font-weight:900;background:linear-gradient(135deg,#fff 0%,#e9d5ff 50%,#c084fc 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">Past Proposal Analyzer</h2>
+                <p style="color:rgba(255,255,255,0.40);font-size:12px;margin:4px 0 0;">Analyze past tenders to discover winning patterns, average bids &amp; competitive intelligence — now on its own dedicated page.</p>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # ── Navigate to dedicated Past Proposal Analyzer page ──
+    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+    _, btn_center, _ = st.columns([1, 1, 1])
+    with btn_center:
+        if st.button("📊 Open Past Proposal Analyzer →", use_container_width=True, key="btn_goto_ppa"):
+            st.switch_page("pages/pastProposalAnalyzer.py")
+
+bid_generation_page()
+

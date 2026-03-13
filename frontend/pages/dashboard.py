@@ -11,6 +11,7 @@ from utils.auth import can_access
 from utils.queries import get_tenders, get_bids, get_generated_tenders, get_pending_tenders, get_pending_bids
 import base64
 from pathlib import Path
+from streamlit_autorefresh import st_autorefresh
 
 
 # ROLE_PERMISSIONS = {
@@ -298,7 +299,6 @@ div.block-container {
     font-weight: 500;
 }
 </style>
-</style>
 """, unsafe_allow_html=True)
 
 # st.markdown(""" <hr> """, unsafe_allow_html=True)
@@ -335,6 +335,9 @@ if "pending_bid_action" in st.session_state:
     # Show toast feedback
     result_text = "Won" if won_status else "Lost"
     st.toast(f"Marked bid '{project_name}' as {result_text}!")
+
+# Auto-refresh every 30 seconds for real-time dashboard updates
+st_autorefresh(interval=30_000, key="dashboard_autorefresh")
 
 # Data loading (NOW with fresh data if action was processed above)
 tenders = get_tenders()
@@ -580,7 +583,6 @@ lost_projects = set(g.get("project_name") for g in generated_tenders if g.get("s
 
 won_bids = len(won_projects)
 lost_bids = len(lost_projects)
-total_value_won = 0  # Could be calculated if value field exists
 
 # Calculate win/loss ratio as actual ratio string (e.g., "3:2")
 win_ratio_display = f"{won_bids}:{lost_bids}"
@@ -593,7 +595,23 @@ else:
 
 capture_ratio_display = f"{capture_ratio_val:.1f}%"
 
-kpi(c1, "Project Value Won", "₹3.40 Cr")
+# Dynamic Project Value Won: sum final_bid_amount from bid_history_v2 where won=True
+try:
+    company_id = st.session_state.get("active_company_id")
+    won_bids_resp = (
+        supabase.table("bid_history_v2")
+        .select("final_bid_amount")
+        .eq("won", True)
+        .execute()
+    )
+    won_bid_data = won_bids_resp.data or []
+    total_value_lakhs = sum(b.get("final_bid_amount") or 0 for b in won_bid_data)
+    total_value_cr = total_value_lakhs / 100  # final_bid_amount stored in Lakhs
+    project_value_display = f"₹{total_value_cr:.2f} Cr" if total_value_cr > 0 else "₹0"
+except Exception:
+    project_value_display = "₹0"
+
+kpi(c1, "Project Value Won", project_value_display)
 kpi(c2, "Win / Loss Ratio", win_ratio_display)
 kpi(c3, "Capture Ratio", capture_ratio_display)
 kpi(c4, "Registered Opportunities", len(tenders))
@@ -718,23 +736,65 @@ with col1:
     if not final_list:
         st.info(f"No tenders found for category: {selected_cat}")
     else:
-        # Build HTML rows for st.markdown (No iframes)
-        html_cat_rows = '<div class="list-container">'
-        for i, item in enumerate(final_list[:8], 1): # Limit to 8
-            name = item.get("project_name", "Unknown")
-            cat = item.get("category")
-            
-            html_cat_rows += f"""
-            <div class="list-row">
-                <span class="list-name" title="{name}">
-                    <span style="color:rgba(255,255,255,0.3);margin-right:8px;">{i:02d}</span>{name}
-                </span>
-                <span class="list-tag">{cat}</span>
-            </div>
-            """
-        html_cat_rows += '</div>'
+        # Build self-contained HTML (components.html uses an iframe — no parent CSS)
+        LIST_CSS = """
+        <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@600&display=swap');
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background: transparent;
+            font-family: 'Inter', sans-serif;
+            padding: 0;
+            overflow-x: hidden;
+        }
+        .list-wrap {
+            height: 310px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+        .list-wrap::-webkit-scrollbar { width: 5px; }
+        .list-wrap::-webkit-scrollbar-track { background: transparent; }
+        .list-wrap::-webkit-scrollbar-thumb { background: rgba(168,85,247,0.4); border-radius: 10px; }
+        .list-wrap::-webkit-scrollbar-thumb:hover { background: rgba(168,85,247,0.7); }
+        .row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 11px 14px;
+            margin-bottom: 8px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.07);
+            border-radius: 10px;
+            transition: background 0.2s, border-color 0.2s;
+            cursor: default;
+        }
+        .row:hover { background: rgba(168,85,247,0.08); border-color: rgba(168,85,247,0.28); }
+        .row-left { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; }
+        .num { font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.25); min-width: 22px; }
+        .name {
+            font-size: 13px; font-weight: 600; color: #e4e4e7;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .tag {
+            font-size: 10px; font-weight: 600; text-transform: uppercase;
+            letter-spacing: 0.06em; color: #a855f7;
+            background: rgba(168,85,247,0.12);
+            border: 1px solid rgba(168,85,247,0.22);
+            padding: 3px 9px; border-radius: 20px;
+            white-space: nowrap; flex-shrink: 0;
+        }
+        .empty { color: rgba(255,255,255,0.35); font-size: 13px; text-align: center; margin-top: 40px; }
+        </style>
+        """
 
-        st.markdown(html_cat_rows, unsafe_allow_html=True)
+        rows_html = ""
+        for i, item in enumerate(final_list[:8], 1):
+            name = item.get("project_name", "Unknown")
+            cat = item.get("category", "")
+            rows_html += f'<div class="row"><div class="row-left"><span class="num">{i:02d}</span><span class="name" title="{name}">{name}</span></div><span class="tag">{cat}</span></div>'
+
+        full_html = LIST_CSS + f'<div class="list-wrap">{rows_html}</div>'
+        components.html(full_html, height=330, scrolling=False)
 
 with col2:
     st.markdown("<div class='section-title'>&nbsp;&nbsp;&nbsp;&nbsp;Top 5 Highest Bids</div>", unsafe_allow_html=True)
@@ -761,28 +821,180 @@ with col2:
     if not top_bids:
         st.info("No bids available")
     else:
-        html_rows = '<div class="list-container">'
+        BID_LIST_CSS = """
+        <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@600;700&display=swap');
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background: transparent;
+            font-family: 'Inter', sans-serif;
+            padding: 0;
+            overflow-x: hidden;
+        }
+        .list-wrap {
+            height: 310px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+        .list-wrap::-webkit-scrollbar { width: 5px; }
+        .list-wrap::-webkit-scrollbar-track { background: transparent; }
+        .list-wrap::-webkit-scrollbar-thumb { background: rgba(168,85,247,0.4); border-radius: 10px; }
+        .list-wrap::-webkit-scrollbar-thumb:hover { background: rgba(168,85,247,0.7); }
+        .row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 11px 14px;
+            margin-bottom: 8px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.07);
+            border-radius: 10px;
+            transition: background 0.2s, border-color 0.2s;
+        }
+        .row:hover { background: rgba(168,85,247,0.08); border-color: rgba(168,85,247,0.28); }
+        .row-left { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+        .row-top { display: flex; align-items: center; gap: 8px; }
+        .num { font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.25); min-width: 22px; }
+        .name {
+            font-size: 13px; font-weight: 600; color: #e4e4e7;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .sub { font-size: 11px; color: #71717a; padding-left: 30px; }
+        .amount {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700; font-size: 14px;
+            color: #a855f7; white-space: nowrap; flex-shrink: 0;
+        }
+        .amount-unit { font-size: 10px; color: #71717a; font-weight: 500; margin-left: 3px; }
+        </style>
+        """
+
+        bid_rows_html = ""
         for i, bid in enumerate(top_bids, 1):
             project_name = bid.get('project_name', 'Unnamed Project')
             category = bid.get('category', '') or 'General'
             bid_amount = bid.get('final_bid_amount', 0) or 0
-            amount_cr = bid_amount / 100 
-            
-            html_rows += f"""
-            <div class="list-row">
-                <div style="display:flex; flex-direction:column; gap:2px; max-width:65%;">
-                    <span class="list-name" title="{project_name}">
-                        <span style="color:rgba(255,255,255,0.3);margin-right:8px;">{i:02d}</span>{project_name}
-                    </span>
-                    <span style="font-size:11px; color:#71717a; padding-left:24px;">{category}</span>
-                </div>
-                <div class="list-amount">₹{amount_cr:.2f} <span style="font-size:10px;color:#71717a">Cr</span></div>
-            </div>
-            """
-        html_rows += '</div>'
+            amount_cr = bid_amount / 100
+            bid_rows_html += (
+                f'<div class="row">'
+                f'<div class="row-left">'
+                f'<div class="row-top"><span class="num">{i:02d}</span><span class="name" title="{project_name}">{project_name}</span></div>'
+                f'<span class="sub">{category}</span>'
+                f'</div>'
+                f'<div class="amount">{chr(8377)}{amount_cr:.2f}<span class="amount-unit">Cr</span></div>'
+                f'</div>'
+            )
 
-        st.markdown(html_rows, unsafe_allow_html=True)
+        full_bid_html = BID_LIST_CSS + f'<div class="list-wrap">{bid_rows_html}</div>'
+        components.html(full_bid_html, height=330, scrolling=False)
 
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# COMPETITIVE INTEL WIDGET  — Past Proposal Analyzer Stats
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+st.markdown("<div class='section-title'>📊 Competitive Intelligence</div>", unsafe_allow_html=True)
+
+# Fetch live stats from bid_history_v2
+ci_avg_bid = 0.0
+ci_win_rate = 0.0
+ci_count = 0
+ci_total_value = 0.0
+try:
+    company_id = st.session_state.get("active_company_id")
+    if company_id:
+        ci_resp = supabase.table("bid_history_v2").select("final_bid_amount, won").eq("company_id", company_id).execute()
+        if ci_resp.data:
+            ci_count = len(ci_resp.data)
+            bids_lakh = [r["final_bid_amount"] for r in ci_resp.data if r.get("final_bid_amount")]
+            if bids_lakh:
+                ci_avg_bid = (sum(bids_lakh) / len(bids_lakh)) * 100_000
+                ci_total_value = sum(bids_lakh) * 100_000
+            wins_ci = [r for r in ci_resp.data if r.get("won") is True]
+            ci_win_rate = (len(wins_ci) / ci_count * 100) if ci_count > 0 else 0
+except Exception:
+    pass
+
+def format_inr_dash(number):
+    try:
+        number = float(number)
+        if number >= 10_000_000:
+            return f"₹{number/10_000_000:.2f} Cr"
+        elif number >= 100_000:
+            return f"₹{number/100_000:.2f} L"
+        else:
+            return f"₹{number:,.0f}"
+    except Exception:
+        return "₹0"
+
+ci_col1, ci_col2, ci_col3, ci_col4 = st.columns([1, 1, 1, 1.5])
+
+CI_CARD_CSS = """
+<style>
+.ci-card {
+    background: linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.01));
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.10);
+    border-radius: 16px;
+    padding: 20px 20px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+}
+.ci-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 2px;
+    background: linear-gradient(90deg, transparent, #a855f7, transparent);
+    opacity: 0.5;
+}
+.ci-lbl { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; color: rgba(244,244,245,0.55); margin-bottom: 6px; }
+.ci-val { font-size: 24px; font-weight: 700; font-family: 'JetBrains Mono', monospace; color: #fff; }
+</style>
+"""
+st.markdown(CI_CARD_CSS, unsafe_allow_html=True)
+
+with ci_col1:
+    st.markdown(f"""
+    <div class="ci-card">
+        <div class="ci-lbl">Saved Bids</div>
+        <div class="ci-val">{ci_count if ci_count > 0 else "—"}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+with ci_col2:
+    st.markdown(f"""
+    <div class="ci-card">
+        <div class="ci-lbl">Avg Bid Amount</div>
+        <div class="ci-val" style="color:#c084fc;">{format_inr_dash(ci_avg_bid) if ci_avg_bid > 0 else "—"}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+with ci_col3:
+    win_color = "#4ade80" if ci_win_rate >= 50 else "#fbbf24" if ci_win_rate >= 25 else "#f87171"
+    st.markdown(f"""
+    <div class="ci-card">
+        <div class="ci-lbl">Win Rate</div>
+        <div class="ci-val" style="color:{win_color};">{f"{ci_win_rate:.0f}%" if ci_count > 0 else "—"}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+with ci_col4:
+    st.markdown(f"""
+    <div class="ci-card" style="display:flex;flex-direction:column;gap:12px;">
+        <div>
+            <div class="ci-lbl">Total Bid Value</div>
+            <div class="ci-val" style="font-size:20px;color:#fbbf24;">{format_inr_dash(ci_total_value) if ci_total_value > 0 else "—"}</div>
+        </div>
+        <div style="font-size:11.5px;color:rgba(255,255,255,0.40);line-height:1.5;">
+            {"Analyze past tenders to discover winning patterns & avg budgets." if ci_count == 0 else f"Based on {ci_count} bid strateg{'y' if ci_count == 1 else 'ies'} saved."}
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
+    if st.button("🔍 Analyze Past Tenders", use_container_width=True, key="dash_goto_ppa"):
+        st.switch_page("pages/pastProposalAnalyzer.py")
+
+st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
 # REGULATORY & BID DOCUMENTATION (Scrollable Container)
 st.markdown("<div class='section-title'>Regulatory & Bid Documentation Updates</div>", unsafe_allow_html=True)

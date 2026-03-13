@@ -8,7 +8,7 @@ supabase = create_client(
 )
 
 
-@st.cache_data(ttl=15)
+@st.cache_data(ttl=30)
 def get_tenders():
     response = (
         supabase
@@ -19,7 +19,7 @@ def get_tenders():
     return response.data or []
 
 
-@st.cache_data(ttl=15)
+@st.cache_data(ttl=30)
 def get_bids():
     response = (
         supabase
@@ -30,12 +30,13 @@ def get_bids():
     return response.data or []
 
 
-@st.cache_data(ttl=15)
+@st.cache_data(ttl=30)
 def get_generated_tenders():
     response = (
         supabase
         .table("generated_tenders")
         .select("*")
+        .order("created_at", desc=True)
         .execute()
     )
     return response.data or []
@@ -59,8 +60,7 @@ def get_pending_bids():
         supabase
         .table("bid_history_v2")
         .select("id, project_name, category, won")
+        .is_("won", "null")
         .execute()
     )
-    # Filter for NULL won values - Supabase returns None for SQL NULL
-    data = response.data or []
-    return [bid for bid in data if bid.get("won") is None]
+    return response.data or []

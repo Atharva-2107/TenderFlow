@@ -692,9 +692,16 @@ async def upload_tender(
                 if i % (EMBED_BATCH_SIZE * 2) == 0:
                     gc.collect()
             
-            vectorstore.save_local(index_path)
-            total_time = time.time() - start_time
-            print(f"[HIGH-QUALITY HYBRID COMPLETE] Index saved with {total_chunks} chunks in {total_time:.2f}s")
+            if vectorstore is not None:
+                vectorstore.save_local(index_path)
+                total_time = time.time() - start_time
+                print(f"[HIGH-QUALITY HYBRID COMPLETE] Index saved with {total_chunks} chunks in {total_time:.2f}s")
+            else:
+                total_time = time.time() - start_time
+                print(f"[HIGH-QUALITY HYBRID] WARNING: No chunks extracted, index not saved")
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+                raise HTTPException(status_code=500, detail="No text could be extracted from the PDF. The document may be image-only or corrupted.")
             
         else:
             # FAST-QUALITY MODE: Parse PDF with PyMuPDF (15-21x faster than PyPDF)
@@ -731,9 +738,40 @@ async def upload_tender(
                 
                 gc.collect()
             
-            vectorstore.save_local(index_path)
-            total_time = time.time() - start_time
-            print(f"[FAST-QUALITY MODE COMPLETE] Index saved with {total_chunks} chunks in {total_time:.2f}s")
+            if vectorstore is not None:
+                vectorstore.save_local(index_path)
+                total_time = time.time() - start_time
+                print(f"[FAST-QUALITY MODE COMPLETE] Index saved with {total_chunks} chunks in {total_time:.2f}s")
+            else:
+                # AUTO-FALLBACK: Fast mode yielded 0 chunks → retry with OCR
+                print(f"[FAST-QUALITY MODE] WARNING: No text extracted via PyMuPDF. Auto-falling back to High-Quality OCR...")
+                
+                docs = parse_pdf_hybrid_quality(temp_path)
+                split_docs = text_splitter.split_documents(docs)
+                total_chunks = len(split_docs)
+                print(f"[FALLBACK OCR] Got {total_chunks} chunks from OCR parsing")
+                
+                EMBED_BATCH_SIZE_FB = 100
+                vectorstore = None
+                for i in range(0, total_chunks, EMBED_BATCH_SIZE_FB):
+                    batch = split_docs[i:i + EMBED_BATCH_SIZE_FB]
+                    if vectorstore is None:
+                        vectorstore = FAISS.from_documents(batch, embeddings)
+                    else:
+                        vectorstore.add_documents(batch)
+                    if i % (EMBED_BATCH_SIZE_FB * 2) == 0:
+                        gc.collect()
+                
+                if vectorstore is not None:
+                    vectorstore.save_local(index_path)
+                    total_time = time.time() - start_time
+                    print(f"[FALLBACK OCR COMPLETE] Index saved with {total_chunks} chunks in {total_time:.2f}s")
+                else:
+                    total_time = time.time() - start_time
+                    print(f"[FALLBACK OCR] FAILED: Still no text extracted after OCR")
+                    if os.path.exists(temp_path):
+                        os.remove(temp_path)
+                    raise HTTPException(status_code=500, detail="No text could be extracted from the PDF even with OCR. The document may be corrupted.")
         
         # Cleanup
         if os.path.exists(temp_path):
@@ -1151,6 +1189,266 @@ async def retrain_model_endpoint():
         print(f"Retraining Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
+# ══════════════════════════════════════════════════════════════════
+# PAST PROPOSAL ANALYZER  –  Multi-tender analysis endpoint
+# ══════════════════════════════════════════════════════════════════
+import re as _re
+from typing import List as _List
+
+def _extract_budget_from_text(text: str) -> float:
+    """
+    Extract estimated budget (in absolute Rs.) from tender text.
+    Handles: ₹ symbol, Rs./INR prefix, Lakh/Crore multipliers.
+    Returns 0.0 if nothing found.
+    """
+    # ── 1. Patterns that capture value AND optional unit (lakh/crore) ──────────────
+    # Each pattern must have group(1) = numeric string, optional group(2) = unit
+    labeled_patterns = [
+        # ₹ symbol directly after label
+        r"(?:Estimated\s+(?:Cost|Amount|Value)|Tender\s+(?:Value|Amount)|Approximate\s+(?:Cost|Value)|Total\s+(?:Estimated|Amount))[^\n]{0,80}₹\s*([\d,\.]+)\s*(Lakh|Lakhs|Lac|Lacs|L|Crore|Crores|Cr|CR|C)?",
+        # Rs./INR after label
+        r"(?:Estimated\s+(?:Cost|Amount|Value)|Tender\s+(?:Value|Amount)|Approximate\s+(?:Cost|Value)|Total\s+(?:Estimated|Amount))[^\n]{0,80}(?:Rs\.?|INR)\s*([\d,\.]+)\s*(Lakh|Lakhs|Lac|Lacs|L|Crore|Crores|Cr|CR|C)?",
+        # Value in parentheses with unit label
+        r"(?:Rs\.?|INR|₹)\s*([\d,\.]+)\s*(Lakh|Lakhs|Lac|Lacs|Crore|Crores|Cr)\b",
+        # Plain ₹ amount with unit nearby
+        r"₹\s*([\d,\.]+)\s*(Lakh|Lakhs|Lac|Lacs|L|Crore|Crores|Cr|CR)?",
+        # Number followed by Crore/Lakh (written as words) near cost keywords
+        r"(?:cost|value|amount|budget)[^\n]{0,60}([\d,\.]+)\s*(Lakh|Lakhs|Lac|Lacs|Crore|Crores)",
+        # Fallback: any Rs./INR amount >= 4 digits
+        r"(?:Rs\.?|INR)\s*([\d,\.]{5,})",
+    ]
+
+    for pat in labeled_patterns:
+        m = _re.search(pat, text, _re.IGNORECASE)
+        if m:
+            try:
+                val_str = m.group(1).replace(",", "")
+                val = float(val_str)
+                if val == 0:
+                    continue
+                # Apply multiplier
+                unit = (m.group(2) or "").strip().lower() if m.lastindex and m.lastindex >= 2 else ""
+                if unit in ("lakh", "lakhs", "lac", "lacs", "l"):
+                    val *= 100_000
+                elif unit in ("crore", "crores", "cr", "c"):
+                    val *= 10_000_000
+                if val > 1_000:  # sanity: must be at least ₹1000
+                    return val
+            except (ValueError, IndexError, AttributeError):
+                continue
+    return 0.0
+
+
+def _extract_emd_from_text(text: str) -> float:
+    """Extract EMD/Earnest Money amount from tender text."""
+    patterns = [
+        r"(?:EMD|Earnest\s+Money(?:\s+Deposit)?)[^\n₹]{0,80}₹\s*([\d,\.]+)\s*(Lakh|Lakhs|Lac|Crore|Crores|Cr)?",
+        r"(?:EMD|Earnest\s+Money(?:\s+Deposit)?)[^\n]{0,80}(?:Rs\.?|INR)\s*([\d,\.]+)\s*(Lakh|Lakhs|Lac|Crore|Crores|Cr)?",
+        r"(?:Rs\.?|INR|₹)\s*([\d,\.]+)[^\n]{0,40}(?:EMD|Earnest\s+Money)",
+    ]
+    for pat in patterns:
+        m = _re.search(pat, text, _re.IGNORECASE)
+        if m:
+            try:
+                val = float(m.group(1).replace(",", ""))
+                if val == 0:
+                    continue
+                unit = (m.group(2) or "").strip().lower() if m.lastindex and m.lastindex >= 2 else ""
+                if unit in ("lakh", "lakhs", "lac"):
+                    val *= 100_000
+                elif unit in ("crore", "crores", "cr"):
+                    val *= 10_000_000
+                return val
+            except (ValueError, IndexError, AttributeError):
+                continue
+    return 0.0
+
+
+@app.post("/analyze-past-tenders")
+async def analyze_past_tenders(files: _List[UploadFile] = File(...)):
+    """
+    Analyze multiple past tender PDFs.
+    Returns: per-tender budgets, aggregate stats, qualification patterns, winning insights.
+    """
+    if not files:
+        raise HTTPException(status_code=400, detail="No files uploaded")
+
+    return await _run_tender_analysis_on_files(files)
+
+
+@app.get("/analyze-sample-tenders")
+async def analyze_sample_tenders():
+    """
+    Auto-analyze all sample tenders from the sample_tenders/ directory.
+    Returns the same structure as /analyze-past-tenders.
+    """
+    sample_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "sample_tenders")
+    if not os.path.isdir(sample_dir):
+        raise HTTPException(status_code=404, detail=f"sample_tenders directory not found at {sample_dir}")
+
+    pdf_files = [f for f in os.listdir(sample_dir) if f.lower().endswith(".pdf")]
+    if not pdf_files:
+        raise HTTPException(status_code=404, detail="No PDF files found in sample_tenders/")
+
+    results = []
+    all_text = ""
+
+    for fname in pdf_files:
+        fpath = os.path.join(sample_dir, fname)
+        try:
+            doc = fitz.open(fpath)
+            text = ""
+            for page in doc:
+                text += page.get_text() + "\n"
+            doc.close()
+
+            budget = _extract_budget_from_text(text)
+            emd = _extract_emd_from_text(text)
+
+            results.append({
+                "filename": fname,
+                "budget": budget,
+                "emd": emd,
+                "text_length": len(text),
+            })
+            all_text += f"\n--- TENDER: {fname} ---\n{text[:3000]}\n"
+        except Exception as e:
+            results.append({"filename": fname, "budget": 0, "emd": 0, "error": str(e)})
+
+    return await _build_analysis_response(results, all_text)
+
+
+async def _run_tender_analysis_on_files(files: _List[UploadFile]) -> dict:
+    """Core file-upload analysis logic shared by /analyze-past-tenders."""
+    results = []
+    all_text = ""
+
+    for f in files:
+        if not f.filename.lower().endswith(".pdf"):
+            continue
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+        try:
+            content = await f.read()
+            tmp.write(content)
+            tmp.close()
+
+            doc = fitz.open(tmp.name)
+            text = ""
+            for page in doc:
+                text += page.get_text() + "\n"
+            doc.close()
+
+            budget = _extract_budget_from_text(text)
+            emd = _extract_emd_from_text(text)
+
+            results.append({
+                "filename": f.filename,
+                "budget": budget,
+                "emd": emd,
+                "text_length": len(text),
+            })
+            all_text += f"\n--- TENDER: {f.filename} ---\n{text[:3000]}\n"
+        except Exception as e:
+            results.append({"filename": f.filename, "budget": 0, "emd": 0, "error": str(e)})
+        finally:
+            try:
+                os.unlink(tmp.name)
+            except Exception:
+                pass
+
+    return await _build_analysis_response(results, all_text)
+
+
+async def _build_analysis_response(results: list, all_text: str) -> dict:
+    """Build the final analysis JSON from parsed results + Groq AI insights."""
+    budgets = [r["budget"] for r in results if r["budget"] > 0]
+    avg_budget = sum(budgets) / len(budgets) if budgets else 0
+    min_budget = min(budgets) if budgets else 0
+    max_budget = max(budgets) if budgets else 0
+
+    patterns = []
+    insights = []
+    boq_items = []
+    try:
+        groq_key = os.environ.get("GROQ_API_KEY", "")
+        if groq_key and all_text.strip():
+            client = Groq(api_key=groq_key)
+            prompt = f"""Analyze these {len(results)} Indian government tender documents and provide:
+
+1. QUALIFICATION_CRITERIA: List the 5 most common qualification/eligibility requirements across all tenders (one per line, concise, realistic).
+2. WINNING_PATTERNS: List 4 key patterns or strategies that would help win these tenders (one per line, concise, actionable).
+3. COMMON_BOQ_ITEMS: List the 5 most frequently appearing BOQ item categories (one per line).
+
+Format EXACTLY as:
+QUALIFICATION_CRITERIA:
+- [criterion]
+WINNING_PATTERNS:
+- [pattern]
+COMMON_BOQ_ITEMS:
+- [item]
+
+Tender excerpts:
+{all_text[:7000]}"""
+
+            response = client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.3,
+                max_tokens=900,
+            )
+            reply = response.choices[0].message.content
+
+            current_section = None
+            for line in reply.split("\n"):
+                line = line.strip()
+                if "QUALIFICATION_CRITERIA" in line:
+                    current_section = "qual"; continue
+                elif "WINNING_PATTERNS" in line:
+                    current_section = "win"; continue
+                elif "COMMON_BOQ_ITEMS" in line:
+                    current_section = "boq"; continue
+                if line.startswith(("- ", "* ")):
+                    item = line[2:].strip()
+                    if current_section == "qual":
+                        patterns.append(item)
+                    elif current_section == "win":
+                        insights.append(item)
+                    elif current_section == "boq":
+                        boq_items.append(item)
+    except Exception as e:
+        print(f"AI analysis error (non-fatal): {e}")
+
+    return {
+        "tender_count": len(results),
+        "tenders": results,
+        "aggregate": {
+            "avg_budget": avg_budget,
+            "min_budget": min_budget,
+            "max_budget": max_budget,
+            "total_budget": sum(budgets),
+        },
+        "qualification_patterns": patterns or [
+            "Annual turnover >= 3x estimated cost in 3 of last 5 FYs",
+            "Similar work experience >= 80% of estimated cost",
+            "EMD via Bank Guarantee or FDR required",
+            "Valid GST registration and PAN mandatory",
+            "ISO/NABL certification for specialized works",
+        ],
+        "winning_insights": insights or [
+            "Competitive pricing within 90-95% of estimated budget",
+            "Strong technical qualification with relevant past projects",
+            "Lower overhead margins win more frequently",
+            "Joint ventures improve eligibility for large projects",
+        ],
+        "boq_categories": boq_items or [
+            "Earth excavation and grading works",
+            "Reinforced concrete (RCC/PCC) structures",
+            "Steel fabrication and erection",
+            "Electrical wiring and panel installation",
+            "Civil finishing works (plastering, flooring)",
+        ],
+    }
 
 if __name__ == "__main__":
     import uvicorn

@@ -40,20 +40,19 @@ def get_base64_of_bin_file(path):
 def format_inr(number):
     try:
         number = float(number)
+        if number == 0:
+            return "—"
         if number < 0:
             return "-" + format_inr(-number)
-        s, *d = str(f"{number:.2f}").partition(".")
-        if len(s) <= 3:
-            r = s
+        
+        if number >= 10_000_000:
+            return f"₹{number/10_000_000:.2f} Cr"
+        elif number >= 100_000:
+            return f"₹{number/100_000:.2f} L"
         else:
-            r = s[-3:]
-            s = s[:-3]
-            while s:
-                r = s[-2:] + "," + r
-                s = s[:-2]
-        return "₹" + r + "".join(d)
+            return f"₹{number:,.0f}"
     except Exception:
-        return f"₹{number:,.2f}"
+        return f"₹{number}"
 
 # ── Auth Guard ───────────────────────────────────────────────────────────────
 if not st.session_state.get("authenticated"):
@@ -301,12 +300,13 @@ with upload_col:
             key="ppa_uploader",
             label_visibility="collapsed"
         )
+        include_samples = st.checkbox("Also include 5 built-in Sample Tenders in analysis", value=False)
 
     # ── Action Buttons ──
     btn_c1, btn_c2 = st.columns(2)
     with btn_c1:
         analyze_clicked = st.button("🔍 Analyze Uploaded", use_container_width=True, key="btn_ppa_analyze",
-                                     disabled=(not past_files))
+                                     disabled=(not past_files and not include_samples))
     with btn_c2:
         sample_clicked = st.button("🧪 Use Sample Tenders", use_container_width=True, key="btn_ppa_samples")
 
@@ -332,7 +332,8 @@ with upload_col:
         with st.spinner("🧠 AI is analyzing your tenders..."):
             try:
                 api_files = [("files", (f.name, f.getvalue(), "application/pdf")) for f in past_files]
-                resp = requests.post("http://localhost:8000/analyze-past-tenders", files=api_files, timeout=90)
+                data = {"include_samples": "true" if include_samples else "false"}
+                resp = requests.post("http://localhost:8000/analyze-past-tenders", files=api_files, data=data, timeout=120)
                 if resp.status_code == 200:
                     st.session_state.ppa_analysis = resp.json()
                     st.toast(f"✅ Analyzed {st.session_state.ppa_analysis['tender_count']} tenders!")
@@ -342,8 +343,8 @@ with upload_col:
             except Exception as e:
                 st.error(f"Analysis failed: {e}")
 
-    elif analyze_clicked and not past_files:
-        st.warning("⚠️ Upload at least one PDF first.")
+    elif analyze_clicked and not past_files and not include_samples:
+        st.warning("⚠️ Upload at least one PDF or check the sample tenders box.")
 
     if sample_clicked:
         with st.spinner("🧪 Loading & analyzing sample tenders..."):

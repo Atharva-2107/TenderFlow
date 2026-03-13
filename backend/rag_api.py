@@ -1,4 +1,5 @@
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException
+from typing import Optional, List as _List
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import tempfile
@@ -1266,15 +1267,21 @@ def _extract_emd_from_text(text: str) -> float:
 
 
 @app.post("/analyze-past-tenders")
-async def analyze_past_tenders(files: _List[UploadFile] = File(...)):
+async def analyze_past_tenders(
+    files: Optional[_List[UploadFile]] = File(None),
+    include_samples: Optional[str] = Form("false")
+):
     """
     Analyze multiple past tender PDFs.
     Returns: per-tender budgets, aggregate stats, qualification patterns, winning insights.
     """
-    if not files:
-        raise HTTPException(status_code=400, detail="No files uploaded")
+    if files is None:
+        files = []
+    
+    if not files and (not include_samples or include_samples.lower() != "true"):
+        raise HTTPException(status_code=400, detail="No files uploaded or samples selected")
 
-    return await _run_tender_analysis_on_files(files)
+    return await _run_tender_analysis_on_files(files, include_samples.lower() == "true" if include_samples else False)
 
 
 @app.get("/analyze-sample-tenders")
@@ -1319,7 +1326,33 @@ async def analyze_sample_tenders():
     return await _build_analysis_response(results, all_text)
 
 
-async def _run_tender_analysis_on_files(files: _List[UploadFile]) -> dict:
+async def _predict_budget_from_text(text: str) -> float:
+    try:
+        groq_key = os.environ.get("GROQ_API_KEY", "")
+        if not groq_key or not text.strip(): return 0.0
+        import asyncio, re
+        
+        def call_groq():
+            client = Groq(api_key=groq_key)
+            prompt = f"Estimate or extract the total budget/estimated cost of this project in Indian Rupees (INR) from the text. Reply ONLY with the raw number (e.g. 15000000). If you cannot find or estimate it, reply with 0. No explanation, no symbols.\n\n{text[:8000]}"
+            resp = client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.0,
+                max_tokens=20
+            )
+            return resp.choices[0].message.content.strip()
+            
+        loop = asyncio.get_event_loop()
+        reply = await loop.run_in_executor(None, call_groq)
+        val_str = re.sub(r'[^\d\.]', '', reply)
+        return float(val_str) if val_str else 0.0
+    except Exception as e:
+        print(f"AI budget prediction error: {e}")
+        return 0.0
+
+
+async def _run_tender_analysis_on_files(files: _List[UploadFile], include_samples: bool = False) -> dict:
     """Core file-upload analysis logic shared by /analyze-past-tenders."""
     results = []
     all_text = ""
@@ -1340,6 +1373,8 @@ async def _run_tender_analysis_on_files(files: _List[UploadFile]) -> dict:
             doc.close()
 
             budget = _extract_budget_from_text(text)
+            if budget == 0.0:
+                budget = await _predict_budget_from_text(text)
             emd = _extract_emd_from_text(text)
 
             results.append({
@@ -1356,6 +1391,34 @@ async def _run_tender_analysis_on_files(files: _List[UploadFile]) -> dict:
                 os.unlink(tmp.name)
             except Exception:
                 pass
+
+    if include_samples:
+        sample_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "sample_tenders")
+        if os.path.isdir(sample_dir):
+            pdf_files = [f for f in os.listdir(sample_dir) if f.lower().endswith(".pdf")]
+            for fname in pdf_files:
+                fpath = os.path.join(sample_dir, fname)
+                try:
+                    doc = fitz.open(fpath)
+                    text = ""
+                    for page in doc:
+                        text += page.get_text() + "\n"
+                    doc.close()
+
+                    budget = _extract_budget_from_text(text)
+                    if budget == 0.0:
+                        budget = await _predict_budget_from_text(text)
+                    emd = _extract_emd_from_text(text)
+
+                    results.append({
+                        "filename": fname,
+                        "budget": budget,
+                        "emd": emd,
+                        "text_length": len(text),
+                    })
+                    all_text += f"\n--- TENDER: {fname} ---\n{text[:3000]}\n"
+                except Exception as e:
+                    results.append({"filename": fname, "budget": 0, "emd": 0, "error": str(e)})
 
     return await _build_analysis_response(results, all_text)
 

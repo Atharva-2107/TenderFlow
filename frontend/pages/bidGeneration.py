@@ -899,19 +899,26 @@ a:hover { text-decoration: underline !important; }
                             ]
                             for pat in patterns:
                                 m = re.search(pat, text, re.IGNORECASE)
-                                if m:
+                                # if m:
+                                #     try:
+                                #         val_str = m.group(1).replace(",", "")
+                                #         val = float(val_str)
+                                #         unit = (m.group(2) or "").lower()
+                                #         if unit in ("lakh", "l"):
+                                #             val *= 100000
+                                #         elif unit in ("crore", "cr"):
+                                #             val *= 10000000
+                                #         return val
+                                #     except (IndexError, ValueError):
+                                #         continue
+                                if m and m.group(1):
                                     try:
-                                        val_str = m.group(1).replace(",", "")
-                                        val = float(val_str)
-                                        unit = (m.group(2) or "").lower()
-                                        if unit in ("lakh", "l"):
-                                            val *= 100000
-                                        elif unit in ("crore", "cr"):
-                                            val *= 10000000
-                                        return val
-                                    except (IndexError, ValueError):
+                                        # Clean the string and convert to float
+                                        return float(m.group(1).replace(",", ""))
+                                    except ValueError:
                                         continue
                             return 0.0
+
 
                         tender_data = {
                             "estimated_budget": extract_amount("Estimated Cost|Tender Value|Estimated Amount|Approximate Value|Total Estimated"),

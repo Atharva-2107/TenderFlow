@@ -451,6 +451,8 @@ if analyze_button:
                 else:
                     st.error(f"Error {response.status_code}: {response.text}")
             except Exception as e:
+                import traceback
+                traceback.print_exc()
                 st.error(f"Connection Error: {e}")
                 st.info("Make sure 'rag_api.py' is running.")
     else:

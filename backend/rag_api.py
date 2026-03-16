@@ -67,36 +67,23 @@ def parse_pdf_fast_quality(file_path: str) -> list:
         total_pages = len(pdf_document)
         print(f"[FAST-QUALITY] Parsing {total_pages} pages with PyMuPDF...")
         
-        # Process pages in parallel for maximum speed
-        def extract_page(page_num):
-            page = pdf_document[page_num]
-            # Extract text with layout preservation
-            text = page.get_text("text", sort=True)  # sort=True preserves reading order
-            return Document(
-                page_content=text,
-                metadata={
-                    "source": file_path,
-                    "page": page_num + 1,
-                    "parser": "pymupdf_fast_quality"
-                }
-            )
-        
-        # Use ThreadPoolExecutor for parallel page extraction
-        # OPTIMIZATION: Limit workers to prevent system freeze
-        max_workers = min(4, os.cpu_count() or 4)
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = {executor.submit(extract_page, i): i for i in range(total_pages)}
-            for future in as_completed(futures):
-                page_num = futures[future]
-                try:
-                    doc = future.result()
-                    if doc.page_content.strip():  # Only add non-empty pages
-                        docs.append(doc)
-                except Exception as e:
-                    print(f"[FAST-QUALITY] Page {page_num} extraction error: {e}")
-        
-        # Sort docs by page number to maintain order
-        docs.sort(key=lambda x: x.metadata.get("page", 0))
+        # Process pages sequentially because PyMuPDF (fitz) is NOT thread-safe.
+        # Concurrent access to pdf_document can corrupt C++ pointers and cause SWIG to return NotImplementedType.
+        for page_num in range(total_pages):
+            try:
+                page = pdf_document[page_num]
+                text = page.get_text("text", sort=True)
+                if text.strip():
+                    docs.append(Document(
+                        page_content=text,
+                        metadata={
+                            "source": file_path,
+                            "page": page_num + 1,
+                            "parser": "pymupdf_fast_quality"
+                        }
+                    ))
+            except Exception as e:
+                print(f"[FAST-QUALITY] Page {page_num} extraction error: {e}")
         
         pdf_document.close()
         print(f"[FAST-QUALITY] Successfully extracted {len(docs)} documents")

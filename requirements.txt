@@ -106,7 +106,7 @@ networkx>=3.0
 nibabel==5.3.3
 nipype==1.10.0
 nltk==3.9.2
-numpy<2.3.0
+numpy==1.26.4
 ollama==0.6.1
 onnxruntime==1.23.2
 orjson==3.11.5

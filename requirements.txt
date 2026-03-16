@@ -222,3 +222,5 @@ xhtml2pdf==0.2.17
 xxhash==3.6.0
 yarl==1.22.0
 zstandard==0.25.0
+selenium
+webdriver-manager

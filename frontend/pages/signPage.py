@@ -22,9 +22,7 @@ def load_env():
             return True
     return False
 
-if not load_env():
-    st.error(".env file not found")
-    st.stop()
+load_env()
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")

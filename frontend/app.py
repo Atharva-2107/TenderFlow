@@ -15,8 +15,8 @@ load_dotenv(dotenv_path=env_path)
 
 @st.cache_resource
 def get_supabase() -> Client:
-    url = os.getenv("SUPABASE_URL")
-    key = os.getenv("SUPABASE_KEY")
+    url = os.getenv("SUPABASE_URL") or os.getenv("SUPABASE_URL")
+    key = os.getenv("SUPABASE_KEY") or os.getenv("SUPABASE_KEY")
     
     # This prevents the Pylance 'None' error by ensuring strings exist
     if not url or not key:

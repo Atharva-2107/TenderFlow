@@ -10,6 +10,15 @@ from io import BytesIO
 from xhtml2pdf import pisa
 from utils.auth import can_access
 
+# API Configuration: Use Render URL by default, fallback to localhost for dev
+API_BASE_URL = os.environ.get(
+    "API_BASE_URL",
+    "https://tenderflow-iwpl.onrender.com"
+)
+# Override to localhost if explicitly running in dev mode
+if os.environ.get("TENDERFLOW_ENV", "").lower() == "dev":
+    API_BASE_URL = "http://127.0.0.1:8000"
+
 
 # Now import from components
 # try:
@@ -62,96 +71,113 @@ def create_analysis_pdf(markdown_content: str) -> bytes:
         <style>
             @page {{
                 size: A4;
-                margin: 2cm;
-                @bottom-right {{
-                    content: "Page " counter(page);
-                    font-size: 9pt;
-                    color: #666;
-                }}
+                margin: 20mm 15mm 20mm 15mm;
             }}
             body {{
                 font-family: 'Helvetica', 'Arial', sans-serif;
-                font-size: 10pt;
-                line-height: 1.5;
-                color: #222;
+                font-size: 11pt;
+                line-height: 1.6;
+                color: #333333;
                 text-align: justify;
             }}
-            h1 {{ 
-                font-size: 20pt; 
-                color: #1a202c; 
-                border-bottom: 2px solid #2d3748; 
-                padding-bottom: 8px; 
-                margin-top: 0;
-                margin-bottom: 20px;
+            h1 {{
+                font-size: 22pt;
+                color: #1e3a8a;
+                text-transform: uppercase;
+                text-align: center;
+                border-bottom: 3px solid #1e3a8a;
+                padding-bottom: 10px;
+                margin-bottom: 25px;
             }}
-            h2 {{ 
-                font-size: 16pt; 
-                color: #2c5282; 
-                margin-top: 25px; 
-                margin-bottom: 12px;
-                border-bottom: 1px solid #e2e8f0;
-                padding-bottom: 4px;
+            h2 {{
+                font-size: 15pt;
+                color: #2563eb;
+                margin-top: 30px;
+                margin-bottom: 15px;
+                border-bottom: 1px solid #d1d5db;
+                padding-bottom: 5px;
             }}
-            h3 {{ 
-                font-size: 12pt; 
-                color: #2d3748; 
-                margin-top: 20px; 
-                margin-bottom: 8px; 
+            h3 {{
+                font-size: 13pt;
+                color: #1f2937;
+                margin-top: 20px;
+                margin-bottom: 10px;
                 font-weight: bold;
             }}
-            p {{ margin-bottom: 10px; }}
+            p {{ margin-bottom: 12px; }}
             table {{
                 width: 100%;
                 border-collapse: collapse;
                 margin: 20px 0;
-                font-size: 9pt;
             }}
             th {{
-                background-color: #f7fafc;
-                color: #2d3748;
+                background-color: #1e3a8a;
+                color: #ffffff;
                 font-weight: bold;
-                padding: 10px;
+                padding: 12px;
                 text-align: left;
-                border: 1px solid #cbd5e0;
+                border: 1px solid #1e3a8a;
             }}
             td {{
-                padding: 10px;
-                border: 1px solid #e2e8f0;
+                padding: 10px 12px;
+                border: 1px solid #e5e7eb;
                 vertical-align: top;
             }}
-            tr:nth-child(even) {{ background-color: #f8f9fa; }}
+            tr:nth-child(even) {{ background-color: #f3f4f6; }}
             ul, ol {{ margin-left: 20px; margin-bottom: 15px; }}
-            li {{ margin-bottom: 5px; }}
+            li {{ margin-bottom: 8px; }}
             blockquote {{
-                border-left: 4px solid #4299e1;
-                background-color: #ebf8ff;
-                padding: 10px;
-                margin: 15px 0;
+                border-left: 4px solid #3b82f6;
+                background-color: #eff6ff;
+                padding: 15px;
+                margin: 20px 0;
+                color: #1e40af;
                 font-style: italic;
-                color: #2b6cb0;
             }}
             .header {{
                 text-align: center;
-                margin-bottom: 30px;
+                margin-bottom: 40px;
+                padding: 30px 20px;
+                background-color: #f8fafc;
+                border: 2px solid #e2e8f0;
+                border-radius: 6px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.05);
             }}
             .header-logo {{
-                font-size: 24pt;
+                font-size: 26pt;
                 font-weight: bold;
-                color: #2b4c7e;
+                color: #0f172a;
+                letter-spacing: 1px;
+                border-bottom: 1px solid #cbd5e1;
+                padding-bottom: 10px;
+                margin-bottom: 10px;
             }}
             .header-sub {{
-                font-size: 10pt;
-                color: #718096;
-                margin-top: 5px;
+                font-size: 11pt;
+                color: #64748b;
+                text-transform: uppercase;
+                letter-spacing: 2px;
+                font-weight: bold;
+            }}
+            .footer {{
+                text-align: center;
+                font-size: 9pt;
+                color: #94a3b8;
+                margin-top: 50px;
+                border-top: 1px solid #e2e8f0;
+                padding-top: 15px;
             }}
         </style>
     </head>
     <body>
         <div class="header">
-            <div class="header-logo">TenderFlow AI</div>
-            <div class="header-sub">Professional Tender Analysis Report</div>
+            <div class="header-logo">Tender Document Analysis</div>
+            <div class="header-sub">Proprietary Analytical Report • TenderFlow AI</div>
         </div>
         {html_body}
+        <div class="footer">
+            Generated securely by Tender Summarizer Studio | Confidential Report
+        </div>
     </body>
     </html>
     """
@@ -425,7 +451,7 @@ if analyze_button:
                 
                 # Call Backend
                 # Increased timeout to 600s (10 min) for large High-Quality jobs
-                response = requests.post("http://127.0.0.1:8000/analyze-tender", files=files, data=data, timeout=600)
+                response = requests.post(f"{API_BASE_URL}/analyze-tender", files=files, data=data, timeout=600)
                 
                 if response.status_code == 200:
                     result = response.json()
@@ -433,7 +459,12 @@ if analyze_button:
                     
                     # Generate PROFESSIONAL PDF using xhtml2pdf (same as tenderGeneration)
                     with st.spinner("📄 Generating PDF Report..."):
-                        st.session_state.pdf_bytes = create_analysis_pdf(st.session_state.summary_result)
+                        try:
+                            st.session_state.pdf_bytes = create_analysis_pdf(st.session_state.summary_result)
+                        except TypeError as pdf_err:
+                            # Guard against xhtml2pdf 'NotImplementedType' CSS parsing errors
+                            st.warning(f"PDF generation encountered a non-critical issue: {pdf_err}. You can still view the summary below.")
+                            st.session_state.pdf_bytes = None
                     
                     st.session_state.show_summary = True
                     st.session_state.copy_status = "📋 Copy Summary"

@@ -535,14 +535,11 @@ def generate_summary_with_groq(user_query, retrieved_chunks, output_format):
     - If format is 'Technical Narrative', write in professional prose.
     - If format is 'Compliance Matrix', list requirements vs compliance status.
     - STRICTLY base your answer on the provided Context.
-    - IMPORTANT: Provide a COMPREHENSIVE and DETAILED response. 
-    - For large documents, ensure you capture ALL key requirements, dates, and eligibility criteria.
-    - The summary should be thorough (target 20-25 pages of content, approx 6000-8000 words).
-    - BE EXTREMELY DETAILED AND VERBOSE. 
-    - Expand on every single point. Do not use summary bullets; use long, detailed paragraphs.
-    - Quote specific clauses verbatim where appropriate to add length and precision.
-    - Include all specific technical requirements and clause numbers found.
-    - Do not leave any section brief. If a section seems short, expand it with relevant context from the tender.
+    - IMPORTANT: Provide a CONCISE and HIGHLIGHT-FOCUSED response.
+    - Ensure you capture the most critical requirements, dates, and eligibility criteria.
+    - The summary should be brief, highly readable, and directly to the point.
+    - AVOID unnecessary verbosity. Use well-structured formatting and concise points.
+    - Include specific technical requirements and clause numbers where absolutely necessary.
     
     NEGATIVE CONSTRAINTS:
     - Do NOT include any introductory or concluding remarks (e.g., "Here is the analysis...", "Please note...").

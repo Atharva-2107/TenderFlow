@@ -37,7 +37,7 @@ if not can_access("tender_generation"):
 
 
 # BACKEND CONFIG (PRESERVED)
-API_BASE_URL = "http://localhost:8000"
+API_BASE_URL = "https://tenderflow-iwpl.onrender.com"
 
 url = os.environ.get("SUPABASE_URL")
 key = os.environ.get("SUPABASE_KEY")

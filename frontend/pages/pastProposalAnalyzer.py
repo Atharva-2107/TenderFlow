@@ -333,7 +333,7 @@ with upload_col:
             try:
                 api_files = [("files", (f.name, f.getvalue(), "application/pdf")) for f in past_files]
                 data = {"include_samples": "true" if include_samples else "false"}
-                resp = requests.post("http://localhost:8000/analyze-past-tenders", files=api_files, data=data, timeout=120)
+                resp = requests.post("https://tenderflow-iwpl.onrender.com/analyze-past-tenders", files=api_files, data=data, timeout=120)
                 if resp.status_code == 200:
                     st.session_state.ppa_analysis = resp.json()
                     st.toast(f"✅ Analyzed {st.session_state.ppa_analysis['tender_count']} tenders!")
